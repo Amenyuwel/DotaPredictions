@@ -46,6 +46,20 @@ function validPayload() {
       gatesForced: [],
       isCurrent: true,
     },
+    scoring: {
+      version: "ti2026-client",
+      verifiedAgainstClient: true,
+      colors: ["red", "blue", "green"],
+      stats: {
+        smokes_used: { perUnit: 293, base: 0, color: "blue", measurable: true, source: "smokes_used" },
+        lotuses_grabbed: { perUnit: 176, base: 0, color: "blue", measurable: false, source: null },
+      },
+      quality: { tier_ii: 0.3, tier_iv: 1.0 },
+      traits: {
+        friendly: { bonus: 0.5, adjacentBonus: 0, condition: "at least 3 Friendly" },
+        vampiric: { bonus: 0.5, adjacentBonus: -0.1, condition: null },
+      },
+    },
     teams: [{ teamId: 1, tournamentId: "ti2026", name: "Team Spirit", alsoTeamIds: [] }],
     players: [
       {

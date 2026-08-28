@@ -18,7 +18,7 @@ answers from whoever is looking:
 
 | `/api/health` | Means | Fix |
 |---|---|---|
-| `unconfigured` | no `MONGODB_URI` | set it |
+| `unconfigured` | neither `RUN_FILE` nor `MONGODB_URI` | set one |
 | `empty` | connected, nothing published, or the database is unreachable | publish a run |
 | `ready` | serving | — |
 
@@ -36,17 +36,28 @@ that decodes into a matrix with every column shifted.
 ## Endpoints
 
 ```
-GET /api/health         load state and why
-GET /api/run/current    run metadata, teams, players, emblem catalog
+GET  /api/health         load state and why
+GET  /api/run/current    run metadata, teams, players, emblem catalog
+POST /api/player/rank    { role, emblems:[{emblemId, order}] } -> ranked units
 ```
+
+`RUN_FILE` loads a run from a `publish.py --out` payload instead of Mongo. It is
+validated by the same schema on the same code path, so it is a real run that
+skips the database -- which is what makes the whole stack runnable before Atlas
+exists.
+
+`/api/player/rank` ranks a team's **duo** for core and support and a single
+player for mid, because the client scores a role rather than a person. `role` is
+required for exactly that reason. Answers are memoised per run and body: a run
+is immutable, so the same banner has the same answer for the life of the
+process. Cold ~115ms for eight units, warm ~2ms.
 
 `/api/run/current` returns 404 with a `reason` and a `hint` when nothing is
 published — that is a state for the client to render, not an error. Sample
 matrices are not returned: they are megabytes of Float32 that only the scorer
 reads.
 
-Not built yet: `/api/player/rank`, `/api/banner/optimize`, `/api/roster/score`.
-The LRU memo for POST bodies arrives with the first POST endpoint, not before.
+Not built yet: `/api/banner/optimize`, `/api/roster/score`.
 
 ## Layout
 
@@ -55,6 +66,7 @@ src/config.ts      every knob, read from the environment once
 src/validate.ts    the contract, and the crash that enforces it
 src/run-store.ts   the in-memory run, loaded once at boot
 src/routes/        one file per resource
+src/scoring/       decode, banner arithmetic, seeded RNG, E[best series]
 src/app.ts         wiring; the only file that knows the order
 ```
 

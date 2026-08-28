@@ -211,6 +211,43 @@ def build_players(cfg: Config, tournament_id: str) -> list[dict[str, Any]]:
     ]
 
 
+def build_scoring(cfg: Config) -> dict[str, Any]:
+    """The scoring table itself, published rather than reimplemented.
+
+    Without this the server would need its own copy of `scoring.yaml` to turn a
+    stat line into points, and two copies of a table drift silently. Base values
+    are wildly unequal -- Creep Score pays 3 per unit and Roshan 1,172 -- so a
+    raw rate is meaningless until it is multiplied through these numbers.
+
+    Trait adjacency travels too: an emblem's displayed percentage depends on its
+    NEIGHBOURS, so the server cannot derive an ordering's value without it.
+    """
+    traits = {}
+    for name, spec in (cfg.scoring.traits or {}).items():
+        traits[name] = {
+            "bonus": float(spec.get("bonus") or 0.0),
+            "adjacentBonus": float(spec.get("adjacent_bonus") or 0.0),
+            "condition": spec.get("condition"),
+        }
+    return {
+        "version": cfg.scoring.version,
+        "verifiedAgainstClient": cfg.scoring.verified,
+        "colors": list(cfg.scoring.colors),
+        "stats": {
+            key: {
+                "perUnit": stat.per_unit,
+                "base": stat.base,
+                "color": stat.color,
+                "measurable": stat.measurable,
+                "source": STAT_SOURCE.get(key),
+            }
+            for key, stat in sorted(cfg.scoring.stats.items())
+        },
+        "quality": {k: float(v) for k, v in (cfg.scoring.quality or {}).items()},
+        "traits": traits,
+    }
+
+
 def build_emblems(cfg: Config, tournament_id: str, stage: str) -> list[dict[str, Any]]:
     """The full generatable catalog: every stat x tier x trait.
 
@@ -732,6 +769,7 @@ def main() -> int:
             prior_strength=args.prior_strength,
             gates_forced=forced,
         ),
+        "scoring": build_scoring(cfg),
         "teams": build_teams(cfg, args.tournament_id),
         "players": build_players(cfg, args.tournament_id),
         "emblems": build_emblems(cfg, args.tournament_id, args.stage),

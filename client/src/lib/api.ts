@@ -42,10 +42,10 @@ export function getCurrentRun(tournamentId?: string, stage?: Stage) {
 }
 
 export interface RankRequest {
-  tournamentId: string
-  stage: Stage
   emblems: { emblemId: string; order: number }[]
-  role?: "core" | "mid" | "support"
+  /** Required: core and support are duos, mid is one player, so the unit being
+   * ranked depends on which slot the banner is for. */
+  role: "core" | "mid" | "support"
 }
 
 export function rankPlayers(body: RankRequest) {

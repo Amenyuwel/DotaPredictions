@@ -20,10 +20,11 @@ export type Lane = "carry" | "mid" | "offlane" | "soft_support" | "hard_support"
 export type Base64Binary = string
 
 /**
- * The contract between the Python engine and the compute server. Python validates against this on write; the server validates on read; the client's types are generated from it. One file, three consumers, so a change is a single commit. Binary matrices travel as base64 in this canonical form: the publisher encodes before validating and writes BSON Binary, and the server decodes after validating. Byte lengths are invariants the schema cannot express and both sides assert in code -- games is nGames * nStats * 4 bytes, seriesSamples is nShapeSamples * maxSeries bytes.
+ * The contract between the Python engine and the compute server. Python validates against this on write; the server validates on read; the client's types are generated from it. One file, three consumers, so a change is a single commit. Binary matrices travel as base64 in this canonical form: the publisher encodes before validating and writes BSON Binary, and the server decodes after validating. Byte lengths are invariants the schema cannot express and both sides assert in code -- games is nGames * nStats * 4 bytes, matchId and startTime are 8 bytes per row and the other scalars 4 (1 for won), seriesSamples is nShapeSamples * maxSeries bytes.
  */
 export interface RunPayload {
   run: RunMeta
+  scoring: Scoring
   /**
    * @minItems 1
    */
@@ -93,6 +94,42 @@ export interface RunMeta {
    * Scoped per {tournamentId, stage}, never global.
    */
   isCurrent: boolean
+}
+/**
+ * The client's scoring table, published so the server can score a banner without a second copy of scoring.yaml. Stat values are wildly unequal (Creep Score 3 per unit, Roshan 1172), so a raw rate means nothing until it is multiplied through this.
+ */
+export interface Scoring {
+  version: string
+  verifiedAgainstClient: boolean
+  colors: string[]
+  /**
+   * Scoring-stat key -> what it pays. `source` is the column name in playerSamples.stats; `measurable` false means the source data has no field for it at any depth.
+   */
+  stats: {
+    [k: string]: {
+      perUnit: number
+      base: number
+      color: string
+      measurable: boolean
+      source?: string | null
+    }
+  }
+  /**
+   * Emblem tier -> multiplier bonus.
+   */
+  quality: {
+    [k: string]: number
+  }
+  /**
+   * Trait -> its own bonus and what it does to each NEIGHBOUR. Vampiric charges adjacent emblems -0.10 and Benevolent pays them +0.20, which is why an emblem's displayed percentage is a property of an arrangement rather than of the emblem.
+   */
+  traits: {
+    [k: string]: {
+      bonus: number
+      adjacentBonus: number
+      condition?: string | null
+    }
+  }
 }
 export interface Team {
   teamId: number

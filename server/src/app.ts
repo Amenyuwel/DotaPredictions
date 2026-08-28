@@ -6,6 +6,7 @@ import rateLimit from "express-rate-limit"
 
 import { config } from "./config.js"
 import { healthRouter } from "./routes/health.js"
+import { rankRouter } from "./routes/rank.js"
 import { runRouter } from "./routes/run.js"
 
 /**
@@ -33,6 +34,7 @@ export function createApp(): Express {
 
   app.use("/api", healthRouter)
   app.use("/api", runRouter)
+  app.use("/api", rankRouter)
 
   app.use("/api", (_req, res) => {
     res.status(404).json({ error: "not_found" })

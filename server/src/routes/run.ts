@@ -24,7 +24,7 @@ runRouter.get("/run/current", (_req, res) => {
       reason: state.reason,
       hint:
         state.status === "unconfigured"
-          ? "Set MONGODB_URI, then publish a run from engine/."
+          ? "Set RUN_FILE to a `publish.py --out` payload, or MONGODB_URI."
           : "Publish one with `python -m scripts.publish` from engine/.",
     })
     return

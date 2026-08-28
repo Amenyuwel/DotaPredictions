@@ -4,7 +4,15 @@ import { fileURLToPath } from "node:url"
 import { Ajv2020, type ValidateFunction } from "ajv/dist/2020.js"
 import addFormats from "ajv-formats"
 
-import type { PlayerSamples, RunPayload, StageProjection } from "../../shared/run-types.js"
+import type {
+  Emblem,
+  FantasyRole,
+  Player,
+  PlayerSamples,
+  RunPayload,
+  Scoring,
+  StageProjection,
+} from "../../shared/run-types.js"
 
 /**
  * Validation against the published contract.
@@ -105,4 +113,4 @@ function base64Bytes(value: unknown): number {
   return typeof value === "string" ? Buffer.from(value, "base64").byteLength : -1
 }
 
-export type { PlayerSamples, RunPayload, StageProjection }
+export type { Emblem, FantasyRole, Player, PlayerSamples, RunPayload, Scoring, StageProjection }

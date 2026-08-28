@@ -6,6 +6,7 @@
   "type": "object",
   "required": [
     "run",
+    "scoring",
     "teams",
     "players",
     "emblems",
@@ -15,43 +16,87 @@
   ],
   "additionalProperties": false,
   "properties": {
-    "run": { "$ref": "#/$defs/RunMeta" },
-    "teams": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/Team" } },
-    "players": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/Player" } },
-    "emblems": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/Emblem" } },
+    "run": {
+      "$ref": "#/$defs/RunMeta"
+    },
+    "scoring": {
+      "$ref": "#/$defs/Scoring"
+    },
+    "teams": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/Team"
+      }
+    },
+    "players": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/Player"
+      }
+    },
+    "emblems": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/Emblem"
+      }
+    },
     "playerSamples": {
       "type": "array",
       "minItems": 1,
-      "items": { "$ref": "#/$defs/PlayerSamples" }
+      "items": {
+        "$ref": "#/$defs/PlayerSamples"
+      }
     },
     "stageProjections": {
       "type": "array",
       "minItems": 1,
-      "items": { "$ref": "#/$defs/StageProjection" }
+      "items": {
+        "$ref": "#/$defs/StageProjection"
+      }
     },
-    "factorAudit": { "type": "array", "items": { "$ref": "#/$defs/FactorAudit" } }
+    "factorAudit": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/FactorAudit"
+      }
+    }
   },
   "$defs": {
     "Stage": {
       "type": "string",
-      "enum": ["group", "main"],
+      "enum": [
+        "group",
+        "main"
+      ],
       "description": "Fantasy resets per stage: its own roster, its own banner, its own answer. Banner size differs between them, so nothing may assume an emblem count."
     },
     "FantasyRole": {
       "type": "string",
-      "enum": ["core", "mid", "support"],
+      "enum": [
+        "core",
+        "mid",
+        "support"
+      ],
       "description": "The slot the client scores. core and support are duos; mid is one player."
     },
     "Lane": {
       "type": "string",
-      "enum": ["carry", "mid", "offlane", "soft_support", "hard_support"]
+      "enum": [
+        "carry",
+        "mid",
+        "offlane",
+        "soft_support",
+        "hard_support"
+      ]
     },
     "Base64Binary": {
       "type": "string",
       "contentEncoding": "base64",
       "description": "A typed-array payload. Stored as BSON Binary, carried here as base64."
     },
-
     "RunMeta": {
       "type": "object",
       "description": "One immutable snapshot. Never updated -- a correction is a new run.",
@@ -70,11 +115,25 @@
       ],
       "additionalProperties": false,
       "properties": {
-        "runId": { "type": "string", "minLength": 1 },
-        "tournamentId": { "type": "string", "minLength": 1 },
-        "stage": { "$ref": "#/$defs/Stage" },
-        "schemaVersion": { "type": "integer", "const": 1 },
-        "createdAt": { "type": "string", "format": "date-time" },
+        "runId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tournamentId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "stage": {
+          "$ref": "#/$defs/Stage"
+        },
+        "schemaVersion": {
+          "type": "integer",
+          "const": 1
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
         "engineVersion": {
           "type": "string",
           "description": "Git SHA of the engine that produced this run."
@@ -110,24 +169,47 @@
               "format": "date-time",
               "description": "The timestamp both decays are measured against."
             },
-            "l2Prior": { "type": "number", "minimum": 0 },
-            "patchStrength": { "type": "number" },
-            "sims": { "type": "integer", "exclusiveMinimum": 0 }
+            "l2Prior": {
+              "type": "number",
+              "minimum": 0
+            },
+            "patchStrength": {
+              "type": "number"
+            },
+            "sims": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            }
           }
         },
         "dataWindow": {
           "type": "object",
-          "required": ["from", "to", "matchCount"],
+          "required": [
+            "from",
+            "to",
+            "matchCount"
+          ],
           "additionalProperties": false,
           "properties": {
-            "from": { "type": "string", "format": "date-time" },
-            "to": { "type": "string", "format": "date-time" },
-            "matchCount": { "type": "integer", "minimum": 0 }
+            "from": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "to": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "matchCount": {
+              "type": "integer",
+              "minimum": 0
+            }
           }
         },
         "gatesForced": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "description": "Freshness gates overridden with --force at publish. Empty is the normal case; a non-empty list is why a wrong number was allowed to ship."
         },
         "isCurrent": {
@@ -136,40 +218,77 @@
         }
       }
     },
-
     "Team": {
       "type": "object",
-      "required": ["teamId", "tournamentId", "name", "alsoTeamIds"],
+      "required": [
+        "teamId",
+        "tournamentId",
+        "name",
+        "alsoTeamIds"
+      ],
       "additionalProperties": false,
       "properties": {
-        "teamId": { "type": "integer" },
-        "tournamentId": { "type": "string" },
-        "name": { "type": "string", "minLength": 1 },
-        "tag": { "type": "string" },
-        "region": { "type": "string" },
-        "logoUrl": { "type": "string" },
+        "teamId": {
+          "type": "integer"
+        },
+        "tournamentId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tag": {
+          "type": "string"
+        },
+        "region": {
+          "type": "string"
+        },
+        "logoUrl": {
+          "type": "string"
+        },
         "alsoTeamIds": {
           "type": "array",
-          "items": { "type": "integer" },
+          "items": {
+            "type": "integer"
+          },
           "description": "Other OpenDota ids the same org played under. Load-bearing: one org carrying two ids splits its evidence in half and the model rates it on the remainder, with no error."
         }
       }
     },
-
     "Player": {
       "type": "object",
-      "required": ["playerId", "tournamentId", "nick", "teamId", "fantasyRole", "lane"],
+      "required": [
+        "playerId",
+        "tournamentId",
+        "nick",
+        "teamId",
+        "fantasyRole",
+        "lane"
+      ],
       "additionalProperties": false,
       "properties": {
-        "playerId": { "type": "integer" },
-        "tournamentId": { "type": "string" },
-        "nick": { "type": "string", "minLength": 1 },
-        "teamId": { "type": "integer" },
-        "fantasyRole": { "$ref": "#/$defs/FantasyRole" },
-        "lane": { "$ref": "#/$defs/Lane" }
+        "playerId": {
+          "type": "integer"
+        },
+        "tournamentId": {
+          "type": "string"
+        },
+        "nick": {
+          "type": "string",
+          "minLength": 1
+        },
+        "teamId": {
+          "type": "integer"
+        },
+        "fantasyRole": {
+          "$ref": "#/$defs/FantasyRole"
+        },
+        "lane": {
+          "$ref": "#/$defs/Lane"
+        }
       }
     },
-
     "Emblem": {
       "type": "object",
       "description": "One row of the full generatable catalog -- every stat x tier x trait the client can produce, generated from scoring.yaml. NOT the emblems on one rolled banner.",
@@ -185,24 +304,39 @@
       ],
       "additionalProperties": false,
       "properties": {
-        "emblemId": { "type": "string", "minLength": 1 },
-        "tournamentId": { "type": "string" },
-        "stage": { "$ref": "#/$defs/Stage" },
-        "stat": { "type": "string", "minLength": 1 },
-        "tier": { "type": "string", "minLength": 1 },
+        "emblemId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tournamentId": {
+          "type": "string"
+        },
+        "stage": {
+          "$ref": "#/$defs/Stage"
+        },
+        "stat": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tier": {
+          "type": "string",
+          "minLength": 1
+        },
         "trait": {
           "type": "string",
           "minLength": 1,
           "description": "Required, because the displayed multiplier is derived from tier + trait + NEIGHBOURS. Vampiric charges each adjacent emblem -10%, Benevolent pays each +20%. Store the multiplier instead and every ordering scores identically."
         },
-        "displayName": { "type": "string", "minLength": 1 },
+        "displayName": {
+          "type": "string",
+          "minLength": 1
+        },
         "measurable": {
           "type": "boolean",
           "description": "False for stats with no field in the source data at any depth. Such an emblem scores zero for everyone -- excluded from valuation, never scored as a zero, and surfaced as a caveat."
         }
       }
     },
-
     "PlayerSamples": {
       "type": "object",
       "description": "Per-player, per-game stat lines AFTER the engine's factor stack. Publishing raw lines would make the server disagree with the engine.",
@@ -223,16 +357,27 @@
       ],
       "additionalProperties": false,
       "properties": {
-        "runId": { "type": "string" },
-        "playerId": { "type": "integer" },
+        "runId": {
+          "type": "string"
+        },
+        "playerId": {
+          "type": "integer"
+        },
         "stats": {
           "type": "array",
           "minItems": 1,
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "description": "Column order of the games matrix."
         },
-        "games": { "$ref": "#/$defs/Base64Binary" },
-        "nGames": { "type": "integer", "minimum": 0 },
+        "games": {
+          "$ref": "#/$defs/Base64Binary"
+        },
+        "nGames": {
+          "type": "integer",
+          "minimum": 0
+        },
         "matchId": {
           "$ref": "#/$defs/Base64Binary",
           "description": "Int64 per row -- match ids passed 2**31 in 2023, so a 32-bit column wraps into a different match. REQUIRED: a duo's role score is the average of its members in the SAME match, using only matches where both appear. Without this the join is impossible and core and support scores come out wrong while still looking plausible."
@@ -241,7 +386,10 @@
           "$ref": "#/$defs/Base64Binary",
           "description": "Int32 per row. Coach prefixes key on the hero played."
         },
-        "won": { "$ref": "#/$defs/Base64Binary", "description": "Uint8 per row. Suffix 'the Underdog'." },
+        "won": {
+          "$ref": "#/$defs/Base64Binary",
+          "description": "Uint8 per row. Suffix 'the Underdog'."
+        },
         "durationSeconds": {
           "$ref": "#/$defs/Base64Binary",
           "description": "Int32 per row. Suffixes 'the Decisive' and 'the Lucky'."
@@ -260,12 +408,13 @@
         },
         "sampleWarnings": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "description": "Counted on JOINT duo games, not per-player games, and naming the direction of the bias: the bootstrap cannot draw above an observed maximum, so a thin sample has its ceiling truncated under E[max]. Biased low, not merely uncertain."
         }
       }
     },
-
     "StageProjection": {
       "type": "object",
       "required": [
@@ -282,25 +431,55 @@
       ],
       "additionalProperties": false,
       "properties": {
-        "runId": { "type": "string" },
-        "teamId": { "type": "integer" },
-        "stage": { "$ref": "#/$defs/Stage" },
+        "runId": {
+          "type": "string"
+        },
+        "teamId": {
+          "type": "integer"
+        },
+        "stage": {
+          "$ref": "#/$defs/Stage"
+        },
         "swiss": {
           "type": "object",
-          "required": ["bucketProbs", "advanceProb"],
+          "required": [
+            "bucketProbs",
+            "advanceProb"
+          ],
           "additionalProperties": false,
           "properties": {
-            "bucketProbs": { "type": "object", "additionalProperties": { "type": "number" } },
-            "advanceProb": { "type": "number", "minimum": 0, "maximum": 1 }
+            "bucketProbs": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "number"
+              }
+            },
+            "advanceProb": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
           }
         },
         "bracket": {
           "type": "object",
-          "required": ["placementProbs", "winProb"],
+          "required": [
+            "placementProbs",
+            "winProb"
+          ],
           "additionalProperties": false,
           "properties": {
-            "placementProbs": { "type": "object", "additionalProperties": { "type": "number" } },
-            "winProb": { "type": "number", "minimum": 0, "maximum": 1 }
+            "placementProbs": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "number"
+              }
+            },
+            "winProb": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
           }
         },
         "seriesSamples": {
@@ -311,35 +490,174 @@
           "$ref": "#/$defs/Base64Binary",
           "description": "Uint8, same shape: did that series go the full distance. 'the Clutch' pays there, and it cannot be recovered from the game count once a Bo5 exists -- a 3-game Bo5 is a sweep, a 3-game Bo3 is a decider."
         },
-        "nSims": { "type": "integer", "exclusiveMinimum": 0 },
+        "nSims": {
+          "type": "integer",
+          "exclusiveMinimum": 0
+        },
         "nShapeSamples": {
           "type": "integer",
           "exclusiveMinimum": 0,
           "description": "Shapes kept. Both simulators cap at 4,000 regardless of nSims, so collapsing the two makes a run look like it disagrees with itself."
         },
-        "maxSeries": { "type": "integer", "exclusiveMinimum": 0 },
-        "expectedSeries": { "type": "number", "minimum": 0 },
-        "eliminationRisk": { "type": "number", "minimum": 0, "maximum": 1 }
+        "maxSeries": {
+          "type": "integer",
+          "exclusiveMinimum": 0
+        },
+        "expectedSeries": {
+          "type": "number",
+          "minimum": 0
+        },
+        "eliminationRisk": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
       }
     },
-
     "FactorAudit": {
       "type": "object",
       "description": "What each modelling factor was worth, including the ones that were measured and rejected, and the ones that are simply absent.",
-      "required": ["runId", "factor", "kind", "verdict"],
+      "required": [
+        "runId",
+        "factor",
+        "kind",
+        "verdict"
+      ],
       "additionalProperties": false,
       "properties": {
-        "runId": { "type": "string" },
-        "factor": { "type": "string", "minLength": 1 },
+        "runId": {
+          "type": "string"
+        },
+        "factor": {
+          "type": "string",
+          "minLength": 1
+        },
         "kind": {
           "type": "string",
-          "enum": ["data", "assumption", "absent"],
+          "enum": [
+            "data",
+            "assumption",
+            "absent"
+          ],
           "description": "Measured, assumed, or unmodelled. Never let one masquerade as another."
         },
-        "delta": { "type": ["number", "null"] },
-        "ciCrossesZero": { "type": ["boolean", "null"] },
-        "verdict": { "type": "string", "enum": ["keep", "reject", "missing"] },
-        "evidence": { "type": "string" }
+        "delta": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "ciCrossesZero": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "verdict": {
+          "type": "string",
+          "enum": [
+            "keep",
+            "reject",
+            "missing"
+          ]
+        },
+        "evidence": {
+          "type": "string"
+        }
+      }
+    },
+    "Scoring": {
+      "type": "object",
+      "description": "The client's scoring table, published so the server can score a banner without a second copy of scoring.yaml. Stat values are wildly unequal (Creep Score 3 per unit, Roshan 1172), so a raw rate means nothing until it is multiplied through this.",
+      "required": [
+        "version",
+        "verifiedAgainstClient",
+        "colors",
+        "stats",
+        "quality",
+        "traits"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "type": "string"
+        },
+        "verifiedAgainstClient": {
+          "type": "boolean"
+        },
+        "colors": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "stats": {
+          "type": "object",
+          "description": "Scoring-stat key -> what it pays. `source` is the column name in playerSamples.stats; `measurable` false means the source data has no field for it at any depth.",
+          "additionalProperties": {
+            "type": "object",
+            "required": [
+              "perUnit",
+              "base",
+              "color",
+              "measurable"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "perUnit": {
+                "type": "number"
+              },
+              "base": {
+                "type": "number"
+              },
+              "color": {
+                "type": "string"
+              },
+              "measurable": {
+                "type": "boolean"
+              },
+              "source": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        "quality": {
+          "type": "object",
+          "description": "Emblem tier -> multiplier bonus.",
+          "additionalProperties": {
+            "type": "number"
+          }
+        },
+        "traits": {
+          "type": "object",
+          "description": "Trait -> its own bonus and what it does to each NEIGHBOUR. Vampiric charges adjacent emblems -0.10 and Benevolent pays them +0.20, which is why an emblem's displayed percentage is a property of an arrangement rather than of the emblem.",
+          "additionalProperties": {
+            "type": "object",
+            "required": [
+              "bonus",
+              "adjacentBonus"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "bonus": {
+                "type": "number"
+              },
+              "adjacentBonus": {
+                "type": "number"
+              },
+              "condition": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        }
       }
     }
   }

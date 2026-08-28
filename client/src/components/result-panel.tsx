@@ -10,7 +10,9 @@ import type { AnswerResponse, RankedUnit } from "@/types/run"
  * opposite directions and an answer should not change shape with the route.
  */
 export function ResultPanel({ answer }: { answer: AnswerResponse }) {
-  const units = [answer.best, ...answer.alternatives]
+  const best = answer.best
+  if (!best) return null
+  const units = [best, ...answer.alternatives]
   const anyTie = answer.tied.length > 0
 
   return (
@@ -28,7 +30,7 @@ export function ResultPanel({ answer }: { answer: AnswerResponse }) {
             key={unit.unitId}
             unit={unit}
             rank={i + 1}
-            tied={verdictFor(unit, answer.best, answer.tied) === "tied"}
+            tied={verdictFor(unit, best, answer.tied) === "tied"}
           />
         ))}
       </ul>

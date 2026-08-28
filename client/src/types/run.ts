@@ -45,7 +45,8 @@ export interface RankedUnit {
 export interface AnswerResponse {
   runId: string
   computedAt: string
-  best: RankedUnit
+  /** null when no unit in this stage has a joint sample to score. */
+  best: RankedUnit | null
   alternatives: RankedUnit[]
   /** Units whose interval overlaps `best` — rendered as tied, never as losers. */
   tied: string[]

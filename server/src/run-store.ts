@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs"
+import { resolve } from "node:path"
+
 import { MongoClient, type Db } from "mongodb"
 
 import { config } from "./config.js"
@@ -41,7 +44,7 @@ export const runStore = {
  * Three outcomes, deliberately distinct, because they need different answers
  * from the user:
  *
- *   unconfigured  no MONGODB_URI          -> set it
+ *   unconfigured  no RUN_FILE and no MONGODB_URI -> set one
  *   empty         connected, nothing to serve -> publish a run
  *   ready         serving
  *
@@ -50,8 +53,27 @@ export const runStore = {
  * writer and reader disagree about is worse than serving nothing.
  */
 export async function loadCurrentRun(): Promise<StoreState> {
+  if (config.runFile) {
+    const path = resolve(config.runFile)
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(readFileSync(path, "utf8"))
+    } catch (err) {
+      state = { status: "empty", reason: `cannot read RUN_FILE ${path}: ${describe(err)}` }
+      return state
+    }
+    // Same assertion as the Mongo path. A file is a shortcut around the
+    // database, not around the contract.
+    assertRunPayload(parsed)
+    state = { status: "ready", payload: parsed, loadedAt: new Date().toISOString() }
+    return state
+  }
+
   if (!config.mongoUri) {
-    state = { status: "unconfigured", reason: "MONGODB_URI is not set" }
+    state = {
+      status: "unconfigured",
+      reason: "neither RUN_FILE nor MONGODB_URI is set",
+    }
     return state
   }
 
