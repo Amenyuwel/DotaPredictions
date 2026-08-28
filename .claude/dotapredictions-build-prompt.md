@@ -111,6 +111,11 @@ Then a human verifies roles (soft vs hard support is editorial — replay parsin
 | Probability distributions sum to `1.0 ± 1e-9` | simulation or serialization corruption |
 | `emblems.check_against_client` returns empty | a mis-transcribed emblem multiplier |
 | Config `verified_against_client: true` | scoring values copied forward from last year and never re-checked |
+| Every `hero_id` in the samples exists in `hero_adjectives.yaml` | a newly released hero silently paying no coach prefix |
+
+`hero_adjectives.yaml` is extracted from `pak01_dir.vpk` and therefore needs Dota
+installed. Regenerate it locally after a hero patch and commit the result; publish
+must never depend on a game install being present on the machine that runs it.
 
 Failures print what to pin and where. `--force` exists for the operator who has genuinely decided a warning is acceptable, and every forced gate is recorded on the run document so a bad number can be traced back to the override that allowed it.
 
@@ -148,12 +153,23 @@ All model output is scoped to a `runId` and is immutable. Never update a project
 {
   _id, tournamentId, stage: "group" | "main", schemaVersion: 1, createdAt,
   engineVersion, configHash,
-  params: { halfLife, l2Prior, patchStrength, sims },
+  params: {
+    statHalfLife: 60,       // days, stat means AND bootstrap weights
+    ratingHalfLife: 90,     // days, Bradley-Terry fit
+    asOf,                   // the timestamp both decays are measured against
+    l2Prior, patchStrength, sims
+  },
   dataWindow: { from, to, matchCount },
   gatesForced: [],          // any freshness gate overridden with --force
   isCurrent: true           // scoped per {tournamentId, stage}
 }
 ```
+
+**There are two half-lives and they differ.** Stat means and the bootstrap decay at
+60 days (`dota/fantasy.py`); ratings decay at 90 (`dota/ratings.py`). Both, plus the
+`asOf` they are measured against, must be published — the server cannot reproduce
+`recency_weights` from one of them, and getting it wrong fails parity silently
+rather than loudly.
 
 ### `teams`
 ```js
@@ -168,10 +184,20 @@ All model output is scoped to a `runId` and is immutable. Never update a project
 `fantasyRole` is the slot the client scores; `lane` is the finer role the engine assigns. Both are needed: core and support are **duos**, so the fantasy unit is a pair, not a player.
 
 ### `emblems`
-Per tournament, per stage — Valve changes the trait table and the banner size between events.
+The **full generatable catalog**, not one rolled banner. Users own their own emblems,
+so the catalog is every combination the client can produce: each scorable stat ×
+5 quality tiers × 5 traits, roughly 450 rows. Generate it from that tournament's
+`scoring.yaml`. Do **not** generate it from `banners.yaml` — that file holds one
+operator's rolled banner and is a fixture, not a catalog.
+
 ```js
-{ emblemId, tournamentId, stage, stat, tier, trait, displayName, slotIndex }
+{ emblemId, tournamentId, stage, stat, tier, trait, displayName, measurable }
 ```
+
+`measurable: false` for stats with no field in the data at any depth, so the client
+can mark them at build time instead of after computing a score of zero. No
+`slotIndex` — position is a property of a request, not of an emblem.
+
 **The multiplier is derived, never stored.** Vampiric pays itself +50% and charges each *adjacent* emblem −10%; Benevolent pays each adjacent emblem +20% and itself nothing; Fractal, Friendly and Unique are whole-banner conditions. So an emblem's displayed percentage is a function of tier + trait + **neighbours**, and storing it as a scalar would make all 120 orderings score identically and silently disable the ordering feature. Derive it exactly as `dota/emblems.py:multipliers` does, and port `check_against_client` as a publish assertion.
 
 ### `playerSamples`
@@ -190,9 +216,17 @@ The important one. Per-player, per-game stat samples, **after** the engine's fac
   firstBloodTime:   <Int32 array>,  // negative = before the horn
   startTime:        <Int32 array>,  // unix seconds, for recency weights
   gameWeight:       <Float32 array>,// league + hero evidence weight
-  sampleWarnings: ["n=54, thin tail"]
+  sampleWarnings: ["n=54 joint games; ceiling likely understated"]
 }
 ```
+
+Two things about `sampleWarnings`. Count **joint** games for a duo, not per-player
+games: role scores use only matches where both members appear, so a 90-game player
+beside a 40-game partner gives the slot about 40, and a per-player `n` overstates
+confidence on exactly the duos where it is weakest. And state the *direction* of the
+thin-tail bias — the bootstrap can never draw above a player's observed maximum, so
+under an `E[max]` objective a small sample has its ceiling truncated. It is biased
+low, not merely uncertain, and "thin tail" alone does not say so.
 
 `matchId` is not optional and there is no `seriesIndex`. Two reasons, both fatal if ignored:
 
@@ -210,12 +244,18 @@ Tournament context. This is what makes answers tournament-aware.
   runId, teamId, stage,
   swiss:   { bucketProbs: {...}, advanceProb },      // stage === "group"
   bracket: { placementProbs: {...}, winProb },       // stage === "main"
-  seriesSamples:  <BSON Binary>,   // Int8, nSims x maxSeries, 0-padded
+  seriesSamples:  <BSON Binary>,   // Int8, nShapeSamples x maxSeries, 0-padded
   deciderSamples: <BSON Binary>,   // Uint8, same shape
-  nSims,
+  nSims,                           // simulations run
+  nShapeSamples,                   // shapes kept -- both simulators cap at 4,000
   expectedSeries, eliminationRisk
 }
 ```
+
+`nSims` and `nShapeSamples` are different numbers and both are needed. Both
+simulators keep `min(n_sims, 4000)` series shapes, so a run at `--sims 20000`
+publishes 20,000 simulations' worth of probabilities beside 4,000 shapes. Collapse
+them into one field and the run looks like it disagrees with itself.
 
 `expectedSeries: 3.2` alone is **not sufficient** and the scalar must never be used to score. A scoring period sums the top two games *within* a series and then keeps the best series, and a game count cannot express that structure. The sampled per-series shapes are the input the scorer actually needs.
 
@@ -242,6 +282,20 @@ These are non-negotiable and are the reason a naive implementation will be wrong
 - Ranking players by average stats will systematically favor consistent players over volatile ones. That is the specific error this tool exists to avoid.
 - **Only the banner's stats score.** A player's overall quality is close to irrelevant; they are worth exactly what their banner stats pay. Base values are wildly unequal (Creep Score 3 per unit, Roshan 1,172), so a raw rate is meaningless until multiplied through.
 - **Core and support are duos sharing one banner.** The banner is fitted to the pair's combined line, and the slot score is the pair's average, so a duo whose strengths do not overlap is worth less than either player looks alone.
+- **A banner may repeat a colour but never a stat.** This is the rule that breaks
+  the obvious implementation. `dota/banner.py:best_banner` picks the best stat in
+  *each colour* — one red, one blue, one green — which is right for choosing three
+  emblems and wrong for everything else here. The TI 2026 Core banner is 3 red,
+  2 green and **no blue**, and `best_banner` can never produce it. Score a
+  user-supplied banner through the fixed path instead, which slots emblems by index
+  rather than by colour (`scripts/fixed_banner.py:fixed_plan`).
+- **The player → banner direction needs an engine function that does not exist yet.**
+  "Best banner for this unit" is a constrained search: maximise over the emblems the
+  user owns, subject to no repeated stat, colours unconstrained, `slots` from the
+  request, with the 120-permutation ordering evaluated inside each candidate set.
+  Write it in Python beside `best_banner`, then mirror it in TypeScript. Building it
+  only on the server guarantees the two directions eventually disagree and gives the
+  parity test nothing to check it against.
 - Emblem ordering matters, and it is free. Evaluate orderings exhaustively (5! = 120).
 - Coach Titles apply per game and stack multiplicatively (assumed — record it as an assumption).
 - **Unmeasurable stats are excluded, not discounted.** Some emblems carry stats with no field in the data at any depth. They are worth real points in the client and zero in the model. Never quietly substitute a placeholder multiplier — surface it as a caveat that says the emblem scores 0 for every player and the ranking is therefore softer than it looks.
@@ -310,6 +364,15 @@ Header always displays the tournament, the stage, the run timestamp and the data
 
 Libraries: TanStack Query for data, TanStack Table for tables, Recharts for interval/breakdown charts. Debounce input at 250ms and POST on change.
 
+The confidence interval needs a gamma sampler on whichever side computes it. The
+engine's interval is a Bayesian bootstrap over `rng.dirichlet`, which Node has no
+equivalent of — Marsaglia–Tsang is about thirty lines, but budget it as real work
+rather than meeting it mid-phase.
+
+**Assets and attribution.** Hero portraits and emblem art belong to Valve. Pull
+images from OpenDota's CDN, credit OpenDota as the data source in the footer, and
+avoid any framing that implies Valve endorsement.
+
 ### Saving results
 
 Ship in this order:
@@ -330,7 +393,19 @@ Build vertical slices. Get one real number end to end before adding breadth.
 2. Write `shared/run-schema.json`, including the `playerSamples` binary layout and the per-game scalar arrays. Version it.
 3. Write `engine/scripts/publish.py` with every freshness gate above. Publish one real run for `{ti2026, main}`.
 4. Express: load the current run into memory at boot, validate on read, crash on mismatch. Implement `/api/player/rank` only.
-5. **Verify.** Compare one known slot against the engine's own output, digit by digit, with the same seed and the same sim count. Any mismatch is a serialization bug — stop and fix it before building further. **This is the checkpoint that matters.** Commit it as a golden-fixture test.
+5. **Verify, in two halves.** This is the checkpoint that matters, and it cannot be
+   one test: numpy's PCG64 has no JavaScript equivalent, so a Monte Carlo estimate
+   will never match digit for digit and chasing that difference wastes days on a
+   serialization bug that is not there.
+   - **Exact, to 1e-9:** per-game banner score, emblem multipliers under every
+     ordering, the duo's role average, and the coach-title multipliers. All are
+     deterministic given the published sample matrix. **A mismatch here is a real
+     serialization bug — stop and fix it.**
+   - **Within tolerance, ≤0.25%:** the projection and its interval, with a fixed
+     TypeScript seed and `n ≥ 20,000`. Widen the tolerance only with a measured
+     reason, never to make a failing test pass.
+
+   Commit both as golden-fixture tests.
 6. Vite client: banner → player direction, one screen. This alone is a usable tool. Ship it.
 7. Publish the `{ti2026, group}` run and add the stage switcher. This is the first real test that nothing hardcodes an emblem count or a bracket shape.
 8. Add `/api/banner/optimize` and the player → banner direction.
@@ -349,6 +424,8 @@ Additive and small. The modeling code does not change.
 | `Config` accepts a `tournament_id`; config files move under `config/<tournamentId>/` | `dota/config.py` | one deployment serves many events |
 | Qualifier league ids move from a module constant into `tournament.yaml` | `scripts/discover_rosters.py:29` | the constant is TI 2026-specific and would silently serve the wrong leagues next year |
 | Emit `decider_samples` beside `series_samples` | `dota/swiss.py` | the group stage needs the same scorer input the bracket already provides |
+| New constrained banner search: maximise over an inventory, no repeated stat, `slots` variable | `dota/banner.py` | the player → banner direction has no function today, and `best_banner`'s one-per-colour rule cannot express a real banner |
+| Warn on a `hero_id` present in the samples but missing from `hero_adjectives.yaml` | `dota/titles.py` / publish gate | `prefix_multiplier` returns 1.0 for an unknown hero, so a newly released hero silently under-prices every prefix with no error |
 | `tournament.yaml` gains `stages:` and `qualifier_leagues:` | config | stages become data, not code paths |
 | New `scripts/publish.py` | engine | snapshot writer plus every freshness gate |
 | New `scripts/new_tournament.py` | engine | scaffold a new event from league ids and match data |

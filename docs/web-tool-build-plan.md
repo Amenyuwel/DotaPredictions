@@ -17,9 +17,8 @@ the existing Python engine running batch-only behind immutable Mongo snapshots.
    exactly the failure the spec demands must crash rather than silently render
    wrong numbers. A monorepo makes that commit atomic and the crash unreachable.
 2. **Checkpoint 4 is a cross-language test.** Comparing a TypeScript score against
-   Python's `out/analysis.json` digit by digit needs both trees at compatible
-   commits. In one repo that is a test. Across repos it is a CI integration with a
-   pinned submodule.
+   Python's `out/analysis.json` needs both trees at compatible commits. In one repo
+   that is a test file. Across repos it is a CI integration with a pinned submodule.
 3. **The server ships the client.** The spec already requires Express to serve
    `client/dist` in production "so there is one origin and no CORS configuration
    at all." Two halves of one deploy artifact do not want two repos.
@@ -94,6 +93,15 @@ on `engine/dota/sources/base.py:PlayerGame`:
 
 Keep them in a parallel block — one scalar per row, not part of the stat matrix.
 
+Publish both half-lives with the samples: stat means and the bootstrap decay at
+**60 days** (`fantasy.py:87`), ratings at **90** (`ratings.py:66`), plus the `asOf`
+timestamp they are measured against. The server cannot rebuild `recency_weights`
+from one of them, and the failure is silent.
+
+`sampleWarnings` counts **joint** duo games, not per-player games, and names the
+direction of the bias: the bootstrap cannot draw above an observed maximum, so a
+thin sample has its ceiling truncated under `E[max]` — biased low, not just noisy.
+
 ### 2. Series structure is simulated, not observed
 
 `seriesIndex` does not exist in history. Observed games are only a **bootstrap
@@ -128,8 +136,13 @@ each **+20%**, so the displayed value comes from tier + trait + neighbours
 identically and the ordering feature is inert.
 
 ```js
-{ emblemId, stat, tier, trait, displayName }   // multiplier derived, never stored
+{ emblemId, stat, tier, trait, displayName, measurable }  // multiplier derived, never stored
 ```
+
+Scope it as the **full generatable catalog** — every stat × 5 tiers × 5 traits,
+~450 rows, generated from `scoring.yaml`. `banners.yaml` is one operator's rolled
+banner, a fixture rather than a catalog; users of a public tool own their own
+emblems.
 
 Port `emblems.check_against_client` as a publish-time assertion so a transcription
 error fails the run.
@@ -194,12 +207,17 @@ until they agree:
 
 | Python | TypeScript |
 |---|---|
+| `fixed_banner.fixed_plan` | slot emblems **by index, not colour** |
 | `banner.banner_score_for_game` | per-game banner score |
 | `emblems.multipliers` / `best_order` | positional traits, 120 permutations |
 | `titles.game_multiplier` | prefix per hero, suffix per game |
 | `fantasy.role_game_scores` | **duo join on `matchId`** |
 | `fantasy.plan_series` / `score_plan` | top-2-in-series, best-series |
-| `fantasy.best_series_interval` | Dirichlet bootstrap CI |
+| `fantasy.best_series_interval` | Dirichlet bootstrap CI — needs a Marsaglia–Tsang gamma sampler, Node has none |
+
+Not `banner.best_banner`. It picks one stat per colour, which is right for *choosing*
+three emblems and wrong for scoring a real one: the Main Event core banner is 3 red,
+2 green and no blue, and `best_banner` cannot produce it.
 
 Perf: `best_series_interval` defaults to 160 replicates × 800 sims **per slot**.
 Across 16 candidate duos that is the one thing between this and an interactive UI.
@@ -218,17 +236,24 @@ return `{teamId, slot, nicks[]}`. Only `mid` is a single player.
 
 Before any more breadth. Take one locked slot — `support / Team Spirit` under the
 Main Event banner is the best candidate, since `docs/ti2026-main-event-picks.md`
-records it at **15,379** — and compare the TypeScript number against Python digit
-by digit.
+records it at **15,379**.
+
+**It has to be two tests, not one.** numpy's PCG64 has no JavaScript equivalent, so
+a Monte Carlo estimate can never match digit for digit, and treating that gap as a
+bug burns days looking for something that is not there.
+
+| Half | Tolerance | Covers |
+|---|---|---|
+| Deterministic | `1e-9` | per-game banner score, emblem multipliers under every ordering, duo role average, coach-title multipliers |
+| Stochastic | `≤0.25%` | the projection and its interval, fixed TS seed, `n ≥ 20,000` |
+
+**A mismatch in the deterministic half is a real serialization bug. Stop and fix it
+— do not build past this.** Widen the stochastic tolerance only with a measured
+reason, never to turn a red test green.
 
 Sources of truth, in order: `engine/out/analysis.json` (full precision), then
-`python -m scripts.main_event`.
-
-Pin both sides to the same RNG seed (the engine uses `20260813` and `20260820`) and
-the same `n_sims`. Commit the comparison as `server/test/parity.test.ts` with a
-golden fixture so a later refactor cannot quietly break it.
-
-**Any mismatch is a serialization bug. Stop and fix it — do not build past this.**
+`python -m scripts.main_event`. Commit both halves as `server/test/parity.test.ts`
+with a golden fixture so a later refactor cannot quietly break them.
 
 ---
 
@@ -257,8 +282,11 @@ Caveats render in the result panel, never in a footnote.
    (3 in the group stage, 5 in the main event) or a bracket shape. Requires
    `dota/swiss.py` to emit `decider_samples` beside `series_samples`, so both
    stages feed the scorer identically.
-7. `/api/banner/optimize` and the player → banner direction: emblem inventory →
-   best orderings, exhaustive over 120.
+7. `/api/banner/optimize` and the player → banner direction. **Blocked on a new
+   engine function**: a constrained search over the user's inventory — no repeated
+   stat, colours unconstrained, `slots` from the request, 120 orderings inside each
+   candidate set. Nothing in `dota/banner.py` does this today. Write it in Python
+   first so the parity test has something to check the TypeScript against.
 8. Share URLs (`?t=&s=&p=&e=`), then print stylesheet + `window.print()`. No
    html2canvas. Tournament and stage go in the URL or links rot on the next event.
 9. `/api/roster/score`, alternatives table, caveats panel. The roster scorer must
