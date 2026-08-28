@@ -250,15 +250,53 @@ Caveats render in the result panel, never in a footnote.
 
 ---
 
-## Phases 6-8 — Breadth
+## Phases 6-10 — Breadth
 
-6. `/api/banner/optimize` and the player → banner direction: emblem inventory →
+6. **Group stage run + stage switcher.** Publish `{ti2026, group}` and add the
+   switcher. This is the first real test that nothing hardcodes an emblem count
+   (3 in the group stage, 5 in the main event) or a bracket shape. Requires
+   `dota/swiss.py` to emit `decider_samples` beside `series_samples`, so both
+   stages feed the scorer identically.
+7. `/api/banner/optimize` and the player → banner direction: emblem inventory →
    best orderings, exhaustive over 120.
-7. Share URLs (`?p=&e=`), then print stylesheet + `window.print()`. No html2canvas.
-8. `/api/roster/score`, alternatives table, caveats panel. The roster scorer must
+8. Share URLs (`?t=&s=&p=&e=`), then print stylesheet + `window.print()`. No
+   html2canvas. Tournament and stage go in the URL or links rot on the next event.
+9. `/api/roster/score`, alternatives table, caveats panel. The roster scorer must
    sample all three slots on the **same** simulated bracket
    (`plan_series(indices=...)`); independent draws leave the mean correct and
    understate the spread by ~0.9%, which is the entire question a risk view asks.
+10. **`scripts/new_tournament.py` and the tournament switcher.** Validate it by
+    scaffolding a *past* event from its league ids and diffing the derived roster
+    against the config already committed — the one test that proves onboarding
+    works without waiting a year for the next TI.
+
+---
+
+## Multi-tournament: what makes a stale roster fail loudly
+
+The costliest bug this project has produced was a stale org id that raised no
+error — sixteen TI games landed on a team the model had never heard of, and it
+was rated on no evidence while still printing a projection. `publish.py` turns
+that class of bug into a refusal to publish:
+
+- every player resolves; no fuzzy matches, no duplicate `account_id`s
+  (`resolve.problems` already returns this as a blocking list);
+- every team's rating fit saw at least `--min-team-games` result rows
+  (`ratings.evidence`) — this is the gate that would have caught Iron Wing;
+- roster drift: the five configured accounts match the five most-played accounts
+  in that team's recent games;
+- orphan-id sweep: a pinned `team_id` whose recent matches carry an unknown name
+  is reported as an `also_team_ids` candidate;
+- `verified_against_client: true`, so a scoring table copied forward from last
+  year and never re-checked cannot ship.
+
+`--force` exists, records which gate was overridden on the run document, and is
+the only way past any of them.
+
+Config becomes per-tournament (`engine/config/<tournamentId>/`), with only
+`hero_adjectives.yaml` global since it comes from the game client rather than an
+event. `scripts/discover_rosters.py:29` hardcodes the TI 2026 qualifier league
+ids in a module constant — that moves into each tournament's `tournament.yaml`.
 
 ---
 
@@ -279,10 +317,19 @@ Caveats render in the result panel, never in a footnote.
 
 ## Open questions
 
-1. **Group Stage or Main Event only?** The engine models both and the banners
-   differ (3 emblems vs 5). Main Event alone is simpler and matches the current
-   `config/banners.yaml`.
-2. **Whose emblem inventory?** `banner/optimize` takes an inventory the user owns.
-   Nothing in the engine models an inventory today — it is a pure client concept.
-3. **Run cadence.** Cron during an event, or manual publish? Decides only whether
+**Answered.** *Both stages ship*, group and main, with `stage` part of the run key
+and part of every request. Main Event goes first because its banners are the ones
+currently in `config/banners.yaml`; the group stage follows in Phase 6 and doubles
+as the test that no emblem count is hardcoded. *Multi-tournament is a requirement*,
+not a later nicety — see the phase 10 and freshness sections above.
+
+**Still open.**
+
+1. **Whose emblem inventory?** `banner/optimize` takes an inventory the user owns.
+   Nothing in the engine models an inventory today — it is a pure client concept,
+   so it lives in the querystring and never in Mongo.
+2. **Run cadence.** Cron during an event, or manual publish? Decides only whether
    `publish.py` needs a scheduler.
+3. **Group-stage banners for past events.** `config/banners.yaml` keeps the TI 2026
+   group-stage emblems as a comment, not as data. Phase 6 needs them promoted to a
+   real `stage:` block before that run can publish.
