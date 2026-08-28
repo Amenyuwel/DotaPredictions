@@ -1,57 +1,30 @@
 /**
- * The shapes the server returns.
+ * The client's view of the contract.
  *
- * These are hand-written for now and MUST be replaced by types generated from
- * `shared/run-schema.json` (via `json-schema-to-typescript`) as soon as that
- * file exists. The schema is the single source of truth; a second hand-kept
- * copy of the contract is exactly the silent drift the project's DRY rule
- * exists to prevent. Until then, treat this file as a stub with a deadline.
+ * The run payload types are RE-EXPORTED from `shared/run-types.ts`, which is
+ * generated from `shared/run-schema.json`. They are never redeclared here: a
+ * second hand-kept copy of a contract drifts from the first silently, which is
+ * exactly what the schema exists to prevent.
+ *
+ * What IS declared here is the API response envelope — the shape of an *answer*
+ * rather than of a *run*. It is not in the schema because the engine does not
+ * produce it; the server computes it per request. If it ever needs to be shared
+ * with another consumer, it gets its own schema and this block disappears too.
  */
+export type {
+  Emblem,
+  FantasyRole,
+  Lane,
+  Player,
+  RunMeta,
+  Stage,
+  Team,
+} from "@shared/run-types"
 
-export type Stage = "group" | "main"
+import type { FantasyRole, Emblem, Player, RunMeta, Team } from "@shared/run-types"
 
-export type FantasyRole = "core" | "mid" | "support"
-
-export interface RunMeta {
-  runId: string
-  tournamentId: string
-  stage: Stage
-  createdAt: string
-  engineVersion: string
-  /** Which freshness gates, if any, were overridden with --force at publish. */
-  gatesForced: string[]
-  dataWindow: { from: string; to: string; matchCount: number }
-}
-
-export interface Team {
-  teamId: number
-  name: string
-  tag?: string
-  region?: string
-}
-
-export interface Player {
-  playerId: number
-  nick: string
-  teamId: number
-  fantasyRole: FantasyRole
-  lane: string
-}
-
-export interface Emblem {
-  emblemId: string
-  stat: string
-  tier: string
-  trait: string
-  displayName: string
-  /**
-   * False for stats with no field in the source data at any depth. Such an
-   * emblem scores zero for every player, so the UI marks it up front rather
-   * than presenting a computed zero as a finding.
-   */
-  measurable: boolean
-}
-
+/** What `GET /api/run/current` returns: metadata and catalogues, no sample
+ * matrices — those are megabytes only the scorer reads. */
 export interface CurrentRun {
   run: RunMeta
   teams: Team[]
@@ -83,3 +56,5 @@ export interface AnswerResponse {
   }
   caveats: string[]
 }
+
+export type { Emblem as EmblemOption }

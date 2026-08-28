@@ -1,0 +1,230 @@
+/* eslint-disable */
+/**
+ * GENERATED FILE -- do not edit.
+ * Source: shared/run-schema.json
+ * Regenerate: cd server && npm run gen:types
+ */
+
+/**
+ * Fantasy resets per stage: its own roster, its own banner, its own answer. Banner size differs between them, so nothing may assume an emblem count.
+ */
+export type Stage = "group" | "main"
+/**
+ * The slot the client scores. core and support are duos; mid is one player.
+ */
+export type FantasyRole = "core" | "mid" | "support"
+export type Lane = "carry" | "mid" | "offlane" | "soft_support" | "hard_support"
+/**
+ * A typed-array payload. Stored as BSON Binary, carried here as base64.
+ */
+export type Base64Binary = string
+
+/**
+ * The contract between the Python engine and the compute server. Python validates against this on write; the server validates on read; the client's types are generated from it. One file, three consumers, so a change is a single commit. Binary matrices travel as base64 in this canonical form: the publisher encodes before validating and writes BSON Binary, and the server decodes after validating. Byte lengths are invariants the schema cannot express and both sides assert in code -- games is nGames * nStats * 4 bytes, seriesSamples is nShapeSamples * maxSeries bytes.
+ */
+export interface RunPayload {
+  run: RunMeta
+  /**
+   * @minItems 1
+   */
+  teams: [Team, ...Team[]]
+  /**
+   * @minItems 1
+   */
+  players: [Player, ...Player[]]
+  /**
+   * @minItems 1
+   */
+  emblems: [Emblem, ...Emblem[]]
+  /**
+   * @minItems 1
+   */
+  playerSamples: [PlayerSamples, ...PlayerSamples[]]
+  /**
+   * @minItems 1
+   */
+  stageProjections: [StageProjection, ...StageProjection[]]
+  factorAudit: FactorAudit[]
+}
+/**
+ * One immutable snapshot. Never updated -- a correction is a new run.
+ */
+export interface RunMeta {
+  runId: string
+  tournamentId: string
+  stage: Stage
+  schemaVersion: 1
+  createdAt: string
+  /**
+   * Git SHA of the engine that produced this run.
+   */
+  engineVersion: string
+  /**
+   * Hash over that tournament's config directory, so a run traces to the inputs that made it.
+   */
+  configHash: string
+  params: {
+    /**
+     * Days. Decays stat means AND bootstrap weights. Differs from ratingHalfLife; publishing only one makes the server's recency weights silently wrong.
+     */
+    statHalfLife: number
+    /**
+     * Days. Decays the Bradley-Terry fit.
+     */
+    ratingHalfLife: number
+    /**
+     * The timestamp both decays are measured against.
+     */
+    asOf: string
+    l2Prior: number
+    patchStrength: number
+    sims: number
+  }
+  dataWindow: {
+    from: string
+    to: string
+    matchCount: number
+  }
+  /**
+   * Freshness gates overridden with --force at publish. Empty is the normal case; a non-empty list is why a wrong number was allowed to ship.
+   */
+  gatesForced: string[]
+  /**
+   * Scoped per {tournamentId, stage}, never global.
+   */
+  isCurrent: boolean
+}
+export interface Team {
+  teamId: number
+  tournamentId: string
+  name: string
+  tag?: string
+  region?: string
+  logoUrl?: string
+  /**
+   * Other OpenDota ids the same org played under. Load-bearing: one org carrying two ids splits its evidence in half and the model rates it on the remainder, with no error.
+   */
+  alsoTeamIds: number[]
+}
+export interface Player {
+  playerId: number
+  tournamentId: string
+  nick: string
+  teamId: number
+  fantasyRole: FantasyRole
+  lane: Lane
+}
+/**
+ * One row of the full generatable catalog -- every stat x tier x trait the client can produce, generated from scoring.yaml. NOT the emblems on one rolled banner.
+ */
+export interface Emblem {
+  emblemId: string
+  tournamentId: string
+  stage: Stage
+  stat: string
+  tier: string
+  /**
+   * Required, because the displayed multiplier is derived from tier + trait + NEIGHBOURS. Vampiric charges each adjacent emblem -10%, Benevolent pays each +20%. Store the multiplier instead and every ordering scores identically.
+   */
+  trait: string
+  displayName: string
+  /**
+   * False for stats with no field in the source data at any depth. Such an emblem scores zero for everyone -- excluded from valuation, never scored as a zero, and surfaced as a caveat.
+   */
+  measurable: boolean
+}
+/**
+ * Per-player, per-game stat lines AFTER the engine's factor stack. Publishing raw lines would make the server disagree with the engine.
+ */
+export interface PlayerSamples {
+  runId: string
+  playerId: number
+  /**
+   * Column order of the games matrix.
+   *
+   * @minItems 1
+   */
+  stats: [string, ...string[]]
+  games: Base64Binary
+  nGames: number
+  /**
+   * A typed-array payload. Stored as BSON Binary, carried here as base64.
+   */
+  matchId: string
+  /**
+   * A typed-array payload. Stored as BSON Binary, carried here as base64.
+   */
+  heroId: string
+  /**
+   * A typed-array payload. Stored as BSON Binary, carried here as base64.
+   */
+  won: string
+  /**
+   * A typed-array payload. Stored as BSON Binary, carried here as base64.
+   */
+  durationSeconds: string
+  /**
+   * A typed-array payload. Stored as BSON Binary, carried here as base64.
+   */
+  firstBloodTime: string
+  /**
+   * A typed-array payload. Stored as BSON Binary, carried here as base64.
+   */
+  startTime: string
+  /**
+   * A typed-array payload. Stored as BSON Binary, carried here as base64.
+   */
+  gameWeight: string
+  /**
+   * Counted on JOINT duo games, not per-player games, and naming the direction of the bias: the bootstrap cannot draw above an observed maximum, so a thin sample has its ceiling truncated under E[max]. Biased low, not merely uncertain.
+   */
+  sampleWarnings: string[]
+}
+export interface StageProjection {
+  runId: string
+  teamId: number
+  stage: Stage
+  swiss?: {
+    bucketProbs: {
+      [k: string]: number
+    }
+    advanceProb: number
+  }
+  bracket?: {
+    placementProbs: {
+      [k: string]: number
+    }
+    winProb: number
+  }
+  /**
+   * A typed-array payload. Stored as BSON Binary, carried here as base64.
+   */
+  seriesSamples: string
+  /**
+   * A typed-array payload. Stored as BSON Binary, carried here as base64.
+   */
+  deciderSamples: string
+  nSims: number
+  /**
+   * Shapes kept. Both simulators cap at 4,000 regardless of nSims, so collapsing the two makes a run look like it disagrees with itself.
+   */
+  nShapeSamples: number
+  maxSeries: number
+  expectedSeries: number
+  eliminationRisk: number
+}
+/**
+ * What each modelling factor was worth, including the ones that were measured and rejected, and the ones that are simply absent.
+ */
+export interface FactorAudit {
+  runId: string
+  factor: string
+  /**
+   * Measured, assumed, or unmodelled. Never let one masquerade as another.
+   */
+  kind: "data" | "assumption" | "absent"
+  delta?: number | null
+  ciCrossesZero?: boolean | null
+  verdict: "keep" | "reject" | "missing"
+  evidence?: string
+}

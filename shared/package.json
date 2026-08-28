@@ -1,0 +1,6 @@
+{
+  "name": "shared",
+  "private": true,
+  "type": "module",
+  "description": "The data contract: run-schema.json and the types generated from it."
+}
