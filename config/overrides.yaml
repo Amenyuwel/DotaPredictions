@@ -1,0 +1,45 @@
+# Manual pins for anything the resolver cannot get right on its own.
+# Overrides always win over automatic resolution.
+#
+# Find an account_id at https://www.opendota.com/players/<account_id>
+# and a team_id at https://www.opendota.com/teams/<team_id>.
+#
+# All 16 team_ids are pinned deliberately. Org names are ambiguous on OpenDota
+# in three separate ways and each one silently poisons the roster lookup:
+#   * rebrands      - BetBoom competes as "BoomBoys", Iron Wing spent the
+#                     season as "1w",
+#                     PARIVISION as "TEAM VISION", L1GA as "HULIGANI"
+#   * recycled ids  - "Aurora Gaming" and "Nigma Galaxy" each map to several
+#                     team_ids from different eras, most carrying dead rosters
+#   * name reuse    - the LGD Gaming at TI 2026 is the South American squad
+#                     (ex-HEROIC), not Chinese PSG.LGD
+# Verified 2026-07-31 against qualifier match data and /teams/{id}/players.
+
+teams:
+  "Aurora Gaming": 9467224
+  "BetBoom Team": 8255888      # competes as "BoomBoys"
+  "Team Falcons": 9247354
+  "Team Liquid": 2163
+  "Iron Wing": 10150413        # season played on the "1w" id 10182357,
+                               # which config/teams.yaml folds in
+  "Xtreme Gaming": 8261500
+  "Team Yandex": 9823272
+  "Vici Gaming": 726228
+  "Team Resilience": 5017210
+  "LGD Gaming": 10150538       # South American squad, NOT Chinese PSG.LGD
+  "OG": 2586976
+  "Team Spirit": 7119388
+  "PARIVISION": 9572001        # competes as "TEAM VISION"
+  "GamerLegion": 9964962
+  "Nigma Galaxy": 10136357
+  "L1GA TEAM": 10149530        # competes as "HULIGANI"
+
+# Pinned because the config nickname and the OpenDota name differ enough that
+# the resolver would only reach them by fuzzy match. Confirmed against each
+# team's current roster on 2026-07-31.
+players:
+  "Team Liquid/miCKe": 152962063         # OpenDota name: m1CKe
+  "Nigma Galaxy/Suma1L": 111620041       # OpenDota name: SumaiL-
+  "Nigma Galaxy/Davai Lama": 138880576   # OpenDota name: Davai
+  "Team Resilience/Erika": 170896543     # now competes as YSR-04E
+  "Team Resilience/Echo": 315272623      # OpenDota name: Echozz

@@ -1,0 +1,173 @@
+# TI 2026 fantasy scoring. Transcribed from the in-client GLOSSARY.
+# Verified 2026-08-01.
+#
+# THE RULE THAT DRIVES EVERYTHING:
+#   "Players receive points only for the stats present on their War Banner."
+# A player scores their three banner stats and nothing else. So the goal is not
+# "pick good players" -- it is "pick players whose best three banner stats are
+# worth the most", which is a different question with a different answer.
+#
+# Scoring chain:
+#   per game   -> sum of the player's banner stats, x emblem multipliers
+#   per role   -> AVERAGE across the players in that role (2 for core/support)
+#   per series -> sum of the TOP TWO games in the series
+#   per period -> the BEST series
+
+version: "ti2026-client"
+verified_against_client: true
+
+# Base points per unit. `flat` stats pay once if the condition is met.
+stats:
+  kills:                   {per_unit: 107.0,  color: red}
+  deaths:                  {per_unit: -195.0, color: red, base: 1950.0}
+  creep_score:             {per_unit: 3.0,    color: red}   # last hits + denies
+  gold_per_min:            {per_unit: 2.0,    color: red}
+  madstone_collected:      {per_unit: 13.0,   color: red}
+  tower_kills:             {per_unit: 352.0,  color: red}
+
+  observer_wards_planted:  {per_unit: 117.0,  color: blue}
+  camps_stacked:           {per_unit: 234.0,  color: blue}
+  rune_pickups:            {per_unit: 141.0,  color: blue}
+  watchers_taken:          {per_unit: 147.0,  color: blue}
+  lotuses_grabbed:         {per_unit: 176.0,  color: blue}
+  smokes_used:             {per_unit: 293.0,  color: blue}
+
+  roshan_kills:            {per_unit: 1172.0, color: green}
+  teamfight_participation: {per_unit: 2124.0, color: green}  # fraction x max
+  seconds_stunned:         {per_unit: 10.0,   color: green}
+  tormentor_kills:         {per_unit: 879.0,  color: green}
+  first_blood:             {per_unit: 1934.0, color: green}
+  courier_kills:           {per_unit: 703.0,  color: green}
+
+# Stats OpenDota does not expose. They are excluded from optimisation rather
+# than scored as zero, so the model never recommends an emblem it cannot value.
+unmeasurable:
+  - watchers_taken
+  - lotuses_grabbed
+# Recovered 2026-08-17, both needed by the Main Event banners:
+#   tormentor_kills    <- players[].killed["npc_dota_miniboss"]
+#   madstone_collected <- players[].item_uses["madstone_bundle"], which counts
+#                         BUNDLES consumed. If a bundle carries more than one
+#                         madstone this understates the stat, so treat any
+#                         madstone emblem's contribution as a floor.
+# watchers_taken and lotuses_grabbed have no OpenDota field at any depth. The
+# Support banner's Lotuses emblem is therefore scored as absent, not as zero --
+# see scripts/main_event.py, which reports what that emblem is worth blind.
+
+# Displayed emblem % = 100 + quality% + trait%.
+emblem_quality:
+  tier_i:   0.10
+  tier_ii:  0.30
+  tier_iii: 0.60
+  tier_iv:  1.00
+  tier_v:   1.50
+
+emblem_traits:
+  fractal:    {bonus: 0.60, condition: "all emblem qualities on the banner differ"}
+  benevolent: {bonus: 0.00, adjacent_bonus: 0.20}
+  vampiric:   {bonus: 0.50, adjacent_bonus: -0.10}
+  unique:     {bonus: 0.30, condition: "only Unique emblem on the banner"}
+  friendly:   {bonus: 0.50, condition: "at least 3 Friendly emblems on the banner"}
+
+# A banner carries one emblem of each colour.
+banner_colors: [red, blue, green]
+
+# Coach Titles: a prefix and a suffix, each a conditional % on the final score.
+# Free to change, no roll tokens.
+#
+# `bonus` is what the client shows. `p` is the base rate of the condition,
+# MEASURED where the corpus can see it and left null where it cannot -- a null
+# is not a zero, it means "no evidence either way, decide by hand".
+#
+# Rates below are for the locked roster (PARIVISION cores / BZM mid / LGD
+# supports), weighted by each slot's share of the projected total
+# (core 48%, mid 27.5%, support 24.5%). Re-measure if the roster changes:
+# decider rate, loss rate and game length all vary by team.
+coach:
+  # What the client currently has equipped: "Cerulean Mayoral D. Luffy [DIPOL]
+  # the Clutch" (2026-08-17). Both are applied by dota/titles.py -- Cerulean per
+  # game, on the games whose hero carries Valve's Blue flag, and the Clutch on the
+  # last possible game of a series inside the bracket simulation. Titles cost no
+  # roll tokens, so this pair is a free choice to revisit, not a constant.
+  equipped:
+    prefix: Cerulean
+    suffix: the Clutch
+
+  titles:
+    suffixes:
+      the Clutch:
+        bonus: 0.16
+        condition: "playing the last possible match of a series"
+        p: 0.1923          # measured: 47.5% of Bo3s go 3 games -> 19.2% of games
+        expected: 0.0308   # BEST measurable suffix
+      the Underdog:
+        bonus: 0.06
+        condition: "games where the player loses"
+        p: 0.4001
+        expected: 0.0240
+        note: >-
+          Worth less than the raw number suggests. The objective is E[max], so
+          only your best game is ever recorded, and your best game is usually a
+          win. This bonus pays precisely when you are not scoring.
+      the Lucky:
+        bonus: 0.21
+        condition: "match time ends with an 8"
+        p: 0.1040          # measured; ~1 in 10 as expected for a last digit
+        expected: 0.0218
+      the Decisive:
+        bonus: 0.24
+        condition: "games lasting under 25 minutes"
+        p: 0.0262          # Iron Wing have not played a sub-25 game in 48 sampled
+        expected: 0.0063
+      the Patient:
+        bonus: 0.23
+        condition: "first blood after 10 minutes"
+        p: 0.0012          # median first blood in pro games is 1.8 minutes
+        expected: 0.0003
+      the Flayed Twins Acolyte:
+        bonus: 0.09
+        condition: "first blood before the starting horn"
+        p: 0.0            # zero occurrences in 833 sampled matches
+        expected: 0.0
+      the Tormented:
+        bonus: 0.23
+        condition: "any player dies to a Tormentor"
+        p: null            # not exposed by the match data
+      the Cruel:
+        bonus: 0.13
+        condition: "a player is killed in their own fountain"
+        p: null            # not exposed by the match data
+
+    # Prefixes key on hero COLOUR or hero TYPE. This used to be the one hole in
+    # the model -- Valve publishes no such classification and OpenDota does not
+    # expose one, so every `p` was null and the ranking was guesswork.
+    #
+    # RESOLVED. The client ships the mapping: every hero in
+    # scripts/npc/npc_heroes.txt (inside pak01_dir.vpk) carries an `Adjectives`
+    # block, and the prefixes read straight off those flags. Extracted by
+    # `python -m scripts.extract_hero_adjectives` into config/hero_adjectives.yaml.
+    #
+    # `tags` is the Valve flag(s) a prefix fires on -- ANY match counts. `p` is
+    # therefore no longer a constant: it is the share of a specific player's
+    # hero pool carrying the tag, and must be computed per roster. `pool` below
+    # is the field-wide share, for orientation only.
+    #
+    # Heroes carry several tags at once (Sven is Blue AND Red), so these do not
+    # sum to 1.
+    prefixes:
+      Cerulean:     {bonus: 0.11, condition: "blue hero",                   tags: [Blue],                    pool: 29}
+      Royal:        {bonus: 0.10, condition: "purple hero",                 tags: [Purple],                  pool: 20}
+      Heroic:       {bonus: 0.09, condition: "caped or masked hero",        tags: [Cape, Mask, Masked],      pool: 31}
+      Golden:       {bonus: 0.08, condition: "yellow or brown hero",        tags: [Yellow, Brown],           pool: 25}
+      Elemental:    {bonus: 0.08, condition: "aquatic, fiery or icy hero",  tags: [Aquatic, Fiery, Icy],     pool: 26}
+      Otherworldly: {bonus: 0.07, condition: "undead, demon or spirit hero", tags: [Undead, Demon, Spirit],  pool: 26}
+      Crimson:      {bonus: 0.06, condition: "red hero",                    tags: [Red],                     pool: 30}
+      Emerald:      {bonus: 0.06, condition: "green hero",                  tags: [Green],                   pool: 23}
+      # Not offered in this account's CHANGE TITLES dialog, but in the game
+      # files -- they can appear on a reroll.
+      Bestial:      {bonus: null, condition: "hero with horns or wings",    tags: [Horns, Wings],            pool: 24}
+      Hirsute:      {bonus: null, condition: "bearded or fuzzy hero",       tags: [Bearded, Fuzzy],          pool: 36}
+
+    # `Masked` is a Valve typo: Templar Assassin alone carries it where every
+    # other masked hero carries `Mask`. Matched here defensively, but if the
+    # game reads only `Mask` then TA does not in fact pay Heroic.

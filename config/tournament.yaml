@@ -1,0 +1,116 @@
+# The International 2026 - Shanghai, China
+# Group Stage: Aug 13-16 2026 (Swiss, 16 teams, all Bo3, 5 rounds)
+# Main Event:  Aug 20-23 2026
+# Fantasy + Group Stage predictions lock: 2026-08-13 10:00 CST
+
+name: "The International 2026"
+lock_utc: "2026-08-13T02:00:00Z"   # 10:00 CST == 02:00 UTC
+
+group_stage:
+  teams: 16
+  rounds: 5
+  series_format: bo3
+  # Teams at 4-0/4-1 (top 3) advance straight to the Main Event.
+  # Teams at 3-2/2-3 (ranks 4-13) play a single elimination-round series.
+  # Teams at 1-4 / 0-4 are out.
+  direct_advance: 3
+  elimination_round_slots: 10   # 5 winners advance, 5 losers are out
+
+# Main Event, Aug 20-23. Fantasy is per period, so this is its own roster with
+# its own banner and its own 40 reroll tokens -- the Group Stage answer does not
+# carry over. Eight teams, double elimination, all Bo3 except a Bo5 Grand Final.
+#
+# The draw is done, so the bracket is transcribed, not simulated. Round-one
+# pairings below are read left-to-right off the client's Predictions tab
+# (2026-08-17); team names must match config/teams.yaml exactly.
+main_event:
+  teams: 8
+  series_format: bo3
+  grand_final_format: bo5
+  lock_utc: "2026-08-19T02:00:00Z"    # roster locked in 2 days as of Aug 17
+  upper_bracket_round_1:
+    - ["Iron Wing", "Team Spirit"]      # A  (client tags: IW vs TSpirit)
+    - ["PARIVISION", "BetBoom Team"]    # B  (VSN vs BB)
+    - ["Team Liquid", "Team Yandex"]    # C  (Liquid vs TY)
+    - ["Nigma Galaxy", "Team Falcons"]  # D  (NGX vs FLCN)
+  # OpenDota league id for TI 2026 itself. `scripts.bracket_outcomes` fits on
+  # this league alone when asked to use only this tournament's own results.
+  league_id: 19719
+  # The bracket as filled in inside the client (2026-08-18), one winner per node.
+  # Node labels are bracket.NODES.
+  my_picks:
+    A: "Team Spirit"
+    B: "PARIVISION"
+    C: "Team Liquid"
+    D: "Team Falcons"
+    E: "PARIVISION"
+    F: "Team Liquid"
+    G: "PARIVISION"
+    LB1a: "Iron Wing"
+    LB1b: "Nigma Galaxy"
+    LB2a: "Iron Wing"
+    LB2b: "Team Spirit"
+    LB3: "Team Spirit"
+    LBF: "Team Liquid"
+    GF: "PARIVISION"
+  # Group-stage finish, for the record. Direct: VISION 4-0, Liquid 4-1,
+  # Nigma 4-1. Through the elimination round: Falcons, BetBoom, Spirit, Iron Wing,
+  # Yandex. Out: OG, L1GA and Xtreme (worst three), then Vici, Aurora,
+  # Resilience, GamerLegion and LGD in the elimination round.
+  eliminated:
+    - "OG"
+    - "L1GA TEAM"
+    - "Xtreme Gaming"
+    - "Vici Gaming"
+    - "Aurora Gaming"
+    - "Team Resilience"
+    - "GamerLegion"
+    - "LGD Gaming"
+
+# Prediction grid, mirroring the in-client layout. `count` must sum to 16.
+# `points` = what a correct pick in that bucket is worth. Valve has not
+# published per-bucket values for 2026; equal weighting is the safe default.
+# If HOW TO PLAY shows different values, edit here and re-run.
+prediction_buckets:
+  - id: undefeated
+    label: "4-0 (one undefeated team)"
+    count: 1
+    points: 1.0
+  - id: four_one
+    label: "4-1 (two teams)"
+    count: 2
+    points: 1.0
+  - id: elim_winner
+    label: "Elimination Round Winner (five teams)"
+    count: 5
+    points: 1.0
+  - id: elim_loser
+    label: "Elimination Round Loser (five teams)"
+    count: 5
+    points: 1.0
+  - id: one_four
+    label: "1-4 (two teams)"
+    count: 2
+    points: 1.0
+  - id: winless
+    label: "0-4 (one team)"
+    count: 1
+    points: 1.0
+
+# Fantasy roster construction (new duo-based format for TI 2026).
+fantasy:
+  slots:
+    support_duo:
+      description: "Both supports (soft + hard) from ONE team"
+      roles: [soft_support, hard_support]
+      same_team: true
+    core_duo:
+      description: "Safelane carry + offlaner from ONE team"
+      roles: [carry, offlane]
+      same_team: true
+    mid:
+      description: "Any single mid laner"
+      roles: [mid]
+      same_team: false
+  # Set true if the client forbids drawing two duos from the same team.
+  distinct_teams_required: false

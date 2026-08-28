@@ -1,0 +1,470 @@
+{
+  "teams": {
+    "Aurora Gaming": {
+      "team_id": 9467224,
+      "canonical": "Aurora Gaming"
+    },
+    "BetBoom Team": {
+      "team_id": 8255888,
+      "canonical": "BoomBoys"
+    },
+    "Team Falcons": {
+      "team_id": 9247354,
+      "canonical": "Team Falcons"
+    },
+    "Team Liquid": {
+      "team_id": 2163,
+      "canonical": "Team Liquid"
+    },
+    "Xtreme Gaming": {
+      "team_id": 8261500,
+      "canonical": "Xtreme Gaming"
+    },
+    "Team Yandex": {
+      "team_id": 9823272,
+      "canonical": "Team Yandex"
+    },
+    "Vici Gaming": {
+      "team_id": 726228,
+      "canonical": "Vici Gaming"
+    },
+    "Team Resilience": {
+      "team_id": 5017210,
+      "canonical": "Team Resilience"
+    },
+    "LGD Gaming": {
+      "team_id": 10150538,
+      "canonical": "LGD Gaming"
+    },
+    "OG": {
+      "team_id": 2586976,
+      "canonical": "OG"
+    },
+    "Team Spirit": {
+      "team_id": 7119388,
+      "canonical": "Team Spirit"
+    },
+    "PARIVISION": {
+      "team_id": 9572001,
+      "canonical": "TEAM VISION"
+    },
+    "GamerLegion": {
+      "team_id": 9964962,
+      "canonical": "GamerLegion"
+    },
+    "Nigma Galaxy": {
+      "team_id": 10136357,
+      "canonical": "Nigma Galaxy "
+    },
+    "L1GA TEAM": {
+      "team_id": 10149530,
+      "canonical": "HULIGANI"
+    },
+    "Iron Wing": {
+      "team_id": 10150413,
+      "canonical": "Iron Wing"
+    }
+  },
+  "players": {
+    "Aurora Gaming/Nightfall": {
+      "account_id": 124801257,
+      "canonical": "Nightfall",
+      "confidence": "exact"
+    },
+    "Aurora Gaming/Mikoto": {
+      "account_id": 301750126,
+      "canonical": "Mikoto",
+      "confidence": "exact"
+    },
+    "Aurora Gaming/ws": {
+      "account_id": 126842529,
+      "canonical": "Ws`",
+      "confidence": "exact"
+    },
+    "Aurora Gaming/Mira": {
+      "account_id": 256156323,
+      "canonical": "Mira",
+      "confidence": "exact"
+    },
+    "Aurora Gaming/kaori": {
+      "account_id": 320219866,
+      "canonical": "kaori",
+      "confidence": "exact"
+    },
+    "BetBoom Team/Kiritych": {
+      "account_id": 172099728,
+      "canonical": "Kiritych~",
+      "confidence": "exact"
+    },
+    "BetBoom Team/Gpk": {
+      "account_id": 480412663,
+      "canonical": "gpk~",
+      "confidence": "exact"
+    },
+    "BetBoom Team/MieRo": {
+      "account_id": 165564598,
+      "canonical": "MieRo",
+      "confidence": "exact"
+    },
+    "BetBoom Team/Save-": {
+      "account_id": 317880638,
+      "canonical": "Save-",
+      "confidence": "exact"
+    },
+    "BetBoom Team/Kataomi": {
+      "account_id": 196878136,
+      "canonical": "Kataomi`",
+      "confidence": "exact"
+    },
+    "Team Falcons/Skiter": {
+      "account_id": 100058342,
+      "canonical": "skiter",
+      "confidence": "exact"
+    },
+    "Team Falcons/Malr1ne": {
+      "account_id": 898455820,
+      "canonical": "Malr1ne",
+      "confidence": "exact"
+    },
+    "Team Falcons/ATF": {
+      "account_id": 183719386,
+      "canonical": "AMMAR_THE_F",
+      "confidence": "alias"
+    },
+    "Team Falcons/Cr1t-": {
+      "account_id": 25907144,
+      "canonical": "Cr1t-",
+      "confidence": "exact"
+    },
+    "Team Falcons/Sneyking": {
+      "account_id": 10366616,
+      "canonical": "Sneyking",
+      "confidence": "exact"
+    },
+    "Team Liquid/miCKe": {
+      "account_id": 152962063,
+      "canonical": null,
+      "confidence": "override"
+    },
+    "Team Liquid/Nisha": {
+      "account_id": 201358612,
+      "canonical": "Nisha",
+      "confidence": "exact"
+    },
+    "Team Liquid/Ace": {
+      "account_id": 97590558,
+      "canonical": "Ace \u2660",
+      "confidence": "exact"
+    },
+    "Team Liquid/tOfu": {
+      "account_id": 16497807,
+      "canonical": "tOfu",
+      "confidence": "exact"
+    },
+    "Team Liquid/Boxi": {
+      "account_id": 77490514,
+      "canonical": "Boxi",
+      "confidence": "exact"
+    },
+    "Xtreme Gaming/Ame": {
+      "account_id": 898754153,
+      "canonical": "Ame",
+      "confidence": "exact"
+    },
+    "Xtreme Gaming/NothingToSay": {
+      "account_id": 173978074,
+      "canonical": "NothingToSay",
+      "confidence": "exact"
+    },
+    "Xtreme Gaming/Xxs": {
+      "account_id": 129958758,
+      "canonical": "Xxs",
+      "confidence": "exact"
+    },
+    "Xtreme Gaming/fy": {
+      "account_id": 101695162,
+      "canonical": "fy",
+      "confidence": "exact"
+    },
+    "Xtreme Gaming/xNova": {
+      "account_id": 94296097,
+      "canonical": "xNova",
+      "confidence": "exact"
+    },
+    "Team Yandex/watson": {
+      "account_id": 171262902,
+      "canonical": "\u533b\u8005watson`",
+      "confidence": "alias"
+    },
+    "Team Yandex/Chira_Junior": {
+      "account_id": 312436974,
+      "canonical": "CHIRA_JUNIOR",
+      "confidence": "exact"
+    },
+    "Team Yandex/DM": {
+      "account_id": 56351509,
+      "canonical": "DM",
+      "confidence": "exact"
+    },
+    "Team Yandex/Saksa": {
+      "account_id": 103735745,
+      "canonical": "Saksa",
+      "confidence": "exact"
+    },
+    "Team Yandex/Malady": {
+      "account_id": 93817671,
+      "canonical": "Maladych",
+      "confidence": "alias"
+    },
+    "Vici Gaming/shiro": {
+      "account_id": 320252024,
+      "canonical": "shiro",
+      "confidence": "exact"
+    },
+    "Vici Gaming/Xm": {
+      "account_id": 137129583,
+      "canonical": "Xm",
+      "confidence": "exact"
+    },
+    "Vici Gaming/Bach": {
+      "account_id": 118134220,
+      "canonical": "Bach",
+      "confidence": "exact"
+    },
+    "Vici Gaming/XinQ": {
+      "account_id": 157475523,
+      "canonical": "XinQ",
+      "confidence": "exact"
+    },
+    "Vici Gaming/Y": {
+      "account_id": 111114687,
+      "canonical": "y`",
+      "confidence": "exact"
+    },
+    "Team Resilience/Erika": {
+      "account_id": 170896543,
+      "canonical": null,
+      "confidence": "override"
+    },
+    "Team Resilience/Echo": {
+      "account_id": 315272623,
+      "canonical": null,
+      "confidence": "override"
+    },
+    "Team Resilience/niu": {
+      "account_id": 145957968,
+      "canonical": "niu",
+      "confidence": "exact"
+    },
+    "Team Resilience/planet": {
+      "account_id": 150961567,
+      "canonical": "planet",
+      "confidence": "exact"
+    },
+    "Team Resilience/zzq": {
+      "account_id": 249835593,
+      "canonical": "zzq",
+      "confidence": "exact"
+    },
+    "LGD Gaming/Yuma": {
+      "account_id": 177203952,
+      "canonical": "Yuma",
+      "confidence": "exact"
+    },
+    "LGD Gaming/TaiLung": {
+      "account_id": 1026694469,
+      "canonical": "TaiLung",
+      "confidence": "exact"
+    },
+    "LGD Gaming/Wisper": {
+      "account_id": 292921272,
+      "canonical": "Wisper",
+      "confidence": "exact"
+    },
+    "LGD Gaming/Thiolicor": {
+      "account_id": 105045291,
+      "canonical": "Thiolicor",
+      "confidence": "exact"
+    },
+    "LGD Gaming/KJ": {
+      "account_id": 81306398,
+      "canonical": "KingJungles",
+      "confidence": "alias"
+    },
+    "OG/Natsumi": {
+      "account_id": 355168766,
+      "canonical": "Natsumi",
+      "confidence": "exact"
+    },
+    "OG/Yopaj": {
+      "account_id": 324277900,
+      "canonical": "Yopaj-",
+      "confidence": "exact"
+    },
+    "OG/Raven": {
+      "account_id": 132309493,
+      "canonical": "Raven",
+      "confidence": "exact"
+    },
+    "OG/TIMS": {
+      "account_id": 155494381,
+      "canonical": "TIMS",
+      "confidence": "exact"
+    },
+    "OG/skem": {
+      "account_id": 100594231,
+      "canonical": "skem",
+      "confidence": "exact"
+    },
+    "Team Spirit/Yatoro": {
+      "account_id": 321580662,
+      "canonical": "Yatoro",
+      "confidence": "exact"
+    },
+    "Team Spirit/Larl": {
+      "account_id": 106305042,
+      "canonical": "Larl",
+      "confidence": "exact"
+    },
+    "Team Spirit/Collapse": {
+      "account_id": 302214028,
+      "canonical": "Collapse",
+      "confidence": "exact"
+    },
+    "Team Spirit/not me": {
+      "account_id": 218231587,
+      "canonical": "not_me",
+      "confidence": "exact"
+    },
+    "Team Spirit/Rue": {
+      "account_id": 847565596,
+      "canonical": "rue",
+      "confidence": "exact"
+    },
+    "PARIVISION/Satanic": {
+      "account_id": 1044002267,
+      "canonical": "Satanic",
+      "confidence": "exact"
+    },
+    "PARIVISION/No[o]ne": {
+      "account_id": 106573901,
+      "canonical": "No[o]ne-",
+      "confidence": "exact"
+    },
+    "PARIVISION/Noticed": {
+      "account_id": 195108598,
+      "canonical": "Noticed",
+      "confidence": "exact"
+    },
+    "PARIVISION/9Class": {
+      "account_id": 164199202,
+      "canonical": "9Class",
+      "confidence": "exact"
+    },
+    "PARIVISION/Dukalis": {
+      "account_id": 73401082,
+      "canonical": "Dukalis",
+      "confidence": "exact"
+    },
+    "GamerLegion/Ghost": {
+      "account_id": 206642367,
+      "canonical": "Ghost",
+      "confidence": "exact"
+    },
+    "GamerLegion/RCY": {
+      "account_id": 154974246,
+      "canonical": "RCY",
+      "confidence": "exact"
+    },
+    "GamerLegion/Fayde": {
+      "account_id": 160119017,
+      "canonical": "Fayde",
+      "confidence": "exact"
+    },
+    "GamerLegion/Bignum": {
+      "account_id": 90423751,
+      "canonical": "Bignum",
+      "confidence": "exact"
+    },
+    "GamerLegion/Speeed": {
+      "account_id": 191362875,
+      "canonical": "Speeed",
+      "confidence": "exact"
+    },
+    "Nigma Galaxy/Suma1L": {
+      "account_id": 111620041,
+      "canonical": null,
+      "confidence": "override"
+    },
+    "Nigma Galaxy/Lorenof": {
+      "account_id": 210053851,
+      "canonical": "lorenof",
+      "confidence": "exact"
+    },
+    "Nigma Galaxy/Davai Lama": {
+      "account_id": 138880576,
+      "canonical": null,
+      "confidence": "override"
+    },
+    "Nigma Galaxy/OmaR": {
+      "account_id": 152168157,
+      "canonical": "OmaR",
+      "confidence": "exact"
+    },
+    "Nigma Galaxy/GH": {
+      "account_id": 101356886,
+      "canonical": "GH",
+      "confidence": "exact"
+    },
+    "L1GA TEAM/ssnovv1": {
+      "account_id": 320017600,
+      "canonical": "ssnovv1",
+      "confidence": "exact"
+    },
+    "L1GA TEAM/Mirage": {
+      "account_id": 140251702,
+      "canonical": "Mirage`\u96e8",
+      "confidence": "alias"
+    },
+    "L1GA TEAM/Corrupted": {
+      "account_id": 92487440,
+      "canonical": "Corrupted",
+      "confidence": "exact"
+    },
+    "L1GA TEAM/sayuw": {
+      "account_id": 145065875,
+      "canonical": "sayuw",
+      "confidence": "exact"
+    },
+    "L1GA TEAM/RESPECT": {
+      "account_id": 123787715,
+      "canonical": "RESPECT",
+      "confidence": "exact"
+    },
+    "Iron Wing/Pure": {
+      "account_id": 331855530,
+      "canonical": "Pure",
+      "confidence": "exact"
+    },
+    "Iron Wing/BZM": {
+      "account_id": 93618577,
+      "canonical": "bzm",
+      "confidence": "exact"
+    },
+    "Iron Wing/33": {
+      "account_id": 86698277,
+      "canonical": "33",
+      "confidence": "exact"
+    },
+    "Iron Wing/Ari": {
+      "account_id": 346412363,
+      "canonical": "Ari",
+      "confidence": "exact"
+    },
+    "Iron Wing/Whitemon": {
+      "account_id": 136829091,
+      "canonical": "Whitemon",
+      "confidence": "exact"
+    }
+  }
+}

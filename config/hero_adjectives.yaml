@@ -1,0 +1,866 @@
+# Valve's per-hero appearance tags, extracted from the Dota 2 client's
+# scripts/npc/npc_heroes.txt (inside pak01_dir.vpk) by
+# `python -m scripts.extract_hero_adjectives`. DO NOT HAND-EDIT.
+#
+# These are the ground truth behind the coach-title PREFIXES: Cerulean
+# pays on a blue hero, Royal on a purple one, Heroic on a caped or masked
+# one. The mapping is published nowhere else -- not on OpenDota, not on
+# any community site -- but the client ships it.
+#
+# Heroes carry more than one tag: Sven is Blue AND Red, Muerta is Blue AND
+# Green, Abaddon is Blue AND Purple. A prefix fires if ANY of its tags
+# match, so the categories overlap and do not sum to the hero pool.
+#
+# Re-run after any patch that adds a hero.
+source: npc_heroes.txt Adjectives block, Dota 2 client
+prefix_tags:
+  Cerulean:
+  - Blue
+  Royal:
+  - Purple
+  Heroic:
+  - Cape
+  - Mask
+  - Masked
+  Golden:
+  - Yellow
+  - Brown
+  Elemental:
+  - Aquatic
+  - Fiery
+  - Icy
+  Otherworldly:
+  - Undead
+  - Demon
+  - Spirit
+  Crimson:
+  - Red
+  Emerald:
+  - Green
+  Bestial:
+  - Horns
+  - Wings
+  Hirsute:
+  - Bearded
+  - Fuzzy
+tag_counts:
+  Red: 30
+  Blue: 29
+  Bearded: 26
+  Female: 24
+  Green: 23
+  Flying: 23
+  Cape: 21
+  Purple: 20
+  NicePecs: 17
+  Yellow: 16
+  Undead: 15
+  Horns: 14
+  Arachnophobic: 14
+  Fiery: 14
+  Steed: 13
+  Wings: 13
+  BadTeeth: 12
+  Fuzzy: 12
+  Parent: 11
+  Mask: 10
+  Brown: 10
+  Potbelly: 8
+  Icy: 8
+  Cute: 8
+  Demon: 7
+  Aquatic: 6
+  Spirit: 5
+  Masked: 1
+heroes:
+  102:
+    npc: abaddon
+    tags:
+    - Blue
+    - Cape
+    - Purple
+    - Steed
+  108:
+    npc: abyssal_underlord
+    tags:
+    - Demon
+    - Green
+    - Horns
+    - Potbelly
+  73:
+    npc: alchemist
+    tags:
+    - Bearded
+    - Potbelly
+    - Steed
+    - Yellow
+  68:
+    npc: ancient_apparition
+    tags:
+    - Blue
+    - Flying
+    - Icy
+  1:
+    npc: antimage
+    tags:
+    - NicePecs
+    - Parent
+    - Purple
+  113:
+    npc: arc_warden
+    tags:
+    - Arachnophobic
+    - Blue
+    - Cape
+  2:
+    npc: axe
+    tags:
+    - Bearded
+    - NicePecs
+    - Red
+  3:
+    npc: bane
+    tags:
+    - BadTeeth
+    - Flying
+    - Purple
+  65:
+    npc: batrider
+    tags:
+    - Arachnophobic
+    - Cape
+    - Fiery
+    - Flying
+    - Red
+    - Steed
+    - Yellow
+  38:
+    npc: beastmaster
+    tags:
+    - Bearded
+    - Horns
+    - NicePecs
+    - Red
+  4:
+    npc: bloodseeker
+    tags:
+    - BadTeeth
+    - Cape
+    - Mask
+    - Red
+  62:
+    npc: bounty_hunter
+    tags:
+    - BadTeeth
+    - Mask
+    - Yellow
+  78:
+    npc: brewmaster
+    tags:
+    - Fiery
+    - Fuzzy
+    - Potbelly
+    - Red
+  99:
+    npc: bristleback
+    tags:
+    - NicePecs
+    - Yellow
+  61:
+    npc: broodmother
+    tags:
+    - Female
+    - Parent
+    - Red
+  96:
+    npc: centaur
+    tags:
+    - Bearded
+    - Brown
+    - Horns
+  81:
+    npc: chaos_knight
+    tags:
+    - Mask
+    - Red
+    - Steed
+  66:
+    npc: chen
+    tags:
+    - Arachnophobic
+    - Steed
+    - Yellow
+  56:
+    npc: clinkz
+    tags:
+    - Fiery
+    - Horns
+    - Undead
+    - Yellow
+  5:
+    npc: crystal_maiden
+    tags:
+    - Blue
+    - Cape
+    - Cute
+    - Female
+    - Icy
+  55:
+    npc: dark_seer
+    tags:
+    - Bearded
+    - Parent
+    - Purple
+  119:
+    npc: dark_willow
+    tags:
+    - Cute
+    - Female
+    - Flying
+    - Green
+    - Purple
+    - Wings
+  135:
+    npc: dawnbreaker
+    tags:
+    - Female
+    - Fiery
+    - Yellow
+  50:
+    npc: dazzle
+    tags:
+    - Purple
+  43:
+    npc: death_prophet
+    tags:
+    - Arachnophobic
+    - Female
+    - Flying
+    - Undead
+  87:
+    npc: disruptor
+    tags:
+    - Bearded
+    - Red
+    - Steed
+  69:
+    npc: doom_bringer
+    tags:
+    - Arachnophobic
+    - Demon
+    - Fiery
+    - Horns
+    - Red
+    - Wings
+  49:
+    npc: dragon_knight
+    tags:
+    - Fiery
+    - Red
+  6:
+    npc: drow_ranger
+    tags:
+    - Cape
+    - Female
+    - Icy
+    - Purple
+  107:
+    npc: earth_spirit
+    tags:
+    - Green
+    - NicePecs
+    - Spirit
+  7:
+    npc: earthshaker
+    tags:
+    - Brown
+    - Fuzzy
+  103:
+    npc: elder_titan
+    tags:
+    - Horns
+    - NicePecs
+    - Parent
+    - Yellow
+  106:
+    npc: ember_spirit
+    tags:
+    - Fiery
+    - Red
+    - Spirit
+  58:
+    npc: enchantress
+    tags:
+    - Arachnophobic
+    - Cute
+    - Female
+    - Fuzzy
+    - Green
+    - Horns
+  33:
+    npc: enigma
+    tags:
+    - Flying
+    - NicePecs
+    - Purple
+  41:
+    npc: faceless_void
+    tags:
+    - NicePecs
+    - Purple
+  53:
+    npc: furion
+    tags:
+    - Arachnophobic
+    - Bearded
+    - Cape
+    - Green
+  121:
+    npc: grimstroke
+    tags:
+    - Bearded
+    - Flying
+    - Mask
+    - Undead
+  72:
+    npc: gyrocopter
+    tags:
+    - Flying
+    - Mask
+    - Steed
+    - Yellow
+  123:
+    npc: hoodwink
+    tags:
+    - Cute
+    - Female
+    - Fuzzy
+    - Green
+  59:
+    npc: huskar
+    tags:
+    - Blue
+    - Fiery
+    - NicePecs
+    - Undead
+  74:
+    npc: invoker
+    tags:
+    - Cape
+    - Fiery
+    - Icy
+    - Parent
+  64:
+    npc: jakiro
+    tags:
+    - Blue
+    - Fiery
+    - Flying
+    - Icy
+    - Red
+    - Wings
+  8:
+    npc: juggernaut
+    tags:
+    - BadTeeth
+    - Bearded
+    - Mask
+    - NicePecs
+  90:
+    npc: keeper_of_the_light
+    tags:
+    - Bearded
+    - Parent
+    - Steed
+    - Yellow
+  145:
+    npc: kez
+    tags:
+    - Blue
+  23:
+    npc: kunkka
+    tags:
+    - Aquatic
+    - Bearded
+    - Undead
+  155:
+    npc: largo
+    tags:
+    - Brown
+    - Green
+  104:
+    npc: legion_commander
+    tags:
+    - Female
+    - Red
+  52:
+    npc: leshrac
+    tags:
+    - Blue
+    - Horns
+  31:
+    npc: lich
+    tags:
+    - Blue
+    - Flying
+    - Icy
+    - Undead
+  54:
+    npc: life_stealer
+    tags:
+    - BadTeeth
+    - Undead
+  25:
+    npc: lina
+    tags:
+    - Female
+    - Fiery
+    - Flying
+    - Red
+  26:
+    npc: lion
+    tags:
+    - Cape
+    - Demon
+    - Purple
+  80:
+    npc: lone_druid
+    tags:
+    - Arachnophobic
+    - Bearded
+    - Brown
+    - Fuzzy
+  48:
+    npc: luna
+    tags:
+    - Blue
+    - Female
+    - Steed
+  77:
+    npc: lycan
+    tags:
+    - Arachnophobic
+    - Bearded
+    - Fuzzy
+    - Red
+  97:
+    npc: magnataur
+    tags:
+    - Brown
+    - Fuzzy
+    - Horns
+  136:
+    npc: marci
+    tags:
+    - Cape
+    - Cute
+    - Female
+  129:
+    npc: mars
+    tags:
+    - Bearded
+    - NicePecs
+    - Parent
+    - Red
+  94:
+    npc: medusa
+    tags:
+    - Female
+    - Green
+  82:
+    npc: meepo
+    tags:
+    - Cute
+    - Fuzzy
+    - Parent
+  9:
+    npc: mirana
+    tags:
+    - Blue
+    - Female
+    - Steed
+  114:
+    npc: monkey_king
+    tags:
+    - Cape
+    - Fuzzy
+    - Green
+  10:
+    npc: morphling
+    tags:
+    - Aquatic
+    - Blue
+  138:
+    npc: muerta
+    tags:
+    - Blue
+    - Cape
+    - Female
+    - Green
+    - Undead
+  89:
+    npc: naga_siren
+    tags:
+    - Aquatic
+    - Female
+    - Green
+  36:
+    npc: necrolyte
+    tags:
+    - Bearded
+    - Green
+    - Undead
+  11:
+    npc: nevermore
+    tags:
+    - Demon
+    - Flying
+    - Red
+  60:
+    npc: night_stalker
+    tags:
+    - Blue
+    - Flying
+    - NicePecs
+    - Wings
+  88:
+    npc: nyx_assassin
+    tags:
+    - Red
+  76:
+    npc: obsidian_destroyer
+    tags:
+    - Arachnophobic
+    - Flying
+    - Green
+    - Wings
+  84:
+    npc: ogre_magi
+    tags:
+    - Blue
+    - Fiery
+    - Potbelly
+  57:
+    npc: omniknight
+    tags:
+    - Bearded
+    - Cape
+  111:
+    npc: oracle
+    tags:
+    - Blue
+    - Cape
+    - Flying
+  120:
+    npc: pangolier
+    tags:
+    - Fuzzy
+    - Parent
+    - Red
+  44:
+    npc: phantom_assassin
+    tags:
+    - Cape
+    - Female
+    - Green
+  12:
+    npc: phantom_lancer
+    tags:
+    - Bearded
+    - Blue
+  110:
+    npc: phoenix
+    tags:
+    - Fiery
+    - Flying
+    - Red
+    - Wings
+    - Yellow
+  137:
+    npc: primal_beast
+    tags:
+    - BadTeeth
+    - Brown
+    - Red
+  13:
+    npc: puck
+    tags:
+    - Blue
+    - Cute
+    - Flying
+    - Wings
+  14:
+    npc: pudge
+    tags:
+    - BadTeeth
+    - NicePecs
+    - Potbelly
+    - Red
+    - Undead
+  45:
+    npc: pugna
+    tags:
+    - Cape
+    - Green
+    - Horns
+    - Undead
+  39:
+    npc: queenofpain
+    tags:
+    - Blue
+    - Demon
+    - Female
+    - Horns
+    - Wings
+  51:
+    npc: rattletrap
+    tags:
+    - Arachnophobic
+    - Mask
+    - Red
+  15:
+    npc: razor
+    tags:
+    - Blue
+    - Flying
+  32:
+    npc: riki
+    tags:
+    - Bearded
+    - Horns
+    - Purple
+  131:
+    npc: ringmaster
+    tags:
+    - Red
+    - Yellow
+  86:
+    npc: rubick
+    tags:
+    - Arachnophobic
+    - Cape
+    - Green
+    - Yellow
+  16:
+    npc: sand_king
+    tags:
+    - Brown
+  79:
+    npc: shadow_demon
+    tags:
+    - Cape
+    - Demon
+    - NicePecs
+    - Red
+  27:
+    npc: shadow_shaman
+    tags:
+    - BadTeeth
+    - Mask
+    - Yellow
+  98:
+    npc: shredder
+    tags:
+    - BadTeeth
+    - Purple
+    - Steed
+  75:
+    npc: silencer
+    tags:
+    - Purple
+  42:
+    npc: skeleton_king
+    tags:
+    - Bearded
+    - Green
+    - Undead
+  101:
+    npc: skywrath_mage
+    tags:
+    - Flying
+    - Wings
+  28:
+    npc: slardar
+    tags:
+    - Aquatic
+    - Purple
+  93:
+    npc: slark
+    tags:
+    - Aquatic
+  128:
+    npc: snapfire
+    tags:
+    - Female
+    - Red
+    - Steed
+  35:
+    npc: sniper
+    tags:
+    - Bearded
+    - Cape
+    - Red
+  67:
+    npc: spectre
+    tags:
+    - Female
+    - Purple
+    - Undead
+  71:
+    npc: spirit_breaker
+    tags:
+    - Bearded
+    - Blue
+    - Horns
+  17:
+    npc: storm_spirit
+    tags:
+    - Bearded
+    - Blue
+    - Spirit
+  18:
+    npc: sven
+    tags:
+    - Blue
+    - Mask
+    - NicePecs
+    - Red
+  105:
+    npc: techies
+    tags:
+    - Fiery
+    - Potbelly
+    - Steed
+    - Yellow
+  46:
+    npc: templar_assassin
+    tags:
+    - Female
+    - Masked
+    - Purple
+  109:
+    npc: terrorblade
+    tags:
+    - Demon
+    - Horns
+    - Purple
+    - Wings
+  29:
+    npc: tidehunter
+    tags:
+    - Aquatic
+    - BadTeeth
+    - Green
+    - Potbelly
+  34:
+    npc: tinker
+    tags:
+    - Bearded
+    - Brown
+    - Mask
+    - Yellow
+  19:
+    npc: tiny
+    tags:
+    - Brown
+  83:
+    npc: treant
+    tags:
+    - Brown
+    - Green
+  95:
+    npc: troll_warlord
+    tags:
+    - Red
+  100:
+    npc: tusk
+    tags:
+    - Arachnophobic
+    - Fuzzy
+    - Icy
+  85:
+    npc: undying
+    tags:
+    - BadTeeth
+    - Green
+    - Undead
+  70:
+    npc: ursa
+    tags:
+    - Fuzzy
+    - Parent
+    - Purple
+  20:
+    npc: vengefulspirit
+    tags:
+    - Blue
+    - Female
+    - Spirit
+    - Undead
+  40:
+    npc: venomancer
+    tags:
+    - Green
+  47:
+    npc: viper
+    tags:
+    - Arachnophobic
+    - Flying
+    - Green
+    - Wings
+  92:
+    npc: visage
+    tags:
+    - Blue
+    - Flying
+    - Wings
+  126:
+    npc: void_spirit
+    tags:
+    - Bearded
+    - NicePecs
+    - Purple
+    - Spirit
+  37:
+    npc: warlock
+    tags:
+    - Bearded
+    - Cape
+    - Red
+  63:
+    npc: weaver
+    tags:
+    - Blue
+  21:
+    npc: windrunner
+    tags:
+    - Cape
+    - Cute
+    - Female
+    - Green
+  112:
+    npc: winter_wyvern
+    tags:
+    - Blue
+    - Female
+    - Flying
+    - Icy
+    - Wings
+  91:
+    npc: wisp
+    tags:
+    - Blue
+    - Flying
+  30:
+    npc: witch_doctor
+    tags:
+    - BadTeeth
+    - Potbelly
+    - Purple
+  22:
+    npc: zuus
+    tags:
+    - Bearded
+    - Blue
+    - NicePecs
+    - Parent

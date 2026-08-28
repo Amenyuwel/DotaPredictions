@@ -1,0 +1,66 @@
+# The War Banners you actually rolled, transcribed from the client.
+#
+# Once rolls are spent, the optimisation inverts: the emblems are fixed and the
+# only free choices left are WHICH TEAM's players stand behind them, WHICH coach
+# Titles are equipped, and -- because two traits are positional -- WHAT ORDER the
+# emblems sit in. See dota/emblems.py and scripts/emblem_order.py.
+#
+# `emblems` is listed TOP TO BOTTOM as the client draws it, and order is
+# meaningful: Vampiric charges each neighbour -10%, Benevolent pays each
+# neighbour +20%.
+#
+# `displayed` is the percentage the client shows, as a multiplier (300% -> 3.00).
+# It is redundant -- dota/emblems.py derives it from tier + trait + neighbours --
+# and that is the point: tests/test_emblems.py fails if the two disagree, which
+# catches both a mis-transcription and a wrong model of the trait rules. All
+# fifteen currently agree.
+#
+# Note the client permits repeated colours (Core carries four reds) but never a
+# repeated stat. dota/banner.py's one-per-colour rule applies only to *choosing*
+# emblems and is bypassed here.
+
+# ---------------------------------------------------------------------------
+# MAIN EVENT (period 2), transcribed 2026-08-17. Five emblems per banner.
+# No roll tokens remain: these stats are final.
+# ---------------------------------------------------------------------------
+core:
+  emblems:
+    - {stat: gold_per_min,       tier: tier_v,   trait: vampiric, displayed: 3.00}
+    - {stat: tormentor_kills,    tier: tier_iii, trait: fractal,  displayed: 1.50}
+    - {stat: tower_kills,        tier: tier_ii,  trait: fractal,  displayed: 1.20}
+    - {stat: roshan_kills,       tier: tier_ii,  trait: vampiric, displayed: 1.80}
+    - {stat: madstone_collected, tier: tier_ii,  trait: friendly, displayed: 1.20}
+  # Fractal is dead on this banner: it needs every quality to differ and there are
+  # three Tier IIs. Quality cannot be rerolled, so only a different emblem from
+  # inventory would revive it -- worth +60% on two emblems if you have one.
+
+mid:
+  emblems:
+    - {stat: creep_score,             tier: tier_iv,  trait: fractal,    displayed: 2.20}
+    - {stat: rune_pickups,            tier: tier_iii, trait: benevolent, displayed: 1.60}
+    - {stat: seconds_stunned,         tier: tier_ii,  trait: fractal,    displayed: 1.50}
+    - {stat: madstone_collected,      tier: tier_iii, trait: unique,     displayed: 1.90}
+    - {stat: teamfight_participation, tier: tier_ii,  trait: friendly,   displayed: 1.30}
+  # The two Fractals show +20% rather than 0%: that is the Benevolent emblem at
+  # position 2 paying its neighbours, not Fractal firing. Fractal is dead here too
+  # (two Tier IIIs, two Tier IIs).
+
+support:
+  emblems:
+    - {stat: smokes_used,             tier: tier_iv, trait: friendly, displayed: 1.90}
+    - {stat: seconds_stunned,         tier: tier_iv, trait: vampiric, displayed: 2.50}
+    - {stat: rune_pickups,            tier: tier_iv, trait: fractal,  displayed: 1.80}
+    - {stat: teamfight_participation, tier: tier_ii, trait: vampiric, displayed: 1.80}
+    - {stat: lotuses_grabbed,         tier: tier_ii, trait: fractal,  displayed: 1.20}
+  # Runes sits between BOTH Vampirics and eats -20%. Lotuses is unmeasurable from
+  # OpenDota and scores 0 in the model -- and with no rerolls left it stays that
+  # way, so the only thing to do with it is park it next to a Vampiric where its
+  # -10% costs nothing.
+
+# ---------------------------------------------------------------------------
+# GROUP STAGE (period 1), kept for reference. Three emblems per banner. These no
+# longer score anything: fantasy resets per period.
+# ---------------------------------------------------------------------------
+# core:    tower_kills 3.00 (V+Vampiric), teamfight 2.10 (III+Fractal), gpm 1.90 (II+Fractal)
+# mid:     creep_score 2.00 (IV), rune_pickups 1.30 (II), seconds_stunned 1.30 (II)
+# support: smokes 1.90 (IV+Fractal), seconds_stunned 2.50 (IV+Vampiric), rune_pickups 1.90 (IV+Fractal)

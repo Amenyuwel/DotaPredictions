@@ -1,0 +1,100 @@
+# Gameplay patch adjustment layer.
+#
+# WHY THIS EXISTS: ratings and stat profiles are fit on ~6 months of results
+# spanning several patches. 7.41e landed 2026-07-30, fourteen days before the
+# Aug 13 lock, so essentially no post-patch pro data will exist before you have
+# to commit. That makes this a PRIOR, not a fit. Everything here is hand-entered
+# and every line names the change it comes from.
+#
+# Read the shape of 7.41e before trusting any of it: the patch mostly hits
+# KILLS and TOWER DAMAGE. The banners this model actually selects take Deaths /
+# Creep Score on red, Wards / Runes / Camps on blue, and Teamfight Participation
+# on green. So the honest expectation is that this layer barely moves anything,
+# and its job is to demonstrate that rather than to reshuffle the board. Run
+# with --patch-strength 0 to see the difference.
+
+version: "7.41e"
+released_utc: "2026-07-30T00:00:00Z"
+source: "https://www.dota2.com/patches/7.41e"
+
+# Global dial on everything below. 0.0 disables the layer; 1.0 applies as
+# written. A multiplier m is applied as 1 + (m - 1) * strength.
+strength: 1.0
+
+# HERO VIABILITY. This is the good version of a patch adjustment, and it should
+# be preferred over the per-role stat multipliers below.
+#
+# Weight applied to a historical game based on the hero played in it. A player
+# with ten Zeus games in the corpus has those ten games discounted, because the
+# stat line they produced on Zeus is no longer the stat line they will produce.
+#
+# What is DATA here: which games each player played on which hero. OpenDota
+# returns hero_id on 100% of the 5,842 player-game rows in this corpus, so the
+# mapping is exact, per player, per game.
+# What is ASSUMPTION here: the magnitudes below, read off the 7.41e notes. They
+# are reported as assumptions in the factor audit and never as measurements.
+#
+# 1.0 = unaffected. Below 1 = nerfed, discount those games. Above 1 = buffed.
+hero_viability:
+  Zeus: 0.70              # ultimate damage cut; Rapier spell amp no longer stacks
+  Snapfire: 0.75          # Scatterblast, Firesnap Cookie, Mortimer Kisses all nerfed
+  "Drow Ranger": 0.78     # higher mana cost, less range, lower multishot damage
+  "Lone Druid": 0.80      # Spirit Bear Demolish 30% -> 20%
+  Necrophos: 0.85
+  Hoodwink: 0.85
+  Clockwerk: 0.88
+  "Treant Protector": 0.88
+  Bane: 0.90              # Nightmare changes, but the hero stays relevant
+
+  "Ancient Apparition": 1.20   # Ice Blast cooldown 60 -> 50 at level 1
+  "Elder Titan": 1.15
+  "Queen of Pain": 1.15
+  Gyrocopter: 1.12
+  "Troll Warlord": 1.10
+  "Dragon Knight": 1.10
+  "Outworld Destroyer": 1.10
+
+# Multiplier on a player's per-game value for a stat, keyed by scoring-stat name
+# then by role. Roles: carry, mid, offlane, soft_support, hard_support.
+# Anything unlisted is unchanged. Keys are scoring.yaml stat names, not OpenDota
+# field names -- the STAT_SOURCE map in dota/banner.py does that translation.
+stat_multipliers:
+  tower_kills:
+    # Lone Druid Spirit Bear Demolish bonus building damage 30% -> 20%. LD is a
+    # carry/offlane pick and was the main source of outsized tower credit.
+    carry: 0.94
+    offlane: 0.97
+
+  kills:
+    # Zeus ultimate damage cut, and Divine Rapier spell amp no longer stacks --
+    # both removed the highest-kill-count mid builds in the pool. Snapfire
+    # (Scatterblast / Firesnap Cookie / Mortimer Kisses) nerfed on top.
+    mid: 0.97
+    offlane: 0.99
+
+  first_blood:
+    # Same burst-mid nerfs, weaker effect: first blood is mostly a lane-support
+    # stat and the support pool changed less.
+    mid: 0.98
+
+  seconds_stunned:
+    # Ancient Apparition Ice Blast cooldown 60 -> 50 at level 1 and Elder Titan
+    # buffs push both back into the pool; both are stun/disable-heavy.
+    hard_support: 1.02
+    soft_support: 1.02
+
+  smokes_used:
+    # More off-lane aggression from the Elder Titan / Queen of Pain / Gyrocopter
+    # buffs implies marginally more smoke play. Deliberately tiny.
+    soft_support: 1.01
+    hard_support: 1.01
+
+# Additive Bradley-Terry log-odds delta per team, applied before the Swiss
+# simulation. 1.0 is roughly a 73% per-game win rate against an even opponent,
+# so plausible values here are ±0.05 at most.
+#
+# LEFT EMPTY ON PURPOSE. Claiming a team got stronger or weaker from 7.41e
+# without post-patch results is a guess dressed as a model, and it would move
+# the prediction grid far more than the stat multipliers above ever could. Fill
+# this in only if you have a concrete reason.
+team_rating_delta: {}

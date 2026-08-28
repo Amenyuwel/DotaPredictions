@@ -1,0 +1,169 @@
+# TI 2026 participants: 7 direct invites + 9 regional qualifier winners.
+#
+# Cross-checked 2026-07-31 against OpenDota qualifier match data (leagues
+# 19890-19894) and /teams/{id}/players. Several orgs compete under a different
+# name than the one below -- those aliases are pinned in config/overrides.yaml,
+# which is where team_ids live.
+#
+# Still worth your own check before locking picks: rosters can change up to the
+# deadline, and role labels (soft vs hard support especially) are editorial --
+# replay parsing cannot tell the two apart. Run `python -m scripts.resolve_ids`
+# after any edit.
+# Extra OpenDota team_ids that are the same org playing under another banner.
+# Keyed by id because that is what a match row carries.
+#
+# Iron Wing (10150413) is the team at TI 2026 -- that is the name on the client
+# bracket and the id on every game they played here. The same five players spent
+# the qualifier season on the "1w" id (10182357), so that id is folded in below
+# to keep their pre-TI results attached to them. Verified 2026-08-18 against the
+# account_ids in both sets of games.
+also_team_ids:
+  10182357: "Iron Wing"
+
+verified: true
+source: "OpenDota qualifier leagues 19890-19894 + /teams/{id}/players, 2026-07-31"
+
+teams:
+  - name: "Aurora Gaming"
+    team_id: null
+    players:
+      - {nick: "Nightfall",     role: carry,        account_id: null}
+      - {nick: "Mikoto",        role: mid,          account_id: null}
+      - {nick: "ws",            role: offlane,      account_id: null}
+      - {nick: "Mira",          role: soft_support, account_id: null}
+      - {nick: "kaori",         role: hard_support, account_id: null}
+
+  - name: "BetBoom Team"
+    team_id: null
+    players:
+      - {nick: "Kiritych",      role: carry,        account_id: null}
+      - {nick: "Gpk",           role: mid,          account_id: null}
+      - {nick: "MieRo",         role: offlane,      account_id: null}
+      - {nick: "Save-",         role: soft_support, account_id: null}
+      - {nick: "Kataomi",       role: hard_support, account_id: null}
+
+  - name: "Team Falcons"
+    team_id: null
+    players:
+      - {nick: "Skiter",        role: carry,        account_id: null}
+      - {nick: "Malr1ne",       role: mid,          account_id: null}
+      - {nick: "ATF",           role: offlane,      account_id: null}
+      - {nick: "Cr1t-",         role: soft_support, account_id: null}
+      - {nick: "Sneyking",      role: hard_support, account_id: null}
+
+  - name: "Team Liquid"
+    team_id: null
+    players:
+      - {nick: "miCKe",         role: carry,        account_id: null}
+      - {nick: "Nisha",         role: mid,          account_id: null}
+      - {nick: "Ace",           role: offlane,      account_id: null}
+      - {nick: "tOfu",          role: soft_support, account_id: null}
+      - {nick: "Boxi",          role: hard_support, account_id: null}
+
+  - name: "Iron Wing"
+    team_id: null
+    players:
+      - {nick: "Pure",          role: carry,        account_id: null}
+      - {nick: "BZM",           role: mid,          account_id: null}
+      - {nick: "33",            role: offlane,      account_id: null}
+      - {nick: "Ari",           role: soft_support, account_id: null}
+      - {nick: "Whitemon",      role: hard_support, account_id: null}
+
+  - name: "Xtreme Gaming"
+    team_id: null
+    players:
+      - {nick: "Ame",           role: carry,        account_id: null}
+      - {nick: "NothingToSay",  role: mid,          account_id: null}
+      - {nick: "Xxs",           role: offlane,      account_id: null}
+      - {nick: "fy",            role: soft_support, account_id: null}
+      - {nick: "xNova",         role: hard_support, account_id: null}
+
+  - name: "Team Yandex"
+    team_id: null
+    players:
+      - {nick: "watson",        role: carry,        account_id: null}
+      - {nick: "Chira_Junior",  role: mid,          account_id: null}
+      - {nick: "DM",            role: offlane,      account_id: null}
+      - {nick: "Saksa",         role: soft_support, account_id: null}
+      - {nick: "Malady",        role: hard_support, account_id: null}
+
+  - name: "Vici Gaming"
+    team_id: null
+    players:
+      - {nick: "shiro",         role: carry,        account_id: null}
+      - {nick: "Xm",            role: mid,          account_id: null}
+      - {nick: "Bach",          role: offlane,      account_id: null}
+      - {nick: "XinQ",          role: soft_support, account_id: null}
+      - {nick: "Y",             role: hard_support, account_id: null}
+
+  - name: "Team Resilience"
+    team_id: null
+    players:
+      - {nick: "Erika",         role: carry,        account_id: null}
+      - {nick: "Echo",          role: mid,          account_id: null}
+      - {nick: "niu",           role: offlane,      account_id: null}
+      - {nick: "planet",        role: soft_support, account_id: null}
+      - {nick: "zzq",           role: hard_support, account_id: null}
+
+  - name: "LGD Gaming"
+    team_id: null
+    players:
+      - {nick: "Yuma",          role: carry,        account_id: null}
+      - {nick: "TaiLung",       role: mid,          account_id: null}
+      - {nick: "Wisper",        role: offlane,      account_id: null}
+      - {nick: "Thiolicor",     role: soft_support, account_id: null}
+      - {nick: "KJ",            role: hard_support, account_id: null}
+
+  - name: "OG"
+    team_id: null
+    players:
+      - {nick: "Natsumi",       role: carry,        account_id: null}
+      - {nick: "Yopaj",         role: mid,          account_id: null}
+      - {nick: "Raven",         role: offlane,      account_id: null}
+      - {nick: "TIMS",          role: soft_support, account_id: null}
+      - {nick: "skem",          role: hard_support, account_id: null}
+
+  - name: "Team Spirit"
+    team_id: null
+    players:
+      - {nick: "Yatoro",        role: carry,        account_id: null}
+      - {nick: "Larl",          role: mid,          account_id: null}
+      - {nick: "Collapse",      role: offlane,      account_id: null}
+      - {nick: "not me",        role: soft_support, account_id: null}
+      - {nick: "Rue",           role: hard_support, account_id: null}
+
+  - name: "PARIVISION"
+    team_id: null
+    players:
+      - {nick: "Satanic",       role: carry,        account_id: null}
+      - {nick: "No[o]ne",       role: mid,          account_id: null}
+      - {nick: "Noticed",       role: offlane,      account_id: null}
+      - {nick: "9Class",        role: soft_support, account_id: null}
+      - {nick: "Dukalis",       role: hard_support, account_id: null}
+
+  - name: "GamerLegion"
+    team_id: null
+    players:
+      - {nick: "Ghost",         role: carry,        account_id: null}
+      - {nick: "RCY",           role: mid,          account_id: null}
+      - {nick: "Fayde",         role: offlane,      account_id: null}
+      - {nick: "Bignum",        role: soft_support, account_id: null}
+      - {nick: "Speeed",        role: hard_support, account_id: null}
+
+  - name: "Nigma Galaxy"
+    team_id: null
+    players:
+      - {nick: "Suma1L",        role: carry,        account_id: null}
+      - {nick: "Lorenof",       role: mid,          account_id: null}
+      - {nick: "Davai Lama",    role: offlane,      account_id: null}
+      - {nick: "OmaR",          role: soft_support, account_id: null}
+      - {nick: "GH",            role: hard_support, account_id: null}
+
+  - name: "L1GA TEAM"
+    team_id: null
+    players:
+      - {nick: "ssnovv1",       role: carry,        account_id: null}
+      - {nick: "Mirage",        role: mid,          account_id: null}
+      - {nick: "Corrupted",     role: offlane,      account_id: null}
+      - {nick: "sayuw",         role: soft_support, account_id: null}
+      - {nick: "RESPECT",       role: hard_support, account_id: null}
