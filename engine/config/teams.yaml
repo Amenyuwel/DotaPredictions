@@ -19,6 +19,12 @@
 # account_ids in both sets of games.
 also_team_ids:
   10182357: "Iron Wing"
+  # Found 2026-08-29 by scripts.publish's orphan-id gate, not by hand: these ids
+  # carry games played by the configured five under a second banner, so without
+  # them those results are attributed to a phantom team and the real one is
+  # rated on what is left. Same failure as Iron Wing, caught before it shipped.
+  9824702: "PARIVISION"    # OpenDota "PVISION" (48-27), 55 sampled games
+  10182299: "L1GA TEAM"    # OpenDota "L1 TEAM" (1-9), 24 sampled games
 
 verified: true
 source: "OpenDota qualifier leagues 19890-19894 + /teams/{id}/players, 2026-07-31"

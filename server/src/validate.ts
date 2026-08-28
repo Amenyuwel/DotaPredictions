@@ -92,11 +92,11 @@ function assertByteLengths(payload: RunPayload): void {
 
 /** field -> bytes per game, matching the typed array the publisher wrote. */
 const PER_GAME_WIDTHS: readonly [keyof PlayerSamples & string, number][] = [
-  ["matchId", 4],
+  ["matchId", 8],   // int64: Dota match ids passed 2**31
   ["heroId", 4],
   ["durationSeconds", 4],
   ["firstBloodTime", 4],
-  ["startTime", 4],
+  ["startTime", 8], // int64: int32 unix seconds die in 2038
   ["gameWeight", 4],
   ["won", 1],
 ]

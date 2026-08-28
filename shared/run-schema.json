@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://dotapredictions/run-schema-1.json",
   "title": "RunPayload",
-  "description": "The contract between the Python engine and the compute server. Python validates against this on write; the server validates on read; the client's types are generated from it. One file, three consumers, so a change is a single commit. Binary matrices travel as base64 in this canonical form: the publisher encodes before validating and writes BSON Binary, and the server decodes after validating. Byte lengths are invariants the schema cannot express and both sides assert in code -- games is nGames * nStats * 4 bytes, seriesSamples is nShapeSamples * maxSeries bytes.",
+  "description": "The contract between the Python engine and the compute server. Python validates against this on write; the server validates on read; the client's types are generated from it. One file, three consumers, so a change is a single commit. Binary matrices travel as base64 in this canonical form: the publisher encodes before validating and writes BSON Binary, and the server decodes after validating. Byte lengths are invariants the schema cannot express and both sides assert in code -- games is nGames * nStats * 4 bytes, matchId and startTime are 8 bytes per row and the other scalars 4 (1 for won), seriesSamples is nShapeSamples * maxSeries bytes.",
   "type": "object",
   "required": [
     "run",
@@ -235,7 +235,7 @@
         "nGames": { "type": "integer", "minimum": 0 },
         "matchId": {
           "$ref": "#/$defs/Base64Binary",
-          "description": "Int32 per row. REQUIRED: a duo's role score is the average of its members in the SAME match, using only matches where both appear. Without this the join is impossible and core and support scores come out wrong while still looking plausible."
+          "description": "Int64 per row -- match ids passed 2**31 in 2023, so a 32-bit column wraps into a different match. REQUIRED: a duo's role score is the average of its members in the SAME match, using only matches where both appear. Without this the join is impossible and core and support scores come out wrong while still looking plausible."
         },
         "heroId": {
           "$ref": "#/$defs/Base64Binary",
@@ -252,7 +252,7 @@
         },
         "startTime": {
           "$ref": "#/$defs/Base64Binary",
-          "description": "Int32 unix seconds per row, for recency weights."
+          "description": "Int64 unix seconds per row, for recency weights."
         },
         "gameWeight": {
           "$ref": "#/$defs/Base64Binary",
