@@ -266,9 +266,12 @@ nonsense:
 
 ## Setup
 
+The Python engine lives in `engine/`. Every command below runs from there.
+
 ```bash
 python -m venv .venv
-.venv\Scripts\pip install -r requirements.txt      # PowerShell
+.venv\Scripts\pip install -r engine/requirements.txt   # PowerShell
+cd engine
 ```
 
 Optional, for faster refreshes — free key from https://stratz.com/api:
@@ -458,7 +461,12 @@ you what to pin.
 
 ## Layout
 
+The repo is a monorepo: `engine/` is this Python model, `server/` and `client/`
+are the web tool built on top of it, and `shared/` holds the data contract
+between them. See `docs/web-tool-build-plan.md`.
+
 ```
+engine/
 config/
   teams.yaml         16 teams, five players each, with roles
   overrides.yaml     pinned team_ids and account_ids

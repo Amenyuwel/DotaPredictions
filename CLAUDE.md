@@ -4,6 +4,10 @@ SOLID, YAGNI, KISS, DRY — stated here as they apply to *this* codebase, with t
 existing code that already follows them. A principle with no example is a slogan,
 so every rule below names a file.
 
+Paths are written relative to their own tree: engine files (`ratings.py`,
+`config/*.yaml`, `tests/`) live under `engine/`, and the web tool under `server/`,
+`client/` and `shared/`.
+
 The project has one property that shapes all four: **a wrong number does not
 raise.** A bad `account_id`, a mistyped multiplier or an unmodelled condition
 produces a confident, completely wrong projection. So the principles are applied
