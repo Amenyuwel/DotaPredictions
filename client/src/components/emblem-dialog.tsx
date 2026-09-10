@@ -110,7 +110,10 @@ export function EmblemDialog({
         </Field>
 
         <Field label="Stat">
-          <div className="grid gap-2 sm:grid-cols-2">
+          {/* auto-rows-fr: one option carrying a second line must not make its row
+                taller than the rest. Equal rows by rule, not by every option
+                happening to hold the same amount of text. */}
+          <div className="grid auto-rows-fr gap-2 sm:grid-cols-2">
             {stats.map((option) => (
               <Choice
                 key={option.stat}
@@ -152,7 +155,7 @@ export function EmblemDialog({
                 <span className="text-base leading-none font-semibold tabular-nums">
                   {tierNumeral(tier)}
                 </span>
-                <span className="text-muted-foreground text-[0.7rem] tabular-nums">
+                <span className="text-muted-foreground text-2xs tabular-nums">
                   {signed(scoring?.quality[tier] ?? 0)}
                 </span>
                 <span className="sr-only">{tierLabel(tier)}</span>
@@ -162,7 +165,7 @@ export function EmblemDialog({
         </Field>
 
         <Field label="Trait">
-          <div className="grid gap-2">
+          <div className="grid auto-rows-fr gap-2">
             {catalog.traits.map((trait) => (
               <Choice
                 key={trait}
@@ -208,7 +211,7 @@ export function EmblemDialog({
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <fieldset className="space-y-2">
-      <legend className="text-muted-foreground mb-2 text-[0.7rem] font-semibold tracking-[0.14em] uppercase">
+      <legend className="text-muted-foreground mb-2 text-2xs font-semibold tracking-[0.14em] uppercase">
         {label}
       </legend>
       {children}

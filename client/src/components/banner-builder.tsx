@@ -106,7 +106,7 @@ export function BannerBuilder({
                       <span className="block truncate text-sm font-medium">
                         {catalog.statLabels.get(current.stat) ?? current.stat}
                       </span>
-                      <span className="mt-0.5 flex items-center gap-1.5 text-[0.7rem] tracking-wider uppercase">
+                      <span className="mt-0.5 flex items-center gap-1.5 text-2xs tracking-wider uppercase">
                         <span className={cn("font-semibold", style?.tag)}>{color}</span>
                         <span className="text-muted-foreground/50" aria-hidden>
                           /

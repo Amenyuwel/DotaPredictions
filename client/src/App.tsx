@@ -115,7 +115,7 @@ export default function App() {
       />
 
       <main className="mx-auto grid max-w-6xl gap-6 px-6 py-8 lg:grid-cols-[minmax(0,24rem)_1fr]">
-        <Tabs defaultValue="banner">
+        <Tabs defaultValue="banner" className="flex flex-col gap-4">
           <TabsList className="w-full">
             <TabsTrigger value="banner" className="flex-1">
               I have a banner
@@ -125,7 +125,7 @@ export default function App() {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="banner" className="mt-4">
+          <TabsContent value="banner">
             <Card>
               <CardHeader className="gap-3">
                 <CardTitle className="text-sm">Your banner</CardTitle>
@@ -169,23 +169,21 @@ export default function App() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="player" className="mt-4">
+          <TabsContent value="player">
             <AwaitingInput>
               Not built yet. Ranking banners for a player is a constrained search over the
               emblems you own, and it lands with <code>/api/banner/optimize</code>.
             </AwaitingInput>
           </TabsContent>
 
-          <div className="mt-4">
-            <SavedBanners
-              run={data.run}
-              auth={auth}
-              role={role}
-              banner={banner}
-              slots={slots}
-              onLoad={loadSaved}
-            />
-          </div>
+          <SavedBanners
+            run={data.run}
+            auth={auth}
+            role={role}
+            banner={banner}
+            slots={slots}
+            onLoad={loadSaved}
+          />
         </Tabs>
 
         <section aria-live="polite">

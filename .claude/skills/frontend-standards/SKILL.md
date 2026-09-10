@@ -62,13 +62,53 @@ Full checklist: `references/accessibility-checklist.md` — read when reviewing 
 - Consistent naming convention (BEM, utility-first, or CSS Modules) — pick one per project and stick with it.
 - Dark mode via `prefers-color-scheme` swapping token values, not duplicating rules.
 
-## 5. Typography
+## 5. Uniformity — the user should never have to point at a size
+
+Inconsistent spacing is not a cosmetic bug, it is a bug you make the reader find
+for you. Assume nobody will ever report it and design so it cannot happen.
+
+**Every size comes from the scale.** No arbitrary one-offs (`text-[0.7rem]`,
+`p-[13px]`, `h-[42px]`). If a value is genuinely needed twice, it is a missing
+token — add it to the theme and name it. The same magic number written in three
+components is three things that drift the moment one is edited.
+
+**Peers are one size, decided by the group, not by their content.** Options in a
+picker, cards in a row, buttons in a bar: set the height, padding and gap once on
+the container or a shared component, never per child. If one item is taller than
+its neighbours, the layout is reporting a bug in your CSS, not a fact about the
+data.
+
+**Content must not resize its own box.** The failure is always the same shape: an
+item picks up a badge, a second line, a longer label, or a conditional note — and
+its row grows while the others stay short.
+
+```css
+/* An option with a subtitle must not make its row taller than the rest. */
+.options { display: grid; grid-template-columns: repeat(2, 1fr); grid-auto-rows: 1fr; }
+```
+Tailwind: `grid auto-rows-fr`. For flex rows, `items-stretch` plus one height on
+the shared child. Reserve space for anything conditional (`min-h`, an empty
+placeholder) rather than letting it appear and push.
+
+**One rhythm per group.** Pick the gap once at the container with `gap`, not with
+per-child margins. Mixed `mt-*` on children is how a list ends up with four
+different spacings nobody chose.
+
+**Stateful variants keep the same box.** Selected, disabled, hovered, loading and
+error states change colour, weight or border — never padding, font size or height.
+A border that appears on selection must be there all along, transparent.
+
+Check it by asking what breaks the alignment, not by looking at the happy path:
+double one label's length, empty another, give one item the optional badge and
+the rest none. If the grid still lines up, it is right.
+
+## 6. Typography
 
 - Base body size ≥16px; line-height ~1.5 for body, ~1.1–1.25 for headings.
 - Fluid headings with `clamp()`.
 - Web fonts: limit families and weights, `font-display: swap`, preload the critical one, provide a fallback stack with similar metrics.
 
-## 6. Images and media
+## 7. Images and media
 
 - Always set `width` and `height` attributes (or `aspect-ratio`) to prevent layout shift.
 - Modern formats (AVIF/WebP) with fallback via `<picture>`; responsive `srcset` + `sizes`.
@@ -76,7 +116,7 @@ Full checklist: `references/accessibility-checklist.md` — read when reviewing 
 - SVG for icons and logos; inline or sprite for icons that need `currentColor`.
 - Video: `muted` + `playsinline` for autoplay, captions for speech, poster image.
 
-## 7. Forms
+## 8. Forms
 
 - Every input has a visible `<label for>`. Placeholder is not a label.
 - Correct `type` (`email`, `tel`, `url`, `number`) and `autocomplete` values — mobile keyboards and autofill depend on them.
@@ -86,7 +126,7 @@ Full checklist: `references/accessibility-checklist.md` — read when reviewing 
 - Disable the submit button only while submitting (and show progress), not as a validation mechanism.
 - Group related controls with `<fieldset>` + `<legend>` (radio groups especially).
 
-## 8. UI states
+## 9. UI states
 
 Every data-driven view needs all of these designed, not just the happy path:
 
@@ -96,7 +136,7 @@ Every data-driven view needs all of these designed, not just the happy path:
 - **Partial / long content** — long names, many items, missing images, 0 and 1 items.
 - **Interactive states** — hover, focus-visible, active, disabled, selected, for every control.
 
-## 9. Performance (Core Web Vitals)
+## 10. Performance (Core Web Vitals)
 
 Targets: **LCP < 2.5s**, **INP < 200ms**, **CLS < 0.1**.
 
@@ -107,7 +147,7 @@ Targets: **LCP < 2.5s**, **INP < 200ms**, **CLS < 0.1**.
 - Lazy-load below-the-fold components and heavy third-party embeds.
 - Preconnect to critical third-party origins.
 
-## 10. JavaScript behavior
+## 11. JavaScript behavior
 
 - **Progressive enhancement**: core content and links work before JS loads where feasible.
 - Use event delegation for lists; clean up listeners, timers, and observers.
@@ -115,7 +155,7 @@ Targets: **LCP < 2.5s**, **INP < 200ms**, **CLS < 0.1**.
 - Never trust the client for validation or security — server validates too.
 - Secrets never go in frontend code.
 
-## 11. Meta and SEO basics (for public pages)
+## 12. Meta and SEO basics (for public pages)
 
 - Unique `<title>` (≤60 chars) and `<meta name="description">` (~150 chars).
 - Open Graph tags (`og:title`, `og:description`, `og:image`) for link previews.
@@ -132,6 +172,9 @@ Targets: **LCP < 2.5s**, **INP < 200ms**, **CLS < 0.1**.
 - [ ] Loading, empty, and error states exist
 - [ ] `prefers-reduced-motion` respected
 - [ ] No console errors; no unused libraries
-- [ ] Tokens used instead of scattered raw values
+- [ ] Tokens used instead of scattered raw values; no arbitrary one-off sizes
+- [ ] Peer elements share one height, padding and gap — checked with the longest
+      label, an empty one, and one item carrying an optional badge or subtitle
+- [ ] Selected/disabled/loading states change colour, not size
 
 If the environment allows screenshots or a headless browser, render at mobile and desktop widths and check before delivering.

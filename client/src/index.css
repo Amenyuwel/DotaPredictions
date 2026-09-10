@@ -6,6 +6,13 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+    /* One step below text-xs, for the uppercase micro-labels on fieldset
+       legends, tier captions and emblem meta. It was written as
+       `text-[0.7rem]` in three components, which is the same magic number
+       three times and drifts the moment one of them is edited. */
+    --text-2xs: 0.7rem;
+    --text-2xs--line-height: 1rem;
+
     --font-heading: var(--font-sans);
     --font-sans: 'Geist Variable', sans-serif;
     --color-sidebar-ring: var(--sidebar-ring);
