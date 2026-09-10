@@ -31,7 +31,7 @@ export function RunHeader({
   return (
     <header className="border-b">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-3 gap-y-2 px-6 py-4">
-        <h1 className="text-base font-semibold tracking-tight">DotaPredictions</h1>
+        <h1 className="font-heading text-base font-semibold tracking-tight">DotaPredictions</h1>
         <Badge variant="secondary">{run.tournamentId}</Badge>
         <Badge variant="outline">{STAGE_LABEL[run.stage]}</Badge>
 

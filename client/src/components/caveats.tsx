@@ -13,7 +13,7 @@ export function Caveats({ items }: { items: string[] }) {
 
   return (
     <section aria-label="Caveats" className="bg-muted/40 rounded-lg border p-4">
-      <h3 className="mb-2 flex items-center gap-1.5 text-sm font-medium">
+      <h3 className="font-heading mb-2 flex items-center gap-1.5 text-sm font-medium">
         <Info className="size-4" aria-hidden />
         What this answer cannot see
       </h3>
