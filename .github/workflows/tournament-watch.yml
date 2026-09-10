@@ -1,0 +1,58 @@
+# Monthly: has the next International appeared, and is a stage ready to fetch?
+#
+# The whole notification design is the exit code. `scripts.watch` exits 0 when
+# there is nothing to do and 1 when something needs a person, and GitHub emails
+# on a failed run -- so a red run IS the alert and a green one is silence. No
+# issue templates, no bot account, no secrets.
+#
+# Nothing here publishes, edits config, or forces a gate. Those are decisions
+# that need someone looking at a bracket, and the bracket is in no API at all.
+
+name: Tournament watch
+
+on:
+  schedule:
+    # 09:00 UTC on the 1st of every month. The script decides whether this month
+    # is worth looking at -- see engine/config/watch.yaml. Keeping the cron dumb
+    # and the decision in config means changing the window is a config edit that
+    # shows up in a diff, not a cron expression nobody can read.
+    - cron: "0 9 1 * *"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Ignore the calendar window and search anyway"
+        type: boolean
+        default: false
+
+# A run reads OpenDota and writes a job summary. It needs nothing else.
+permissions:
+  contents: read
+
+concurrency:
+  group: tournament-watch
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: engine/requirements.txt
+
+      - name: Install engine dependencies
+        working-directory: engine
+        run: pip install -r requirements.txt
+
+      - name: Check for the next International
+        working-directory: engine
+        # OpenDota works keyless, so this needs no secret. A token would only
+        # raise the rate limit, and this makes a handful of requests a month.
+        run: |
+          python -m scripts.watch ${{ inputs.force && '--force' || '' }}

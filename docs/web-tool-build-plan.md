@@ -2,7 +2,7 @@
 
 Plan for `.claude/dotapredictions-build-prompt.md`: a free, no-login web tool
 answering **player → banner** and **banner → player**, tournament-aware, backed by
-the existing Python engine running batch-only behind immutable Mongo snapshots.
+the existing Python engine running batch-only behind immutable Supabase snapshots.
 
 ---
 
@@ -192,7 +192,7 @@ Publish-time assertions, all fail-loud:
 - `nGames` matches the matrix row count for every player;
 - flip `isCurrent` in a transaction — the old run stays queryable, never mutated.
 
-**Done when:** one real run lands in Mongo and `db.playerSamples.countDocuments()`
+**Done when:** one real run lands in Supabase and the row's payload
 matches the roster size.
 
 ---
@@ -277,11 +277,21 @@ Caveats render in the result panel, never in a footnote.
 
 ## Phases 6-10 — Breadth
 
-6. **Group stage run + stage switcher.** Publish `{ti2026, group}` and add the
-   switcher. This is the first real test that nothing hardcodes an emblem count
-   (3 in the group stage, 5 in the main event) or a bracket shape. Requires
-   `dota/swiss.py` to emit `decider_samples` beside `series_samples`, so both
-   stages feed the scorer identically.
+6. **Group stage run + stage switcher.** **DONE.** Both stages publish and both
+   are served. Two findings against what this line predicted:
+
+   * `dota/swiss.py` needed **no change**. `publish.build_group_projections`
+     already derives decider flags from the game count, and *refuses loudly* if a
+     group series ever exceeds Bo3 rather than deriving a wrong flag from a
+     format it does not model.
+   * The emblem count **was** hardcoded, in the client, as
+     `stage === "main" ? 5 : 3`. It now travels on the run as
+     `RunMeta.bannerSlots`, read from `tournament.yaml`. The count is a property
+     of the period, not of the word "main".
+
+   The server holds every current run rather than one, keyed by tournament and
+   stage; an unmatched request 404s with what IS available instead of falling
+   back to another stage.
 7. `/api/banner/optimize` and the player → banner direction. **Blocked on a new
    engine function**: a constrained search over the user's inventory — no repeated
    stat, colours unconstrained, `slots` from the request, 120 orderings inside each
@@ -293,10 +303,16 @@ Caveats render in the result panel, never in a footnote.
    sample all three slots on the **same** simulated bracket
    (`plan_series(indices=...)`); independent draws leave the mean correct and
    understate the spread by ~0.9%, which is the entire question a risk view asks.
-10. **`scripts/new_tournament.py` and the tournament switcher.** Validate it by
-    scaffolding a *past* event from its league ids and diffing the derived roster
-    against the config already committed — the one test that proves onboarding
-    works without waiting a year for the next TI.
+10. **`scripts/new_tournament.py` and the tournament switcher.** **Config half
+    done.** `engine/config/<tournamentId>/` is live, `hero_adjectives.yaml` stays
+    global, `config/active.yaml` names the default, and
+    `discover_rosters.py`'s hardcoded qualifier league ids now live in each
+    event's `tournament.yaml`. `scripts/new_tournament.py` scaffolds a new event
+    from an existing one, copying shapes and refusing to copy data.
+
+    Still open: the validation this line asks for — scaffold a *past* event from
+    its league ids and diff the derived roster against the committed config. That
+    is the one test that proves onboarding works without waiting a year.
 
 ---
 
@@ -330,12 +346,25 @@ ids in a module constant — that moves into each tournament's `tournament.yaml`
 
 ## Ops
 
-- **Mongo:** Atlas free tier. Docker is not installed on this machine, so
-  `docker-compose.yml` is a later convenience, not a prerequisite.
-- **Indexes:** `{runId, playerId}` unique on `playerSamples`; `{isCurrent}` on
-  `runs`; `{runId, teamId}` on `stageProjections`.
-- **No auth:** rate limit 60 req/min by IP; `Cache-Control: public, max-age=3600`
-  on `/api/run/current`; LRU memo on POST bodies keyed by hash.
+- **Supabase** (was Mongo). Free tier. Two tables, in
+  `supabase/migrations/`: `runs` holds one published snapshot per row as a
+  single `json` column, and `saved_banners` holds one user's own banner setups.
+  Docker is not installed on this machine, so local Postgres is a later
+  convenience, not a prerequisite.
+- **Why one column, not six tables:** nothing queries inside a payload. The
+  server reads the whole run once at boot, and every field worth filtering on is
+  a column beside it. Splitting it would buy nothing and cost a second
+  representation of the same bytes — which is exactly what the Mongo writer had,
+  with base64 on the file path and BSON Binary in the database.
+- **Indexes:** `(tournament_id, stage, is_current, created_at desc)` on `runs`;
+  `(user_id, created_at desc)` on `saved_banners`.
+- **Auth:** Google and GitHub via Supabase, plus an explicit guest path that
+  saves nothing. The scoring API stays unauthenticated — a guest and a signed-in
+  user get identical projections, because the model does not know who is asking.
+  Identity buys persistence and nothing else, which is why no Express route
+  verifies a token: saves go from the browser to Postgres under RLS.
+- **Rate limit** 60 req/min by IP; `Cache-Control: public, max-age=3600` on
+  `/api/run/current`; LRU memo on POST bodies keyed by hash.
 - **Numbers:** doubles end to end. Format in React only — never in the API or DB
   layer.
 - **Dev:** Vite proxy for `/api`. **Prod:** Express serves `client/dist`, one
@@ -355,7 +384,7 @@ not a later nicety — see the phase 10 and freshness sections above.
 
 1. **Whose emblem inventory?** `banner/optimize` takes an inventory the user owns.
    Nothing in the engine models an inventory today — it is a pure client concept,
-   so it lives in the querystring and never in Mongo.
+   so it lives in the querystring and never in the database.
 2. **Run cadence.** Cron during an event, or manual publish? Decides only whether
    `publish.py` needs a scheduler.
 3. **Group-stage banners for past events.** `config/banners.yaml` keeps the TI 2026

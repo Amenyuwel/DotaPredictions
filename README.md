@@ -285,9 +285,40 @@ OPENDOTA_API_KEY=...     # also optional, raises the rate limit
 Neither is required. OpenDota works keyless and pro-league matches are fully
 parsed there, so every stat the scoring config uses is available either way.
 
+The web tool adds Supabase, which does two unrelated jobs: it stores published
+runs, and it signs users in so they can save banners. Both are optional to the
+engine — `scripts/run` never touches it.
+
+```
+# .env
+VITE_SUPABASE_URL=https://<project-ref>.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...   # safe in the browser
+SUPABASE_URL=https://<project-ref>.supabase.co
+SUPABASE_SECRET_KEY=sb_secret_...                  # server-side only
+```
+
+Apply `supabase/migrations/` once, in the dashboard SQL editor or with the
+Supabase CLI. It creates two tables that answer unrelated questions: `runs`
+(public knowledge, RLS on with no policy, read only by the secret key) and
+`saved_banners` (one user's own rows, gated by RLS on `auth.uid()`). A guest
+matches no policy on either, which is what makes "continue as guest" mean
+exactly what it says.
+
 ## Use
 
+Every command reads one tournament. It is resolved in this order, and the last
+step is the point: with several configured and none named, it **raises rather
+than picking**, because fitting one event's ratings against another's roster and
+printing a projection anyway is the failure every gate here exists to prevent.
+
+1. `--tournament-id` on the command
+2. `$DOTA_TOURNAMENT`
+3. `config/active.yaml`
+4. the only configured tournament, if there is exactly one
+
 ```bash
+python -m scripts.tournament_status # what exists on OpenDota, and which stage is ready
+python -m scripts.watch             # the same, unattended; exit 1 means act (see CI below)
 python -m scripts.resolve_ids       # map config names -> OpenDota IDs (run first)
 python -m scripts.run               # fetch, simulate, and print both answers
 python -m scripts.run --only fantasy --sims 50000
@@ -308,6 +339,159 @@ python -m scripts.bracket_outcomes  # all 16,384 outcomes, exactly, fitted on
                                     # bracket against every one of them
 python -m tests.test_bracket        # structural checks on the bracket
 ```
+
+### The tournament timeline is a correctness property
+
+Config for an event cannot be gathered early, because most of it does not exist
+yet and the parts that do go stale. Between one International and the next,
+rosters change, players retire, orgs disband outright and the game moves to a
+new patch. A config assembled ahead of any of that still parses, still validates
+and still scores — it just answers about a field that no longer exists.
+
+So the fetch happens in steps, and `scripts/gates.py` refuses to publish out of
+order rather than trusting anyone to remember:
+
+| When | What becomes knowable | What to run |
+|---|---|---|
+| Qualifiers finish | the 16-team field and its rosters | `discover_rosters`, `resolve_ids`, then `publish --stage group` |
+| Group stage ends, bracket drawn | the 8 survivors, their current rosters, the tree | re-run `discover_rosters` and `resolve_ids`, then `publish --stage main` |
+
+**How you know it is time.** `scripts/tournament_status.py` asks OpenDota what
+exists right now, so the decision to fetch is made against observation rather
+than a calendar:
+
+```bash
+python -m scripts.tournament_status                        # the active event
+python -m scripts.tournament_status --search "International 2027"
+```
+
+Run against a scaffold it does league discovery — the only question answerable
+before an event exists — and prints the ids to paste into `tournament.yaml`,
+with OpenDota's own tier separating open qualifiers (`excluded`) from regional
+ones (`professional`) from the event itself (`premium`). **The league not being
+there is the signal that it has not started**; Valve creates it shortly before
+the first qualifier game.
+
+Once ids are configured it reports match counts, date windows and, against the
+event's own league, which configured teams have actually played — plus any team
+id that is playing and is *not* in `teams.yaml`, which is the Iron Wing failure
+caught before a rating is ever fitted to it. That check is deliberately scoped to
+the event league and never to a qualifier: a regional qualifier is full of teams
+that did not qualify, so "played here but is not configured" describes almost all
+of them and means nothing.
+
+It ends in a verdict per stage — `NOT READY`, `FETCH NOW`, `FETCH AGAIN`,
+`READY` — using the same reasoning the publish gates use, so the two never
+disagree.
+
+**And it runs itself.** `.github/workflows/tournament-watch.yml` runs
+`scripts/watch.py` on the 1st of every month. The exit code is the whole
+notification design: 0 when there is nothing to do, 1 when something needs a
+person, and GitHub emails on a failed run — so a red run *is* the alert and a
+green one is silence. No issue templates, no bot account, no secrets (OpenDota
+works keyless).
+
+Three guards keep it from crying wolf, checked in order:
+
+| Guard | Skips when |
+|---|---|
+| calendar | the month is outside `config/watch.yaml`'s window |
+| concluded | this year's event has finished, and there is one edition per calendar year |
+| tier | the only new leagues are open qualifiers, which OpenDota tiers `excluded` |
+
+**The window is April–October, and the obvious version of it is wrong.** A
+"-ber months" window reads as sensible and misses August — which is two of the
+seven editions on record, *including the most recent*:
+
+| TI9 2019 | TI10 2021 | TI11 2022 | TI12 2023 | TI13 2024 | TI14 2025 | TI15 2026 |
+|---|---|---|---|---|---|---|
+| Aug 20–25 | Oct 7–17 | Oct 15–30 | Oct 12–29 | Sep 4–15 | Sep 4–14 | Aug 13–23 |
+
+It opens in April rather than August for a second reason: the thing worth
+catching is the **league being created**, which precedes the regional
+qualifiers, which precede the event by about two months — TI 2026's ran June
+15–28 for an August event. That qualifier window is the only clean moment to
+gather roster data, so a watch that wakes in the month of the event is already
+three months late. November through February have never hosted an edition and
+are excluded.
+
+The tier guard is not cosmetic. Each edition spawns five open-qualifier leagues
+that nobody ever configures; without it they read as "an unconfigured league
+matching The International" and fire every month of the window. Measured on the
+current data: **5 false alerts against 0 real ones**. `tests/test_watch.py` pins
+all of this, including that an empty `months:` list means *always* rather than
+*never* — a watch silenced by empty config looks exactly like an event that has
+not happened yet.
+
+Nothing in the workflow publishes, edits config, or forces a gate. Those need
+someone looking at a bracket, and the bracket is in no API at all.
+
+One thing it cannot tell you, and says so: **OpenDota does not label stages.**
+"The group stage is over" is not readable from the API. The script prints the
+narrowing field as an explicitly labelled *inference*, and the bracket itself has
+to be transcribed by hand off the client — the draw is in no API at all.
+
+Four gates enforce it. All four guard the same failure — config that is *out of
+date rather than wrong*, which produces a confident projection and no error:
+
+| Gate | Refuses |
+|---|---|
+| `stage_ready` | a Main Event run before the bracket has pairings; a bracket naming teams the roster lacks; a field short of its team count |
+| `roster_freshness` | a roster with no `verified_utc`; one older than `--max-roster-age` (21 days); **and for the Main Event, one last checked before the group stage locked** |
+| `team_activity` | a configured team with no match in `--max-team-idle` (60 days) — the disbanded-org check, which `team_evidence` cannot make because it counts games anywhere in the window |
+| `patch_consistency` | a patch prior released before every sampled game (the correction double-counts a change already in the data), after every sampled game, or with no release date at all |
+
+Readiness is **inferred from the config, never declared**. There is no `phase:`
+field, because a declared phase and the data it describes are two copies of one
+fact and two copies drift silently. The bracket either has pairings or it does
+not.
+
+`--force <gate>` still exists and still records the gate name on the run, which
+the client renders as a badge. But for these four the answer is usually not
+force but *waiting*: a field nobody has decided cannot be fetched, and a roster
+fetched too early is wrong by the time it matters.
+
+One consequence worth knowing: TI 2026's own config is now 41 days past its
+roster check, so republishing that concluded event needs
+`--force roster_freshness`. That is the gate working. A finished event is a
+record rather than a forecast, and the model cannot tell the difference — so it
+refuses and makes you say so.
+
+### Onboarding the next International
+
+```bash
+python -m scripts.new_tournament ti2027 --from ti2026
+```
+
+Copies the *shapes* and nothing else. The format and the stat table carry over;
+the drawn bracket, lock times, qualifier league ids and every roster do not, and
+`verified_against_client` is forced back to **false** because Valve changes point
+values between events and a table copied forward without re-checking is exactly
+what `scripts/gates.py` refuses.
+
+The result is deliberately unusable. Every unfilled value is the literal string
+`TODO`, and `dota/config.py` refuses to load a file that still contains one,
+naming the file and the keys. A config half copied from last year is how a stale
+roster ships as a confident projection — the costliest bug this project has
+produced — so a scaffold fails at load rather than at the number.
+
+Then, in the order the timeline above allows:
+
+1. Set `config/active.yaml` to the new id.
+2. Find the league ids with `scripts.tournament_status --search "The International
+   2027"` and put them in `tournament.yaml` as they appear. Nothing matching means
+   the event has not been created yet.
+3. **When the qualifiers finish**, `scripts.discover_rosters` then
+   `scripts.resolve_ids`, and set `verified_utc` to the day you actually
+   checked. Not before — a roster gathered early is the thing these gates
+   refuse.
+4. Re-transcribe `scoring.yaml` against the client's HOW TO PLAY and flip
+   `verified_against_client`. Valve changes point values between events.
+5. Fill `patch.yaml` with the patch the event is played on, dated.
+6. `publish --stage group`.
+7. **When the group stage ends**, transcribe the drawn bracket, re-run
+   `discover_rosters` and `resolve_ids` against the eight survivors, update
+   `verified_utc` again, then `publish --stage main`.
 
 `bracket_outcomes` differs from `predict_bracket` in both halves of the job. It
 fits on one league — TI 2026 itself — instead of six months of pro Dota, and it
@@ -462,19 +646,25 @@ you what to pin.
 ## Layout
 
 The repo is a monorepo: `engine/` is this Python model, `server/` and `client/`
-are the web tool built on top of it, and `shared/` holds the data contract
-between them. See `docs/web-tool-build-plan.md`.
+are the web tool built on top of it, `shared/` holds the data contract between
+them, and `supabase/migrations/` holds the schema they share. See
+`docs/web-tool-build-plan.md`.
 
 ```
 engine/
 config/
-  teams.yaml         16 teams, five players each, with roles
-  overrides.yaml     pinned team_ids and account_ids
-  scoring.yaml       fantasy point values  <- verify against the client
-  tournament.yaml    format, buckets, lock time, the drawn Main Event bracket
-  banners.yaml       the emblems you rolled: stat, tier, trait and POSITION
-  patch.yaml         gameplay-patch prior  <- hand-entered, one comment per line
+  active.yaml        which event runs when nothing names one
+  watch.yaml         when to look for the next edition, and when to stop
   hero_adjectives.yaml  hero -> Valve appearance flags, for coach Title prefixes
+                        GLOBAL: it comes from the game client, not from an event
+  ti2026/            one directory per tournament
+    teams.yaml       16 teams, five players each, with roles
+    overrides.yaml   pinned team_ids and account_ids
+    scoring.yaml     fantasy point values  <- verify against the client
+    tournament.yaml  format, buckets, lock times, banner slots per stage,
+                     qualifier league ids, the drawn Main Event bracket
+    banners.yaml     the emblems you rolled: stat, tier, trait and POSITION
+    patch.yaml       gameplay-patch prior  <- hand-entered, one comment per line
 docs/
   ti2026-how-to-play.md  the client's HOW TO PLAY, transcribed. The reference.
 dota/
@@ -583,6 +773,16 @@ Worse than noise, because it is silent, systematic, and no interval covers it.
   online games that dominate the corpus.
 * **Roster and lineup risk.** Stand-ins, illness, visa problems, or a role swap
   inside a team all invalidate a slot. Re-run `scripts.resolve_ids` near the lock.
+  `gates.roster_freshness` now bounds how old that check may be and forces a
+  re-check between stages, but it bounds *staleness*, not correctness: a roster
+  confirmed yesterday against the wrong source passes every gate here.
+* **Patch drift is detected by date, not by observation.**
+  `gates.patch_consistency` compares `patch.yaml`'s `released_utc` against the
+  window of sampled matches, which catches a prior applied to games that already
+  reflect it. It cannot notice that the game has moved to a patch nobody has
+  written down — match records carry a patch id the corpus does not currently
+  read, so an out-of-date `patch.yaml` that is internally consistent still
+  passes.
 * **Forfeits and technical losses** are not simulated.
 * **Correlation between your slots.** Expected totals add correctly, but two slots
   from the same team share a fate. For a top-100 push, variance is an asset and the
