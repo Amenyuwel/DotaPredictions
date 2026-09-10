@@ -50,9 +50,36 @@ unmeasurable:
 #                         BUNDLES consumed. If a bundle carries more than one
 #                         madstone this understates the stat, so treat any
 #                         madstone emblem's contribution as a floor.
-# watchers_taken and lotuses_grabbed have no OpenDota field at any depth. The
-# Support banner's Lotuses emblem is therefore scored as absent, not as zero --
-# see scripts/main_event.py, which reports what that emblem is worth blind.
+# watchers_taken and lotuses_grabbed: nobody has this data, including Valve.
+#
+# Investigated 2026-09-10, because "we cannot see it" and "it does not exist"
+# lead to opposite advice about an emblem. Four checks:
+#
+#   OpenDota   absent. Not one of the 145 fields on a parsed player, not in
+#              objectives (only aegis/courier/firstblood/miniboss/roshan/
+#              building_kill), not anywhere in the payload at any depth. Every
+#              "lotus" string in a match is the ITEM lotus_orb; "watcher"
+#              appears zero times.
+#   STRATZ     absent. Zero hits for lotus or watcher across all 981 types in
+#              the published schema, checked against known-good controls
+#              (campStack, stun, roshan all hit). A STRATZ token does NOT close
+#              this, which this file previously implied.
+#   Valve API  no public fantasy interface at all.
+#   Valve GC   the fields EXIST but are not reachable over HTTP:
+#              CMsgDOTAFantasyPlayerStats.watchers = 24, .lotuses = 25,
+#              delivered by k_EMsgGCFantasyFinalPlayerStats (7309). Reaching it
+#              needs a Steam account attached to the Game Coordinator, and the
+#              message looks event-scoped rather than queryable per match.
+#
+# The decisive evidence is the client itself: its emblem picker prints "no data"
+# under exactly these two stats and no others. So an emblem carrying one scores
+# nothing FOR ANYONE -- it is a dead emblem to reroll, not points this model is
+# blind to. Both readings are consistent with an unpopulated protobuf field.
+#
+# Handling is unchanged and correct under either reading: excluded from emblem
+# choice, and scored as absent rather than as zero, so the model never
+# recommends an emblem it cannot value. See scripts/main_event.py, which reports
+# what the Support banner's Lotuses emblem is worth blind.
 
 # Displayed emblem % = 100 + quality% + trait%.
 emblem_quality:

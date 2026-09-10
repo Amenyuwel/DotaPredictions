@@ -764,12 +764,27 @@ Worse than noise, because it is silent, systematic, and no interval covers it.
 
 ### 2. Unmeasurable — stats with no data at all
 
-* **`lotuses_grabbed` and `watchers_taken` have no OpenDota field at any depth.**
-  A banner emblem carrying one scores **0 for every team**, so it cannot separate
-  them, yet it is not worth 0 in the client. The Main Event support banner carries
-  Lotuses at x1.20; that is real points the model cannot see, and it is the reason
-  the support ordering should be treated as softer than the numbers suggest.
-  A STRATZ token might close this; OpenDota cannot.
+* **`lotuses_grabbed` and `watchers_taken` are not published by anyone**, and the
+  client says so itself: its emblem picker prints *"no data"* under exactly these
+  two stats and no others. So an emblem carrying one scores nothing **for anyone**
+  — it is a dead emblem worth rerolling, not points this model is blind to.
+
+  Checked properly on 2026-09-10, because those two readings lead to opposite
+  advice:
+
+  | Source | Result |
+  |---|---|
+  | OpenDota | absent — not in the 145 fields on a parsed player, not in the objectives log, nowhere in the payload at any depth. Every `lotus` string is the *item* `lotus_orb`; `watcher` appears zero times |
+  | STRATZ | absent — zero hits across all 981 published types, against controls (`campStack`, `stun`, `roshan`) that all hit. **A STRATZ token does not close this**, which an earlier version of this file wrongly implied |
+  | Valve Web API | no public fantasy interface at all |
+  | Valve GC | the fields exist — `CMsgDOTAFantasyPlayerStats.watchers = 24`, `.lotuses = 25`, delivered by `k_EMsgGCFantasyFinalPlayerStats` (7309) — but only over a Game Coordinator connection, which needs a Steam account and looks event-scoped rather than queryable per match |
+
+  Both readings — "Valve tracks it but publishes nothing" and "Valve does not
+  populate it" — are consistent with an unpopulated protobuf field, and both
+  imply the same handling. These stats stay excluded from emblem choice and
+  scored as *absent* rather than as zero, so the model never recommends an
+  emblem it cannot value. The Main Event support banner carries Lotuses at
+  x1.20; `scripts/main_event.py` reports what that emblem is worth blind.
 
 ### 3. Sampling error — reported, not eliminated
 
