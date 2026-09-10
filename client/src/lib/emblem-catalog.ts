@@ -39,41 +39,42 @@ export const UNCLASSIFIED = "unclassified"
  * only reachable from a payload whose scoring table and catalog disagree --
  * falls back to the neutral chrome every other control uses.
  */
-const COLOR_STYLES: Record<
-  string,
-  { idle: string; selected: string; tag: string; bar: string }
-> = {
-  red: {
-    idle: "border-red-200/80 text-red-700 bg-linear-to-br from-red-500/5 to-transparent hover:from-red-500/15 dark:border-red-900 dark:text-red-300",
-    selected:
-      "border-red-500 text-red-900 bg-linear-to-br from-red-500/30 via-red-500/10 to-transparent ring-2 ring-red-500/25 dark:text-red-100 dark:from-red-500/35",
-    tag: "text-red-700 dark:text-red-300",
-    bar: "bg-linear-to-b from-red-400 to-red-600",
-  },
-  blue: {
-    idle: "border-blue-200/80 text-blue-700 bg-linear-to-br from-blue-500/5 to-transparent hover:from-blue-500/15 dark:border-blue-900 dark:text-blue-300",
-    selected:
-      "border-blue-500 text-blue-900 bg-linear-to-br from-blue-500/30 via-blue-500/10 to-transparent ring-2 ring-blue-500/25 dark:text-blue-100 dark:from-blue-500/35",
-    tag: "text-blue-700 dark:text-blue-300",
-    bar: "bg-linear-to-b from-blue-400 to-blue-600",
-  },
-  green: {
-    idle: "border-emerald-200/80 text-emerald-700 bg-linear-to-br from-emerald-500/5 to-transparent hover:from-emerald-500/15 dark:border-emerald-900 dark:text-emerald-300",
-    selected:
-      "border-emerald-500 text-emerald-900 bg-linear-to-br from-emerald-500/30 via-emerald-500/10 to-transparent ring-2 ring-emerald-500/25 dark:text-emerald-100 dark:from-emerald-500/35",
-    tag: "text-emerald-700 dark:text-emerald-300",
-    bar: "bg-linear-to-b from-emerald-400 to-emerald-600",
-  },
-}
+/**
+ * One recipe, at whatever hue the element declares.
+ *
+ * These were three near-identical blocks -- the same classes with "red", "blue"
+ * and "emerald" swapped in -- which drift the moment one is edited and were
+ * never actually equal: Tailwind's red-200, blue-200 and emerald-200 sit at
+ * different lightness and chroma, so the three buttons read as three different
+ * weights of control.
+ *
+ * Now the strings are identical for every colour and the hue arrives as a data
+ * attribute, resolved by the `[data-emblem]` block in index.css where lightness
+ * and chroma are shared. Two colours cannot look different weights, because
+ * there is only one set of classes.
+ */
+const TONE = {
+  idle: "border-[var(--emblem-edge)] bg-[var(--emblem-wash)] text-[var(--emblem-ink)] hover:bg-[var(--emblem-wash-on)]",
+  selected:
+    "border-[var(--emblem-edge-on)] bg-[var(--emblem-wash-on)] text-[var(--emblem-ink-on)] ring-2 ring-[var(--emblem-ring)]",
+  tag: "text-[var(--emblem-ink)]",
+  bar: "bg-linear-to-b from-[var(--emblem-bar-from)] to-[var(--emblem-bar-to)]",
+} as const
 
-const NEUTRAL_STYLE = {
-  idle: "border-input text-muted-foreground hover:bg-accent",
-  selected: "border-ring bg-secondary ring-2 ring-ring/20",
-  tag: "text-muted-foreground",
-  bar: "bg-muted-foreground/40",
-}
+/**
+ * The classes for an emblem colour, plus the attribute that selects its hue.
+ *
+ * Spread `attrs` onto the same element the classes go on -- the custom
+ * properties are declared by that attribute, so the two cannot be separated.
+ */
+export const colorStyle = (color: string) => ({
+  ...TONE,
+  attrs: { "data-emblem": COLOR_HUES.has(color) ? color : UNCLASSIFIED },
+})
 
-export const colorStyle = (color: string) => COLOR_STYLES[color] ?? NEUTRAL_STYLE
+/** Colours index.css declares a hue for. Anything else is drawn at zero chroma
+ * rather than given a style of its own. */
+const COLOR_HUES = new Set(["red", "blue", "green"])
 
 /** The choices that make an emblem. Colour is not one of the emblem's own
  * properties -- it follows from the stat -- but it is the choice a user makes

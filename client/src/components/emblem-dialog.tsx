@@ -97,6 +97,9 @@ export function EmblemDialog({
                   name={`emblem-${slot}-color`}
                   checked={on}
                   onSelect={() => change({ color })}
+                  // The hue lives on the element, the recipe in the class names.
+                  // Both come from colorStyle so they cannot be separated.
+                  {...style.attrs}
                   className={cn(
                     "justify-center text-xs font-semibold tracking-[0.12em] uppercase",
                     on ? style.selected : style.idle,
@@ -233,6 +236,7 @@ function Choice({
   onSelect,
   className,
   children,
+  ...rest
 }: {
   name: string
   checked: boolean
@@ -240,9 +244,10 @@ function Choice({
   onSelect: () => void
   className?: string
   children: React.ReactNode
-}) {
+} & React.HTMLAttributes<HTMLLabelElement>) {
   return (
     <label
+      {...rest}
       className={cn(
         "flex min-h-11 flex-1 cursor-pointer items-center gap-2 rounded-xl border px-3 py-2 text-sm transition-[color,background-color,border-color,box-shadow]",
         "hover:bg-accent has-[:focus-visible]:border-ring has-[:focus-visible]:ring-ring/50 has-[:focus-visible]:ring-3",

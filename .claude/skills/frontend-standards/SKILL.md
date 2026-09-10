@@ -98,6 +98,28 @@ different spacings nobody chose.
 error states change colour, weight or border — never padding, font size or height.
 A border that appears on selection must be there all along, transparent.
 
+**Colour variants are one recipe at different hues.** A set like red / blue /
+green is the same control three times, so write it once and let only the hue
+change. Three hand-written blocks drift the moment one is edited, and named
+ramps make it worse — Tailwind's `red-200`, `blue-200` and `emerald-200` sit at
+different lightness and chroma, so "the same shade" is not the same weight.
+
+Define them in a perceptual space (`oklch`) with lightness and chroma **shared**
+and hue as the only variable:
+
+```css
+[data-tone]        { --tone-ink: oklch(0.48 0.10 var(--tone-hue)); }
+[data-tone="red"]  { --tone-hue: 25; }
+[data-tone="blue"] { --tone-hue: 260; }
+```
+
+One trap makes equal numbers render unequal: **sRGB is far narrower in green
+than in red or blue**, so a chroma every hue cannot reach is honoured for some
+and clipped for the rest. At L=0.62, red reaches C≈0.25 and green stops at
+≈0.14. Pick the tightest hue's limit, not the roomiest. Check it rather than
+eyeballing it — clipping is invisible in the stylesheet, and each variant still
+has to pass contrast on its own.
+
 Check it by asking what breaks the alignment, not by looking at the happy path:
 double one label's length, empty another, give one item the optional badge and
 the rest none. If the grid still lines up, it is right.
@@ -176,5 +198,7 @@ Targets: **LCP < 2.5s**, **INP < 200ms**, **CLS < 0.1**.
 - [ ] Peer elements share one height, padding and gap — checked with the longest
       label, an empty one, and one item carrying an optional badge or subtitle
 - [ ] Selected/disabled/loading states change colour, not size
+- [ ] Colour variants share lightness and chroma, vary only hue, and no hue
+      is clipped out of gamut; each still passes contrast
 
 If the environment allows screenshots or a headless browser, render at mobile and desktop widths and check before delivering.

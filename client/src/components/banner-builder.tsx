@@ -85,6 +85,9 @@ export function BannerBuilder({
               <button
                 type="button"
                 onClick={() => setEditing(i)}
+                // Declared once per row. The colour bar and the colour word are
+                // both inside, so both resolve the same hue and cannot disagree.
+                {...(style?.attrs ?? {})}
                 className={cn(
                   "focus-visible:border-ring focus-visible:ring-ring/50 group relative flex min-h-14 flex-1 items-center gap-3 overflow-hidden rounded-xl border pr-3 text-left transition-colors focus-visible:ring-3",
                   current
