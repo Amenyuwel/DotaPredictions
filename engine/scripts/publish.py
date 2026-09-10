@@ -48,6 +48,7 @@ from dotenv import load_dotenv
 
 from dota import bracket as bracket_mod
 from dota import pipeline
+from dota import unmeasured
 from dota.banner import STAT_SOURCE
 from dota.config import CONFIG_DIR, GLOBAL_CONFIG, ROOT, Config, Player, tournament_dir
 from dota.pipeline import SLOT_ROLES, Analysis
@@ -869,6 +870,16 @@ def main() -> int:
         top_rosters=1,
         verbose=True,
     )
+
+    # Costs nothing -- it re-reads matches the fetch above already cached -- and
+    # it is the difference between noticing that a stat became available and
+    # excluding it from every banner for another year because a list nobody
+    # re-tested still says it cannot be measured.
+    regained = unmeasured.rediscover(
+        [k for k, s in cfg.scoring.stats.items() if not s.measurable]
+    )
+    for line in unmeasured.report(regained):
+        print(f"\n[stats] {line}")
 
     print("\n[gates] checking freshness ...")
     results = gates_mod.run_all(

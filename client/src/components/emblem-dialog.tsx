@@ -116,16 +116,20 @@ export function EmblemDialog({
                 key={option.stat}
                 name={`emblem-${slot}-stat`}
                 checked={axes.stat === option.stat}
-                disabled={usedStats.has(option.stat)}
+                /* Two different reasons to be unpickable, and the label below says
+                   which. A stat already on the banner is unavailable *here*; a
+                   "no data" stat is unavailable everywhere, because the client
+                   marks it the same way in its own picker and an emblem carrying
+                   one scores nothing for anyone. */
+                disabled={usedStats.has(option.stat) || !option.measurable}
                 onSelect={() => change({ stat: option.stat })}
               >
                 <span className="flex flex-col items-start text-left">
                   <span>{option.label}</span>
-                  {/* A warning about the EMBLEM, not about this tool's sight. The
-                      client shows the same "no data" against these stats in its own
-                      picker, so an emblem carrying one scores nothing anywhere. */}
                   {!option.measurable && (
-                    <span className="text-muted-foreground text-xs">no data</span>
+                    <span className="text-muted-foreground text-xs">
+                      no data — scores nothing
+                    </span>
                   )}
                 </span>
               </Choice>

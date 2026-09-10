@@ -18,7 +18,7 @@ export const ROLE_LABEL: Record<FantasyRole, string> = {
 /** The role with the lanes it covers, for a control where the distinction is
  * the whole point -- core and support are duos, mid is one player. */
 export const ROLE_DETAIL: Record<FantasyRole, string> = {
-  core: "Carry + offlane",
+  core: "Carry + Offlane",
   mid: "One player",
-  support: "Soft + hard support",
+  support: "Soft + Hard Support",
 }
