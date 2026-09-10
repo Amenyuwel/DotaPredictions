@@ -1,6 +1,18 @@
+import { resolve } from "node:path"
+
 import { config as loadEnv } from "dotenv"
 
-loadEnv()
+/**
+ * One .env for the monorepo, with a server-local override.
+ *
+ * The engine and the client already read the repo-root file -- the client's
+ * Vite config points `envDir` at it -- so the Supabase credentials are written
+ * down once. `server/.env` still wins where both define a name, which is what
+ * makes a deployment-specific PORT or RUN_FILE possible without copying the
+ * keys beside it. dotenv does not overwrite a name it has already seen, so
+ * order here IS the precedence.
+ */
+loadEnv({ path: [resolve(process.cwd(), ".env"), resolve(process.cwd(), "..", ".env")] })
 
 /**
  * Every knob the process has, resolved once.
@@ -12,15 +24,29 @@ export const config = {
   port: Number(process.env.PORT ?? 3000),
 
   /**
-   * Load a run from a file instead of Mongo. This is what `publish.py --out`
-   * writes, validated by the same schema on the same path, so it is a real run
-   * and not a fixture -- it just skips the database. Takes precedence over
-   * MONGODB_URI when set.
+   * Load runs from files instead of Supabase. These are what `publish.py --out`
+   * writes, validated by the same schema on the same path, so they are real
+   * runs and not fixtures -- they just skip the database. Takes precedence over
+   * SUPABASE_URL when set.
+   *
+   * Comma-separated, because a tournament has stages: one file per stage is the
+   * offline equivalent of one current row per stage, and a dev path that could
+   * only ever hold one run would stop being a rehearsal of the real one.
    */
-  runFile: process.env.RUN_FILE ?? "",
+  runFiles: (process.env.RUN_FILE ?? "")
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean),
 
-  mongoUri: process.env.MONGODB_URI ?? "",
-  mongoDb: process.env.MONGODB_DB ?? "dotapredictions",
+  supabaseUrl: (process.env.SUPABASE_URL ?? "").replace(/\/+$/, ""),
+
+  /**
+   * The secret key (`sb_secret_...`), server-side only. It carries BYPASSRLS,
+   * which is exactly why `runs` has row-level security on and no policy: this
+   * process is the only reader, and a browser key reaching that table returns
+   * nothing rather than everything.
+   */
+  supabaseSecretKey: process.env.SUPABASE_SECRET_KEY ?? "",
 
   /** Which snapshot to serve at boot. Empty means "newest current run". */
   tournamentId: process.env.TOURNAMENT_ID ?? "",

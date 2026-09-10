@@ -17,3 +17,15 @@ server/.env
 
 # dry-run publish artefacts
 run-*.json
+
+# Skill bundles: zip archives that were unpacked into <name>/SKILL.md beside
+# them. Committing both means the readable copy and the binary can disagree.
+.claude/skills/*/*.skill
+
+# Vite reads these after .env; they exist to hold per-machine overrides.
+.env.local
+.env.*.local
+
+# OS noise
+.DS_Store
+Thumbs.db

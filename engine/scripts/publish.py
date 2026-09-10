@@ -1,7 +1,11 @@
-"""Publish an immutable run snapshot to MongoDB.
+"""Publish an immutable run snapshot to Supabase.
 
-    python -m scripts.publish --stage main --out ../run.json     # dry run, no DB
-    python -m scripts.publish --stage main --mongo-uri "$MONGODB_URI"
+    python -m scripts.publish --stage main --out ../run.json   # dry run, no DB
+    python -m scripts.publish --stage main                     # reads .env
+
+Credentials come from SUPABASE_URL and SUPABASE_SECRET_KEY. The secret key
+bypasses row-level security, which is the whole reason `public.runs` has RLS on
+and no policy: this script and the Express server are its only readers.
 
 This is a serialiser, not a model. Everything it writes comes from
 `pipeline.analyse` and the stage simulators; nothing is recomputed, because a
@@ -10,7 +14,8 @@ first.
 
 What it emits, all scoped to one runId:
 
-    runs              params, data window, and which gates were forced
+    runs              one row: params, data window, which gates were forced,
+                      and the entire validated payload as `json`
     teams / players   by id, with also_team_ids folded in
     emblems           the FULL generatable catalog, not one rolled banner
     playerSamples     factor-corrected stat lines, plus the per-game scalars
@@ -30,6 +35,7 @@ import argparse
 import base64
 import hashlib
 import json
+import os
 import subprocess
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -37,12 +43,13 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+import requests
 from dotenv import load_dotenv
 
 from dota import bracket as bracket_mod
 from dota import pipeline
 from dota.banner import STAT_SOURCE
-from dota.config import CONFIG_DIR, ROOT, Config, Player
+from dota.config import CONFIG_DIR, GLOBAL_CONFIG, ROOT, Config, Player, tournament_dir
 from dota.pipeline import SLOT_ROLES, Analysis
 from dota.sources.base import PlayerGame
 from scripts import gates as gates_mod
@@ -80,13 +87,14 @@ THIN_SAMPLE = 40
 
 
 def b64(array: np.ndarray) -> str:
-    """Canonical wire form. The publisher encodes, the server decodes; Mongo
-    holds the raw bytes as BSON Binary."""
+    """Canonical wire form, and now the only one.
+
+    The publisher encodes, the server decodes, and the database stores this
+    exact string -- the file path, the `json` column and the schema all see the
+    same bytes. The earlier Mongo writer kept a second copy as BSON Binary; two
+    encodings of one matrix is one chance for them to disagree.
+    """
     return base64.b64encode(array.tobytes()).decode("ascii")
-
-
-def raw(array: np.ndarray) -> bytes:
-    return array.tobytes()
 
 
 # ---------------------------------------------------------------------------
@@ -111,7 +119,13 @@ def engine_version() -> str:
 def config_hash(tournament_id: str) -> str:
     """Hash of the config that produced this run, so a number traces to inputs."""
     digest = hashlib.sha256()
-    for path in sorted(CONFIG_DIR.rglob("*.yaml")):
+    # This event's files plus the shared ones, never another event's. Hashing
+    # the whole tree would make every run's configHash change when an unrelated
+    # tournament was edited, which destroys the property the hash exists for:
+    # that a number traces to the inputs that produced it.
+    scoped = sorted(tournament_dir(tournament_id).glob("*.yaml"))
+    scoped += sorted(CONFIG_DIR / name for name in GLOBAL_CONFIG)
+    for path in scoped:
         digest.update(path.name.encode())
         digest.update(path.read_bytes())
     digest.update(tournament_id.encode())
@@ -139,6 +153,14 @@ def build_run_meta(
         "runId": run_id,
         "tournamentId": tournament_id,
         "stage": stage,
+        # Read from config rather than inferred from `stage`. Three emblems in a
+        # group stage and five in a main event is a fact about the period, and
+        # the client must not have to know it.
+        "bannerSlots": (
+            cfg.tournament.main_event.banner_slots
+            if stage == "main" and cfg.tournament.main_event is not None
+            else cfg.tournament.banner_slots
+        ),
         "schemaVersion": 1,
         "createdAt": iso(datetime.now(timezone.utc)),
         "engineVersion": engine_version(),
@@ -630,60 +652,121 @@ def validate(wire: dict[str, Any]) -> None:
 # writing
 # ---------------------------------------------------------------------------
 
-COLLECTIONS = (
-    "teams",
-    "players",
-    "emblems",
-    "playerSamples",
-    "stageProjections",
-    "factorAudit",
-)
+def write_supabase(wire: dict[str, Any], url: str, key: str) -> None:
+    """Insert the run, then point `is_current` at it.
 
+    The payload goes in as ONE `json` column rather than as six tables of rows.
+    Nothing queries inside it -- the server reads the whole run once at boot and
+    every field worth filtering on is a column beside it -- so splitting it up
+    would buy nothing and cost a second representation of the same bytes. These
+    are exactly the bytes `--out` writes and exactly the bytes the schema
+    validated, which is what makes the file path a real rehearsal of this one.
 
-def write_mongo(payload: dict[str, Any], uri: str, db_name: str) -> None:
-    from bson.binary import Binary
-    from pymongo import ASCENDING, MongoClient
+    Three requests, in this order, for the same reason the Mongo writer used:
+    the row lands complete before anything points at it. Two runs briefly
+    current is harmless -- the server takes the newest by created_at -- while a
+    current run whose payload is still arriving is not.
+    """
+    run = wire["run"]
+    endpoint = f"{url.rstrip('/')}/rest/v1/runs"
 
-    def bsonify(value: Any) -> Any:
-        if isinstance(value, np.ndarray):
-            return Binary(raw(value))
-        if isinstance(value, dict):
-            return {k: bsonify(v) for k, v in value.items()}
-        if isinstance(value, list):
-            return [bsonify(v) for v in value]
-        if isinstance(value, (np.floating, np.integer)):
-            return value.item()
-        return value
+    # `sb_secret_...` keys are not JWTs and travel on `apikey`; the legacy
+    # service_role key is a JWT that PostgREST reads the role out of. Send the
+    # bearer only when the key looks like one, so either generation works.
+    headers = {"apikey": key, "Content-Type": "application/json"}
+    if key.startswith("ey"):
+        headers["Authorization"] = f"Bearer {key}"
 
-    run = payload["run"]
-    client = MongoClient(uri, serverSelectionTimeoutMS=10_000)
-    db = client[db_name]
+    def send(method: str, params: dict[str, str], body: Any, prefer: str) -> None:
+        response = requests.request(
+            method,
+            endpoint,
+            params=params,
+            json=body,
+            headers={**headers, "Prefer": prefer},
+            timeout=120,
+        )
+        if not response.ok:
+            raise RuntimeError(
+                f"{method} {endpoint} -> {response.status_code} {response.text[:400]}"
+            )
 
-    db.playerSamples.create_index([("runId", ASCENDING), ("playerId", ASCENDING)], unique=True)
-    db.stageProjections.create_index([("runId", ASCENDING), ("teamId", ASCENDING)])
-    db.runs.create_index([("tournamentId", ASCENDING), ("stage", ASCENDING), ("isCurrent", ASCENDING)])
+    row = {
+        "run_id": run["runId"],
+        "tournament_id": run["tournamentId"],
+        "stage": run["stage"],
+        "created_at": run["createdAt"],
+        "engine_version": run.get("engineVersion") or "",
+        "schema_version": run["schemaVersion"],
+        "is_current": False,
+        "payload": wire,
+    }
+    send("POST", {}, row, "resolution=merge-duplicates,return=minimal")
 
-    # Order matters more than atomicity here. The data lands first with the run
-    # marked current last, so a reader never sees a current run whose samples are
-    # still arriving. Two runs briefly current is harmless -- the server takes the
-    # newest by createdAt -- while a current run with no data is not.
-    for name in COLLECTIONS:
-        docs = [bsonify(d) for d in payload[name]]
-        if not docs:
-            continue
-        db[name].delete_many({"runId": run["runId"]}) if "runId" in docs[0] else None
-        db[name].insert_many(docs)
-
-    db.runs.insert_one(bsonify({**run, "isCurrent": True}))
-    db.runs.update_many(
+    send(
+        "PATCH",
         {
-            "tournamentId": run["tournamentId"],
-            "stage": run["stage"],
-            "runId": {"$ne": run["runId"]},
+            "tournament_id": f"eq.{run['tournamentId']}",
+            "stage": f"eq.{run['stage']}",
+            "run_id": f"neq.{run['runId']}",
         },
-        {"$set": {"isCurrent": False}},
+        {"is_current": False},
+        "return=minimal",
     )
-    client.close()
+    send("PATCH", {"run_id": f"eq.{run['runId']}"}, {"is_current": True}, "return=minimal")
+
+
+def prune_runs(url: str, key: str, tournament_id: str, stage: str, keep: int) -> None:
+    """Drop superseded runs, keeping the newest `keep` for this tournament and stage.
+
+    A published run is roughly 0.4 MB stored, so unbounded history is the one
+    thing here that grows without anyone deciding it should. Bounding it is not
+    a cost optimisation dressed up as hygiene: a project that silently crosses a
+    storage limit mid-event fails in the same shape as everything else this code
+    guards against -- confidently, at the worst moment.
+
+    Deletion is announced by run id rather than counted, because a prune that
+    removes more than expected should be visible in the log that recorded it.
+    `--keep 0` disables this entirely.
+    """
+    if keep <= 0:
+        return
+
+    headers = {"apikey": key}
+    if key.startswith("ey"):
+        headers["Authorization"] = f"Bearer {key}"
+
+    listing = requests.get(
+        f"{url.rstrip('/')}/rest/v1/runs",
+        params={
+            "select": "run_id,created_at,is_current",
+            "tournament_id": f"eq.{tournament_id}",
+            "stage": f"eq.{stage}",
+            "order": "created_at.desc",
+        },
+        headers=headers,
+        timeout=60,
+    )
+    if not listing.ok:
+        print(f"[publish] could not list runs to prune: {listing.status_code}")
+        return
+
+    rows = listing.json()
+    # The current run is never a candidate, whatever its timestamp says. A clock
+    # skew that reordered two runs must not be able to delete the one being served.
+    stale = [r for r in rows[keep:] if not r["is_current"]]
+    if not stale:
+        return
+
+    for row in stale:
+        response = requests.delete(
+            f"{url.rstrip('/')}/rest/v1/runs",
+            params={"run_id": f"eq.{row['run_id']}"},
+            headers={**headers, "Prefer": "return=minimal"},
+            timeout=60,
+        )
+        status = "deleted" if response.ok else f"FAILED {response.status_code}"
+        print(f"[publish] prune: {status} {row['run_id']}")
 
 
 # ---------------------------------------------------------------------------
@@ -694,7 +777,12 @@ def write_mongo(payload: dict[str, Any], uri: str, db_name: str) -> None:
 def main() -> int:
     ap = argparse.ArgumentParser(description="Publish a run snapshot")
     ap.add_argument("--stage", choices=("group", "main"), default="main")
-    ap.add_argument("--tournament-id", default="ti2026")
+    ap.add_argument(
+        "--tournament-id",
+        default="",
+        help="which config/<id>/ to publish; default: $DOTA_TOURNAMENT, or the "
+        "only configured tournament",
+    )
     ap.add_argument("--sims", type=int, default=20000)
     ap.add_argument("--group-sims", type=int, default=20000)
     ap.add_argument("--history-days", type=int, default=180)
@@ -703,19 +791,74 @@ def main() -> int:
     ap.add_argument("--min-team-games", type=int, default=8)
     ap.add_argument("--min-player-games", type=int, default=5)
     ap.add_argument(
+        "--max-roster-age",
+        type=int,
+        default=gates_mod.MAX_ROSTER_AGE_DAYS,
+        metavar="DAYS",
+        help="how old teams.yaml's verified_utc may be (default %(default)s)",
+    )
+    ap.add_argument(
+        "--max-team-idle",
+        type=int,
+        default=gates_mod.MAX_TEAM_IDLE_DAYS,
+        metavar="DAYS",
+        help="how long a configured team may have gone without a match "
+        "(default %(default)s)",
+    )
+    ap.add_argument(
         "--force",
         action="append",
         default=[],
         metavar="GATE",
         help="publish despite this gate failing; the name is recorded on the run",
     )
-    ap.add_argument("--out", type=Path, help="write the payload as JSON instead of to Mongo")
-    ap.add_argument("--mongo-uri", default="")
-    ap.add_argument("--mongo-db", default="dotapredictions")
+    ap.add_argument(
+        "--out", type=Path, help="write the payload as JSON instead of to Supabase"
+    )
+    ap.add_argument("--supabase-url", default="", help="default: $SUPABASE_URL")
+    ap.add_argument("--supabase-key", default="", help="default: $SUPABASE_SECRET_KEY")
+    ap.add_argument(
+        "--keep",
+        type=int,
+        default=5,
+        metavar="N",
+        help="keep only the newest N runs per tournament and stage (0 disables)",
+    )
+    ap.add_argument(
+        "--from-file",
+        type=Path,
+        help="publish a payload an earlier --out wrote, instead of re-running the pipeline",
+    )
     args = ap.parse_args()
 
     load_dotenv()
-    cfg = Config()
+
+    if args.from_file:
+        # The dry run and the real one, made the same act.
+        #
+        # `--out` exists so a payload can be inspected before it goes anywhere;
+        # if publishing it then required re-running the pipeline, the bytes that
+        # were inspected would not be the bytes that shipped. Fetches drift,
+        # simulations are random, and "close enough" is the failure this project
+        # exists to avoid. So the file is re-validated and sent as-is.
+        #
+        # The gates are not re-run, and cannot be: they read the analysis, which
+        # this path deliberately does not have. What the gates decided is already
+        # recorded on the run as `gatesForced` -- a payload that got past them
+        # once carries that fact with it.
+        wire = json.loads(args.from_file.read_text(encoding="utf-8"))
+        validate(wire)
+        run = wire["run"]
+        print(f"[publish] {args.from_file}: {run['runId']} -- schema OK")
+        return send(wire, args)
+
+    # Resolved once, then used everywhere below -- including as the run's own
+    # tournamentId. A run labelled with one event and computed from another's
+    # config is the exact failure the freshness gates exist to catch, and this
+    # makes it unrepresentable rather than merely unlikely.
+    cfg = Config(tournament_id=args.tournament_id) if args.tournament_id else Config()
+    tournament_id = cfg.tournament_id
+    print(f"[publish] tournament {tournament_id} ({cfg.tournament.name})")
 
     analysis = pipeline.analyse(
         cfg,
@@ -731,8 +874,15 @@ def main() -> int:
     results = gates_mod.run_all(
         cfg,
         analysis,
+        # The stage decides which gates are even askable. A Main Event run is
+        # refused until the bracket is drawn, and its roster must have been
+        # re-checked after the group stage locked -- the field by then is the
+        # eight survivors, and stand-ins appear between stages.
+        stage=args.stage,
         min_team_games=args.min_team_games,
         min_player_games=args.min_player_games,
+        max_roster_age_days=args.max_roster_age,
+        max_team_idle_days=args.max_team_idle,
     )
     forced: list[str] = []
     blocking = False
@@ -753,26 +903,31 @@ def main() -> int:
         print(
             "\nRefusing to publish. Each failure above is a bug that ships as a "
             "confident wrong number rather than an error.\n"
-            "Fix it, or re-run with --force <gate> to publish anyway and record it."
+            "Fix it, or re-run with --force <gate> to publish anyway and record it.\n"
+            "\n"
+            "If the failures are stage_ready, roster_freshness or team_activity, the\n"
+            "answer is usually not --force but WAITING: a field that is not decided\n"
+            "yet cannot be fetched, and a roster fetched too early is wrong by the\n"
+            "time it matters."
         )
         return 1
 
-    run_id = f"{args.tournament_id}-{args.stage}-{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}"
+    run_id = f"{tournament_id}-{args.stage}-{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}"
     payload: dict[str, Any] = {
         "run": build_run_meta(
             cfg,
             analysis,
             run_id=run_id,
-            tournament_id=args.tournament_id,
+            tournament_id=tournament_id,
             stage=args.stage,
             sims=args.sims if args.stage == "main" else args.group_sims,
             prior_strength=args.prior_strength,
             gates_forced=forced,
         ),
         "scoring": build_scoring(cfg),
-        "teams": build_teams(cfg, args.tournament_id),
-        "players": build_players(cfg, args.tournament_id),
-        "emblems": build_emblems(cfg, args.tournament_id, args.stage),
+        "teams": build_teams(cfg, tournament_id),
+        "players": build_players(cfg, tournament_id),
+        "emblems": build_emblems(cfg, tournament_id, args.stage),
         "playerSamples": build_player_samples(cfg, analysis, run_id),
         "stageProjections": (
             build_main_projections(cfg, analysis, run_id, sims=args.sims)
@@ -791,18 +946,32 @@ def main() -> int:
         f"{len(payload['emblems'])} emblems -- schema OK"
     )
 
+    return send(wire, args)
+
+
+def send(wire: dict[str, Any], args: argparse.Namespace) -> int:
+    """Where a validated payload goes: a file, or the database.
+
+    Both entry paths end here, so `--out` and `--from-file` cannot disagree with
+    a fresh run about what counts as credentials or what gets written.
+    """
     if args.out:
         args.out.write_text(json.dumps(wire, indent=2), encoding="utf-8")
-        print(f"[publish] wrote {args.out} (dry run, nothing sent to Mongo)")
+        print(f"[publish] wrote {args.out} (dry run, nothing sent to Supabase)")
         return 0
 
-    uri = args.mongo_uri or ""
-    if not uri:
-        print("[publish] no --mongo-uri and no --out: nothing written")
+    url = args.supabase_url or os.environ.get("SUPABASE_URL", "")
+    key = args.supabase_key or os.environ.get("SUPABASE_SECRET_KEY", "")
+    if not url or not key:
+        print(
+            "[publish] no Supabase credentials and no --out: nothing written.\n"
+            "          set SUPABASE_URL and SUPABASE_SECRET_KEY, or pass --out."
+        )
         return 1
 
-    write_mongo(payload, uri, args.mongo_db)
-    print(f"[publish] {run_id} is now current in {args.mongo_db}")
+    write_supabase(wire, url, key)
+    print(f"[publish] {wire['run']['runId']} is now current in {url}")
+    prune_runs(url, key, wire["run"]["tournamentId"], wire["run"]["stage"], args.keep)
     return 0
 
 
