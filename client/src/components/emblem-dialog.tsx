@@ -62,14 +62,19 @@ export function EmblemDialog({
 }) {
   const [axes, setAxes] = useState<Axes>(initial)
   const resolved = catalog.resolve(axes)
-  const stats = catalog.statsByColor.get(axes.color) ?? []
+  const stats = (axes.color && catalog.statsByColor.get(axes.color)) || []
 
   const change = (patch: Partial<Axes>) => {
     const next = { ...axes, ...patch }
-    // A stat belongs to exactly one colour, so switching colour drops the stat
+    // A stat belongs to exactly one colour, so changing colour drops the stat
     // but keeps quality and trait -- those are colour-independent, and making
     // the user re-pick them would punish browsing.
-    if (patch.color && next.stat && catalog.colorOf(next.stat) !== patch.color) {
+    //
+    // `"color" in patch` rather than a truthiness test, because clearing the
+    // colour is a change of colour too. Miss that and the stat survives with
+    // no list showing it: still counted by `resolve`, still saveable, and
+    // invisible in the one field that could have told you it was there.
+    if ("color" in patch && next.stat && catalog.colorOf(next.stat) !== next.color) {
       next.stat = null
     }
     setAxes(next)
@@ -102,6 +107,7 @@ export function EmblemDialog({
                   name={`emblem-${slot}-color`}
                   checked={on}
                   onSelect={() => change({ color })}
+                  onClear={() => change({ color: null })}
                   // The hue lives on the element, the recipe in the class names.
                   // Both come from colorStyle so they cannot be separated.
                   {...style.attrs}
@@ -121,6 +127,12 @@ export function EmblemDialog({
           {/* auto-rows-fr: one option carrying a second line must not make its row
                 taller than the rest. Equal rows by rule, not by every option
                 happening to hold the same amount of text. */}
+          {/* An empty grid is a dead end, and with no colour chosen by default
+              it is the first thing a new banner shows. Say which field is
+              waiting rather than leaving a blank the user has to guess at. */}
+          {!axes.color && (
+            <p className="text-muted-foreground text-xs">Pick a colour first.</p>
+          )}
           <div className="grid auto-rows-fr gap-2 sm:grid-cols-2">
             {stats.map((option) => (
               <Choice
@@ -134,6 +146,7 @@ export function EmblemDialog({
                    one scores nothing for anyone. */
                 disabled={usedStats.has(option.stat) || !option.measurable}
                 onSelect={() => change({ stat: option.stat })}
+                onClear={() => change({ stat: null })}
               >
                 <span className="flex flex-col items-start text-left">
                   <span>{option.label}</span>
@@ -156,6 +169,7 @@ export function EmblemDialog({
                 name={`emblem-${slot}-tier`}
                 checked={axes.tier === tier}
                 onSelect={() => change({ tier })}
+                onClear={() => change({ tier: null })}
                 className="flex-col justify-center gap-0.5 px-1 py-2.5"
               >
                 {/* The numeral is the emblem's own stamp, so it is the loud part
@@ -180,6 +194,7 @@ export function EmblemDialog({
                 name={`emblem-${slot}-trait`}
                 checked={axes.trait === trait}
                 onSelect={() => change({ trait })}
+                onClear={() => change({ trait: null })}
               >
                 <span className="flex min-w-0 flex-col items-start text-left">
                   <span className="text-xs font-semibold tracking-[0.12em] uppercase">
@@ -228,17 +243,35 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 /**
- * One option in a group.
+ * One option in a group, and every group here can be left with none chosen.
  *
  * A real radio behind a styled label, not a button with `aria-pressed`: radios
  * give arrow-key movement within the group and one Tab stop for the whole group
  * for free, and a group of five buttons does neither.
+ *
+ * What a radio will not do on its own is come back off, and every axis of an
+ * emblem must -- nothing is chosen for the user, so every click has to be
+ * undoable by the same click. Hence the pair of handlers, and hence `onClick`
+ * alongside `onChange` rather than instead of it:
+ *
+ *   - selecting an unchecked option fires `change`, and `click` too. The DOM
+ *     sets checkedness during click dispatch but fires `input`/`change` after
+ *     it, so `checked` here is still the pre-click value and the clause below
+ *     correctly does nothing.
+ *   - clicking the option that is already checked fires `click` and NOTHING
+ *     else. That silence is the whole reason a radio cannot deselect itself,
+ *     and it is the one signal `onClear` has to work with.
+ *
+ * Keyboard follows: arrows move between options and fire `change` only, so
+ * browsing a group never clears it, while Space on the option already held
+ * fires a click and takes it back off.
  */
 function Choice({
   name,
   checked,
   disabled,
   onSelect,
+  onClear,
   className,
   children,
   ...rest
@@ -247,6 +280,8 @@ function Choice({
   checked: boolean
   disabled?: boolean
   onSelect: () => void
+  /** Called when the option that is already checked is clicked again. */
+  onClear: () => void
   className?: string
   children: React.ReactNode
 } & React.HTMLAttributes<HTMLLabelElement>) {
@@ -269,6 +304,7 @@ function Choice({
         checked={checked}
         disabled={disabled}
         onChange={onSelect}
+        onClick={() => checked && onClear()}
         className="sr-only"
       />
       {children}

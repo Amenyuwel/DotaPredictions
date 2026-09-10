@@ -151,55 +151,119 @@
 /* ---------------------------------------------------------------------------
    Emblem colour
    ---------------------------------------------------------------------------
-   One recipe, evaluated at three hues. Every role below fixes its lightness AND
-   its chroma, so RED / BLUE / GREEN differ only in hue and read as one control
-   in three colours rather than three differently-weighted buttons.
+   A colour chip is an ordinary button until it is hovered or picked. At rest it
+   wears the same chrome as every other control, because three permanently
+   painted slabs in a row are louder than anything on the screen deserves and
+   the word "RED" inside the chip already says which one it is. Hover and
+   selection are where the colour arrives, so the paint is what a pointer or a
+   choice reveals -- confirmation, never the only signal.
 
-   Tailwind's own ramps cannot do this: red-200, blue-200 and emerald-200 sit at
-   different lightness and chroma, which is what made these look mismatched.
+   What it reveals is the client's weave, not a flat fill. `public/Fantasy.png`
+   is a screenshot of the real banner and each colour is patterned differently:
 
-   The chroma numbers are not taste, they are the gamut. sRGB is far narrower in
-   green than in red or blue, so a shared chroma only holds if the tightest hue
-   can reach it -- at L=0.62 red reaches 0.251 and green stops at 0.136. Each
-   value below is 95% of the tightest of the three at that lightness. Pick a
-   larger one and green alone gets clipped, which puts the mismatch straight
-   back. Re-derive them if a hue is added.
+       red     12px checkerboard
+       blue    11px vertical stripes, on 11px off
+       green   two 45-degree band sets crossing, 7px band on a 20px period
 
-   Add a colour by adding a hue here and nothing else. */
+   Measured off the screenshot, so a red emblem is checkered here because it is
+   checkered there. The pattern is the whole per-colour part; everything else is
+   one recipe at three hues, same lightness and same chroma, hue only. Two tones
+   per state -- the ground and the pattern woven over it -- and a second, deeper
+   pair for a chip that is selected, so selection is more of the same colour
+   rather than a different one.
+
+   The client's own tones are near-black (its banner sits on a dark parchment
+   screen) and a dark slab dropped into a light page is the thing they replaced.
+   Only the hues and the patterns are copied. The lightnesses are set for the
+   page this actually renders on, and its dark theme gets its own pair rather
+   than a pale chip flashing on a dark screen.
+
+   The chroma numbers are not taste, they are the gamut. sRGB holds almost no
+   chroma near white -- at L=0.94 red reaches 0.030, blue 0.029 and green 0.108
+   -- so a shared chroma only holds if the tightest hue can reach it. Each value
+   below is about 95% of the tightest of the three at that lightness. Pick a
+   larger one and blue alone gets clipped, which is exactly how three colours
+   end up reading as three different weights of control. Re-derive them if a hue
+   is added, and note that the binding hue changes with lightness: blue near
+   white, green further down.
+
+   Add a colour by adding a hue and a pattern here, and nothing else. */
 @layer base {
   [data-emblem] {
     --emblem-hue: 0;
     /* 0 drains the colour without needing a second set of rules. */
     --emblem-sat: 1;
 
+    /* No weave unless a colour declares one, so an unclassified stat is flat
+       rather than wearing some other colour's pattern. */
+    --emblem-pattern: none;
+    --emblem-pattern-size: auto;
+
+    /* The weave: ground, and the pattern drawn over it. */
+    --emblem-ground: oklch(0.94 calc(0.027 * var(--emblem-sat)) var(--emblem-hue));
+    --emblem-pat: oklch(0.88 calc(0.056 * var(--emblem-sat)) var(--emblem-hue));
+    /* The same weave for a selected chip, one step deeper. */
+    --emblem-ground-on: oklch(0.91 calc(0.041 * var(--emblem-sat)) var(--emblem-hue));
+    --emblem-pat-on: oklch(0.84 calc(0.075 * var(--emblem-sat)) var(--emblem-hue));
+
+    /* The colour stated plainly, for the two places that have no room to weave:
+       the border of a selected chip and the bar down a builder row. One token,
+       because those two are answering the same question and a row's bar
+       disagreeing with its chip's border would be a bug you could see. */
+    --emblem-mark: oklch(0.68 calc(0.11 * var(--emblem-sat)) var(--emblem-hue));
+    --emblem-ring: color-mix(in oklab, var(--emblem-mark) 35%, transparent);
+
+    /* The colour word printed on the page, beside a banner rather than on one.
+       Darker and more saturated than anything above, because it is type on the
+       card background and has to clear contrast on its own. */
     --emblem-ink: oklch(0.48 calc(0.1 * var(--emblem-sat)) var(--emblem-hue));
-    --emblem-ink-on: oklch(0.36 calc(0.075 * var(--emblem-sat)) var(--emblem-hue));
-    --emblem-edge: oklch(0.85 calc(0.071 * var(--emblem-sat)) var(--emblem-hue));
-    --emblem-edge-on: oklch(0.62 calc(0.129 * var(--emblem-sat)) var(--emblem-hue));
-    --emblem-wash: oklch(0.62 calc(0.129 * var(--emblem-sat)) var(--emblem-hue) / 0.07);
-    --emblem-wash-on: oklch(0.62 calc(0.129 * var(--emblem-sat)) var(--emblem-hue) / 0.2);
-    --emblem-ring: oklch(0.62 calc(0.129 * var(--emblem-sat)) var(--emblem-hue) / 0.25);
-    --emblem-bar-from: oklch(0.72 calc(0.139 * var(--emblem-sat)) var(--emblem-hue));
-    --emblem-bar-to: oklch(0.52 calc(0.108 * var(--emblem-sat)) var(--emblem-hue));
   }
 
-  /* Hue angles taken from the Tailwind ramps these replaced, so the palette is
-     recognisably the same -- only the weighting is now equal. */
-  [data-emblem="red"] { --emblem-hue: 25; }
-  [data-emblem="blue"] { --emblem-hue: 260; }
-  [data-emblem="green"] { --emblem-hue: 162; }
+  /* Hue and weave, both measured off the client's own banners. The gaps are
+     `transparent` rather than a colour so one pattern definition works on
+     either pair of tones -- the ground shows through from the layer under it,
+     and only `--emblem-pat` has to change when a chip is selected. */
 
-  /* A stat the scoring table does not classify. The same control in grey, not a
-     separate style to keep in step. */
+  [data-emblem="red"] {
+    --emblem-hue: 21;
+    /* Checkerboard. Each conic quadrant is one 12px cell of the 24px tile. */
+    --emblem-pattern: repeating-conic-gradient(var(--emblem-pat) 0% 25%, transparent 0% 50%);
+    --emblem-pattern-size: 24px 24px;
+  }
+
+  [data-emblem="blue"] {
+    --emblem-hue: 274;
+    --emblem-pattern: repeating-linear-gradient(
+      90deg,
+      var(--emblem-pat) 0 11px,
+      transparent 11px 22px
+    );
+  }
+
+  [data-emblem="green"] {
+    --emblem-hue: 145;
+    /* A lattice, not a plaid: the two band sets are the same tone and simply
+       overlap, so a crossing is no brighter than a band. Drawing them as two
+       layers of one colour is what keeps that true. */
+    --emblem-pattern:
+      repeating-linear-gradient(45deg, var(--emblem-pat) 0 7px, transparent 7px 20px),
+      repeating-linear-gradient(-45deg, var(--emblem-pat) 0 7px, transparent 7px 20px);
+  }
+
+  /* A stat the scoring table does not classify. The same control in grey, and
+     with no weave, because it is not one of the client's colours. */
   [data-emblem="unclassified"] { --emblem-sat: 0; }
 
+  /* Dark theme. The weave inverts -- ground below the pattern instead of above
+     it -- so a hovered chip deepens into the page rather than flashing pale on
+     it, and selection still means more colour. The gamut is far wider down
+     here, so these are nowhere near their limits. */
   .dark [data-emblem] {
+    --emblem-ground: oklch(0.28 calc(0.04 * var(--emblem-sat)) var(--emblem-hue));
+    --emblem-pat: oklch(0.34 calc(0.055 * var(--emblem-sat)) var(--emblem-hue));
+    --emblem-ground-on: oklch(0.34 calc(0.06 * var(--emblem-sat)) var(--emblem-hue));
+    --emblem-pat-on: oklch(0.41 calc(0.08 * var(--emblem-sat)) var(--emblem-hue));
     --emblem-ink: oklch(0.78 calc(0.106 * var(--emblem-sat)) var(--emblem-hue));
-    --emblem-ink-on: oklch(0.9 calc(0.046 * var(--emblem-sat)) var(--emblem-hue));
-    --emblem-edge: oklch(0.4 calc(0.083 * var(--emblem-sat)) var(--emblem-hue));
-    --emblem-edge-on: oklch(0.62 calc(0.129 * var(--emblem-sat)) var(--emblem-hue));
-    --emblem-wash: oklch(0.62 calc(0.129 * var(--emblem-sat)) var(--emblem-hue) / 0.12);
-    --emblem-wash-on: oklch(0.62 calc(0.129 * var(--emblem-sat)) var(--emblem-hue) / 0.28);
   }
 }
 

@@ -12,7 +12,6 @@ import {
   tierLabel,
   tierNumeral,
   traitLabel,
-  UNCLASSIFIED,
   type Axes,
 } from "@/lib/emblem-catalog"
 import { cn } from "@/lib/utils"
@@ -56,17 +55,18 @@ export function BannerBuilder({
   }
 
   /** What the dialog opens on. A filled slot reopens on its own emblem; an empty
-   * one opens on a colour, and slots start on different colours so a fresh
-   * banner is not five copies of the same six stats. */
+   * one opens on nothing at all.
+   *
+   * Empty slots used to open on a colour, rotated by index so a fresh banner
+   * was not five copies of the same six stats. That is a real problem but this
+   * was the wrong answer to it: a slot that opens on red and is saved on red
+   * looks the same afterwards whether the user picked red or never touched the
+   * field, and a banner nobody actually chose still produces a confident
+   * projection. Let the choice be visibly absent instead. */
   const openingAxes = (index: number): Axes => {
     const current = value[index] ?? null
     if (current) return axesOf(current, catalog.colorOf)
-    return {
-      color: catalog.colors[index % Math.max(catalog.colors.length, 1)] ?? UNCLASSIFIED,
-      stat: null,
-      tier: null,
-      trait: null,
-    }
+    return { color: null, stat: null, tier: null, trait: null }
   }
 
   return (

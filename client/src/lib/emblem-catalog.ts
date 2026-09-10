@@ -34,10 +34,18 @@ export const UNCLASSIFIED = "unclassified"
  * "Red", "Blue" or "Green" -- so the paint is confirmation, not information, and
  * a reader who cannot separate red from green loses nothing.
  *
- * `idle` and `selected` are the same hue at two strengths, so selection reads as
- * more of the same colour rather than as a different one. An unknown colour --
- * only reachable from a payload whose scoring table and catalog disagree --
- * falls back to the neutral chrome every other control uses.
+ * `idle` contributes no paint at all -- a resting chip is the same control as
+ * every other button on the screen, and only says which colour it is with the
+ * word inside it. The weave arrives on hover and stays for a selected chip, one
+ * pair of tones deeper. So colour here is what a pointer or a choice reveals,
+ * and a reader who cannot separate red from green loses nothing, because the
+ * word was doing the work the whole time.
+ *
+ * `tag` and `bar` are the exception, and deliberately: they are not buttons.
+ * The word under a builder row and the stripe down its edge are the standing
+ * record of what a banner is, so they are painted always -- `tag` in ink on the
+ * card, `bar` in the mark, which is the colour flat because six pixels of weave
+ * is mush rather than a pattern.
  */
 /**
  * One recipe, at whatever hue the element declares.
@@ -52,13 +60,38 @@ export const UNCLASSIFIED = "unclassified"
  * attribute, resolved by the `[data-emblem]` block in index.css where lightness
  * and chroma are shared. Two colours cannot look different weights, because
  * there is only one set of classes.
+ *
+ * What the three do not share is the pattern -- the client gives red a
+ * checkerboard, blue stripes and green a lattice -- but that too arrives
+ * through the attribute, as `--emblem-pattern`. So the pattern differs without
+ * the classes differing, which is the whole point of the split.
  */
+const SKIN =
+  "bg-[var(--emblem-ground)] bg-[image:var(--emblem-pattern)] bg-[length:var(--emblem-pattern-size)]"
+
+/** The same weave, revealed on hover.
+ *
+ * Written out with the prefix on each class rather than built from `SKIN` with
+ * a map at runtime: Tailwind reads this file as text, so a class name that only
+ * exists once the strings are joined is a class name it never generates, and
+ * the rule silently does not exist.
+ *
+ * It also does the second job of beating `Choice`'s own `hover:bg-accent`.
+ * Without a hover background declared here that grey wins the merge, and the
+ * hover that is supposed to show the pattern shows chrome instead. */
+const SKIN_HOVER =
+  "hover:bg-[var(--emblem-ground)] hover:bg-[image:var(--emblem-pattern)] hover:bg-[length:var(--emblem-pattern-size)]"
+
+/** The deeper pair. Both halves are needed: moving the ground alone would leave
+ * the pattern at its old lightness, which is the one way these two tones end up
+ * further apart than any state is drawn. */
+const DEEPER = "[--emblem-ground:var(--emblem-ground-on)] [--emblem-pat:var(--emblem-pat-on)]"
+
 const TONE = {
-  idle: "border-[var(--emblem-edge)] bg-[var(--emblem-wash)] text-[var(--emblem-ink)] hover:bg-[var(--emblem-wash-on)]",
-  selected:
-    "border-[var(--emblem-edge-on)] bg-[var(--emblem-wash-on)] text-[var(--emblem-ink-on)] ring-2 ring-[var(--emblem-ring)]",
+  idle: SKIN_HOVER,
+  selected: `${SKIN} ${DEEPER} border-[var(--emblem-mark)] text-[var(--emblem-ink)] ring-2 ring-[var(--emblem-ring)]`,
   tag: "text-[var(--emblem-ink)]",
-  bar: "bg-linear-to-b from-[var(--emblem-bar-from)] to-[var(--emblem-bar-to)]",
+  bar: "bg-[var(--emblem-mark)]",
 } as const
 
 /**
@@ -78,9 +111,14 @@ const COLOR_HUES = new Set(["red", "blue", "green"])
 
 /** The choices that make an emblem. Colour is not one of the emblem's own
  * properties -- it follows from the stat -- but it is the choice a user makes
- * FIRST, and a half-built emblem needs somewhere to hold it. */
+ * FIRST, and a half-built emblem needs somewhere to hold it.
+ *
+ * Every axis is nullable, colour included. An empty slot opens with nothing
+ * chosen rather than on a colour picked for the user: a preselected red is
+ * indistinguishable from a red the user chose, and the difference matters when
+ * the thing being built is a projection someone will act on. */
 export interface Axes {
-  color: string
+  color: string | null
   stat: string | null
   tier: string | null
   trait: string | null
