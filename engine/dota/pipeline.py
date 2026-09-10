@@ -11,14 +11,13 @@ from . import factors as factors_mod
 from . import patch as patch_mod
 from . import ratings as ratings_mod
 from . import swiss
-from .banner import STAT_SOURCE, BannerPlan
-from .config import CACHE_DIR, DATA_DIR, OUT_DIR, Config, Player
+from .banner import STAT_SOURCE
+from .config import CACHE_DIR, DATA_DIR, OUT_DIR, Config
 from .fantasy import (
     PlayerProfile,
     SlotProjection,
     profile_player,
     project_slot,
-    summarise_banner,
 )
 from .optimize import (
     FantasyRoster,

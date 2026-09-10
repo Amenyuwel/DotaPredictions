@@ -1,30 +1,22 @@
 /**
- * Whether two answers are actually distinguishable.
+ * How to label a result once the server has decided what is separable.
  *
- * This is the rule the tool exists to enforce, not a display nicety. On the
- * TI 2026 Main Event banners no slot's first place is separated from its
- * second: core leads by 45 points against a 737-point joint sampling error,
- * mid by 146 against 580, support by 280 against 565. Presenting those as a
- * ranked list with a winner states something the numbers do not support.
+ * The rule this enforces is the reason the tool exists, not a display nicety.
+ * On the TI 2026 Main Event banners no slot's first place is separated from its
+ * second: core leads by 45 points against a 737-point joint sampling error, mid
+ * by 146 against 580, support by 280 against 565. Presenting those as a ranked
+ * list with a winner states something the numbers do not support.
  *
- * The server sends `tied` so both sides agree on the verdict. This function is
- * the local fallback and the definition of the rule: intervals that overlap
- * are a tie.
+ * The overlap test itself lives on the server, which sends `tied` with every
+ * answer. It is deliberately NOT reimplemented here: two implementations of one
+ * number are two answers that can disagree, and the one the user sees would be
+ * whichever happened to run last.
  */
 import type { RankedUnit } from "@/types/run"
 
-export function overlaps(a: RankedUnit, b: RankedUnit): boolean {
-  return a.ci.lo <= b.ci.hi && b.ci.lo <= a.ci.hi
-}
-
-/** Ids from `units` that cannot be separated from `best`, `best` excluded. */
-export function tiedWith(best: RankedUnit, units: RankedUnit[]): string[] {
-  return units.filter((u) => u.unitId !== best.unitId && overlaps(best, u)).map((u) => u.unitId)
-}
-
 /**
- * How to label a result. `lead` is reserved for a gap the interval supports;
- * everything overlapping is `tied`, and the UI must give both the same weight.
+ * How to label a row. `lead` is reserved for a gap the interval supports;
+ * anything overlapping is `tied`, and the UI must give both the same weight.
  */
 export type Verdict = "lead" | "tied"
 

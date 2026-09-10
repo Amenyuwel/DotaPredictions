@@ -306,7 +306,3 @@ def problems(matches: list[TeamMatch]) -> tuple[list[str], list[str]]:
                 "(likely coach or stand-in)"
             )
     return blocking, notes
-
-
-def team_name_of(team: Team) -> str:
-    return team.name

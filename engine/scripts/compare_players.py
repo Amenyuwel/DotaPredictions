@@ -26,7 +26,7 @@ from rich.table import Table
 
 from dota import pipeline
 from dota.banner import STAT_SOURCE
-from dota.config import Config, tournament_dir
+from dota.config import Config
 from dota.pipeline import SLOT_ROLES
 from dota.sources import OpenDota
 

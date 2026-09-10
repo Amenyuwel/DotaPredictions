@@ -21,7 +21,6 @@ from __future__ import annotations
 import argparse
 from datetime import timedelta
 
-import numpy as np
 from dotenv import load_dotenv
 from rich.console import Console
 from rich.markup import escape

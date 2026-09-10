@@ -9,7 +9,6 @@ wrong account_id produces confident, wrong projections.
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 import yaml
 from dotenv import load_dotenv

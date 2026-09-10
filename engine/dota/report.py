@@ -341,13 +341,3 @@ def print_factor_audit(analysis: Analysis) -> None:
         "typed by a human, traceable to config/. missing = not modelled; treat "
         "any claim that depends on it as unsupported.[/dim]"
     )
-
-
-def print_all(analysis: Analysis) -> None:
-    print_warnings(analysis)
-    print_factor_audit(analysis)
-    print_ratings(analysis)
-    print_swiss(analysis)
-    print_predictions(analysis)
-    print_fantasy(analysis)
-    print_banners(analysis)
