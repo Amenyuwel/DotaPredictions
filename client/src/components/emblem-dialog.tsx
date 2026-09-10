@@ -77,7 +77,12 @@ export function EmblemDialog({
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-lg">
+      <DialogContent
+        // Cancel sits in the footer and says what leaving means, so the
+        // corner X would be the same exit offered twice.
+        showCloseButton={false}
+        className="max-h-[85dvh] overflow-y-auto sm:max-w-lg"
+      >
         <DialogHeader>
           <DialogTitle>Emblem {slot + 1}</DialogTitle>
           <DialogDescription>

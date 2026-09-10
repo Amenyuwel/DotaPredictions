@@ -37,6 +37,17 @@ function DialogOverlay({
   )
 }
 
+/**
+ * `showCloseButton` stays ON by default, and that default is the safe one.
+ *
+ * A dialog that carries its own dismissal -- "Cancel", "Close" -- should pass
+ * false: two ways out in one box, and the wordless one more prominent than the
+ * labelled one, is a choice presented twice. A dialog with no such button keeps
+ * the X, because Escape alone is not a way out on a touch screen.
+ *
+ * Defaulting to true means forgetting to think about it leaves a way out rather
+ * than removing the only one.
+ */
 function DialogContent({
   className,
   children,
