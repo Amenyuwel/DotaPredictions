@@ -27,7 +27,7 @@ from rich.table import Table
 from dota import emblems as emblems_mod
 from dota import pipeline
 from dota.banner import BannerPlan, EmblemChoice
-from dota.config import CONFIG_DIR, Config, Scoring
+from dota.config import Config, Scoring, tournament_dir
 from dota.fantasy import expected_best_series, role_game_scores, weighted_stat_means
 from dota.optimize import enumerate_fantasy_rosters
 from dota.pipeline import SLOT_ROLES
@@ -35,7 +35,9 @@ from dota.pipeline import SLOT_ROLES
 console = Console()
 
 
-def load_banners(path=None, scoring: Scoring | None = None) -> dict[str, dict[str, float]]:
+def load_banners(
+    path=None, scoring: Scoring | None = None, tournament_id: str | None = None
+) -> dict[str, dict[str, float]]:
     """slot -> {stat: multiplier}, from either banners.yaml form.
 
     The file now lists emblems with their tier, trait and on-banner position, since
@@ -45,7 +47,7 @@ def load_banners(path=None, scoring: Scoring | None = None) -> dict[str, dict[st
     neighbours only when the transcription omits it. The two are checked against
     each other in tests/test_emblems.py.
     """
-    path = path or CONFIG_DIR / "banners.yaml"
+    path = path or tournament_dir(tournament_id) / "banners.yaml"
     raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     out: dict[str, dict[str, float]] = {}
     for slot in ("core", "mid", "support"):

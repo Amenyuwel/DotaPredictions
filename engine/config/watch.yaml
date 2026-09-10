@@ -1,0 +1,49 @@
+# When to look for the next International, and when to stop.
+#
+# Global rather than per-tournament: this file answers "has the next event
+# appeared", which is a question asked when no config for it exists yet.
+#
+# ---------------------------------------------------------------------------
+# Why these months
+# ---------------------------------------------------------------------------
+# The event itself has moved a long way, so a narrow window is a way to miss it:
+#
+#     TI9   2019   Aug 20-25    August
+#     TI10  2021   Oct  7-17    October
+#     TI11  2022   Oct 15-30    October
+#     TI12  2023   Oct 12-29    October
+#     TI13  2024   Sep  4-15    September
+#     TI14  2025   Sep  4-14    September
+#     TI15  2026   Aug 13-23    August
+#
+# August through October, with no clear trend to extrapolate. November and
+# December have never hosted one.
+#
+# But the event date is not what this watch is for. The thing worth catching is
+# the LEAGUE being created, which happens before the regional qualifiers, which
+# run roughly two months before the event -- TI 2026's ran June 15-28 for an
+# August event. That is also the only moment the roster data can be gathered:
+# miss it and the evidence is harder to reconstruct.
+#
+# So the window opens in April, early enough to catch a league created ahead of
+# qualifiers for even the earliest August event, and closes in October, after
+# the latest edition on record has finished.
+months: [4, 5, 6, 7, 8, 9, 10]
+
+# What to match league names against, case-insensitive.
+search: "The International"
+
+# An event whose most recent match is older than this has concluded.
+#
+# Bounded by the largest gap that occurs INSIDE an event, which is the break
+# between the group stage and the main event: 4 days at TI 2026 (Aug 16 -> 20)
+# and 3 at TI 2024 (Sep 10 -> 13). Two weeks clears those several times over
+# while still recognising a finished event within one monthly run -- at 30 days
+# TI 2026 still read as "live" eighteen days after its final game.
+concluded_after_days: 14
+
+# One International per calendar year, always. So once this year's has
+# concluded, there is nothing left to find until January and the watch stops
+# looking -- which is what keeps a September finish from being polled through
+# October, November and December for an event that cannot happen.
+one_per_year: true

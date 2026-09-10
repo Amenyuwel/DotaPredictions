@@ -30,11 +30,18 @@ from typing import Any
 import yaml
 
 from .banner import STAT_SOURCE
-from .config import CONFIG_DIR, ROLES
+from .config import ROLES, tournament_dir
 from .ratings import Ratings
 from .sources.base import PlayerGame
 
-DEFAULT_PATH = CONFIG_DIR / "patch.yaml"
+def default_path(tournament_id: str | None = None) -> Path:
+    """This event's patch prior.
+
+    A function rather than a module constant: the path depends on which
+    tournament is being run, and a constant evaluated at import time would pin
+    whichever event happened to be active when the module was first loaded.
+    """
+    return tournament_dir(tournament_id) / "patch.yaml"
 
 
 @dataclass
@@ -133,10 +140,13 @@ class PatchAdjustment:
 
 
 def load(
-    path: Path | None = None, *, strength: float | None = None
+    path: Path | None = None,
+    *,
+    strength: float | None = None,
+    tournament_id: str | None = None,
 ) -> PatchAdjustment | None:
-    """Read `config/patch.yaml`. A missing file is not an error."""
-    path = path or DEFAULT_PATH
+    """Read this event's `patch.yaml`. A missing file is not an error."""
+    path = path or default_path(tournament_id)
     if not path.exists():
         return None
     raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}

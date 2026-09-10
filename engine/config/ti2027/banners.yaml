@@ -1,0 +1,13 @@
+# The War Banners you actually rolled, transcribed from the client.
+#
+# Empty until you have rolled. `displayed` is the percentage the client shows as
+# a multiplier (300% -> 3.00); it is redundant with what dota/emblems.py derives
+# from tier + trait + neighbours, and that redundancy is the check --
+# tests/test_emblems.py fails if the two disagree.
+#
+# Order is meaningful: Vampiric charges each neighbour -10%, Benevolent pays each
+# neighbour +20%. List emblems TOP TO BOTTOM as the client draws them.
+
+# core:
+#   emblems:
+#     - {stat: gold_per_min, tier: tier_v, trait: vampiric, displayed: 3.00}

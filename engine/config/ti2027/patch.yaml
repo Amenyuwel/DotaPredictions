@@ -1,0 +1,13 @@
+# Gameplay-patch prior, hand-entered, one comment per line explaining the source.
+#
+# `team_rating_delta` is intentionally left empty until there are post-patch
+# results to fit it on. Claiming a team got stronger from a patch with no
+# evidence moves the prediction grid more than anything actually measured.
+
+version: ""            # e.g. "7.41e"
+released_utc: ""
+source: ""             # the patch notes URL you read
+strength: 1.0
+
+source_field_multipliers: {}
+team_rating_delta: {}

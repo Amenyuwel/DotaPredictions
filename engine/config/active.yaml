@@ -1,0 +1,9 @@
+# Which event the engine runs for when nothing names one.
+#
+# Config, not code, and deliberately one line: onboarding the next
+# International should be an edit here plus a new directory beside it, never a
+# constant buried in a module. $DOTA_TOURNAMENT overrides this, and an explicit
+# --tournament-id overrides both.
+#
+# Set it to "" to force every command to name a tournament instead.
+tournament: ti2026

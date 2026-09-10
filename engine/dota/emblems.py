@@ -29,7 +29,7 @@ from itertools import permutations
 
 import yaml
 
-from .config import CONFIG_DIR, Scoring
+from .config import Scoring, tournament_dir
 
 # Positional trait effects on each neighbour.
 ADJACENT = {"vampiric": -0.10, "benevolent": 0.20}
@@ -108,14 +108,14 @@ def best_order(
     return best, best_pts, now
 
 
-def load(path=None) -> dict[str, list[Emblem]]:
+def load(path=None, tournament_id: str | None = None) -> dict[str, list[Emblem]]:
     """Read config/banners.yaml. Accepts the structured form only.
 
     The flat `{stat: multiplier}` form is still readable through
     `scripts.fixed_banner.load_banners`, which is what the older scripts use; this
     loader needs tiers and traits, which the flat form does not carry.
     """
-    path = path or CONFIG_DIR / "banners.yaml"
+    path = path or tournament_dir(tournament_id) / "banners.yaml"
     raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     out: dict[str, list[Emblem]] = {}
     for slot in ("core", "mid", "support"):

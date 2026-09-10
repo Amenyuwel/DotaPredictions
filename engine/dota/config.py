@@ -1,6 +1,7 @@
 """Typed access to the YAML config files."""
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -18,10 +19,135 @@ ROLES = ("carry", "mid", "offlane", "soft_support", "hard_support")
 CORE_DUO_ROLES = ("carry", "offlane")
 SUPPORT_DUO_ROLES = ("soft_support", "hard_support")
 
+# Config that belongs to the GAME, not to an event, and is therefore shared by
+# every tournament. Hero appearance flags come out of Valve's VPK
+# (scripts/extract_hero_adjectives.py); a new International does not change which
+# heroes read as "cerulean". Everything else -- rosters, banners, scoring values,
+# the bracket, the patch prior -- describes one event and lives under its id.
+GLOBAL_CONFIG = frozenset({"hero_adjectives.yaml", "active.yaml"})
 
-def _load(name: str) -> dict[str, Any]:
-    with open(CONFIG_DIR / name, encoding="utf-8") as fh:
-        return yaml.safe_load(fh)
+# Names the default event. See config/active.yaml for why it is config.
+ACTIVE_FILE = "active.yaml"
+
+# Read when no tournament is named. An env var rather than a constant, because a
+# hardcoded default is exactly how last year's roster ships against this year's
+# event -- the costliest bug this project has produced.
+TOURNAMENT_ENV = "DOTA_TOURNAMENT"
+
+
+def available_tournaments() -> list[str]:
+    """Every tournament with a config directory, oldest id first."""
+    return sorted(
+        d.name for d in CONFIG_DIR.iterdir() if d.is_dir() and (d / "tournament.yaml").is_file()
+    )
+
+
+def active_tournament_id() -> str:
+    """Which event the engine is being run for.
+
+    Resolution order, and the last branch is the point of the function: when
+    there is more than one tournament configured and nobody said which, this
+    RAISES rather than picking. Guessing here would mean fitting one event's
+    ratings against another's roster and printing a projection anyway, which is
+    the failure mode every gate in this project exists to prevent.
+    """
+    available = available_tournaments()
+
+    named = os.environ.get(TOURNAMENT_ENV, "").strip()
+    if not named:
+        named = _active_file_id()
+    if named:
+        if named not in available:
+            raise ValueError(
+                f"tournament {named!r} has no config directory "
+                f"(named by {TOURNAMENT_ENV} or config/{ACTIVE_FILE}). "
+                f"Available: {', '.join(available) or 'none'}. "
+                f"Scaffold one with `python -m scripts.new_tournament {named}`."
+            )
+        return named
+    if len(available) == 1:
+        return available[0]
+    if not available:
+        raise ValueError(
+            f"no tournament config found under {CONFIG_DIR}. "
+            "Scaffold one with `python -m scripts.new_tournament <id>`."
+        )
+    raise ValueError(
+        f"{len(available)} tournaments are configured ({', '.join(available)}) and none "
+        f"was named. Set `tournament:` in config/{ACTIVE_FILE}, set {TOURNAMENT_ENV}, "
+        "or pass --tournament-id."
+    )
+
+
+def _active_file_id() -> str:
+    """The default named in config/active.yaml, or "" when it names none."""
+    path = CONFIG_DIR / ACTIVE_FILE
+    if not path.is_file():
+        return ""
+    with open(path, encoding="utf-8") as fh:
+        raw = yaml.safe_load(fh) or {}
+    return str(raw.get("tournament") or "").strip()
+
+
+def tournament_dir(tournament_id: str | None = None) -> Path:
+    """Where one event's config lives."""
+    return CONFIG_DIR / (tournament_id or active_tournament_id())
+
+
+def _parse_utc(value: Any) -> datetime | None:
+    """An ISO-8601 timestamp, or None when the field is absent."""
+    if not value:
+        return None
+    return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+
+
+def _load(name: str, tournament_id: str | None = None) -> dict[str, Any]:
+    base = CONFIG_DIR if name in GLOBAL_CONFIG else tournament_dir(tournament_id)
+    path = base / name
+    if not path.is_file():
+        raise FileNotFoundError(
+            f"{path} is missing. A tournament is not configured until every file "
+            "under its directory exists; an absent one is not an empty one."
+        )
+    with open(path, encoding="utf-8") as fh:
+        raw = yaml.safe_load(fh)
+    _reject_placeholders(path, raw)
+    return raw
+
+
+def _reject_placeholders(path: Path, raw: Any) -> None:
+    """Refuse a scaffold that nobody has filled in.
+
+    `scripts/new_tournament.py` writes TODO where a value belongs, and without
+    this the first TODO surfaces wherever it happens to be parsed --
+    `Invalid isoformat string: 'TODO'` names neither the file nor the fix. A
+    half-filled config is not a config, and it should say so at the point of
+    reading rather than somewhere downstream.
+    """
+    pending: list[str] = []
+
+    def walk(node: Any, trail: str) -> None:
+        if isinstance(node, dict):
+            for key, value in node.items():
+                walk(value, f"{trail}.{key}" if trail else str(key))
+        elif isinstance(node, list):
+            for i, value in enumerate(node):
+                walk(value, f"{trail}[{i}]")
+        elif isinstance(node, str) and node.strip() == "TODO":
+            pending.append(trail)
+
+    walk(raw, "")
+    if not pending:
+        return
+    shown = ", ".join(pending[:5])
+    more = f" (+{len(pending) - 5} more)" if len(pending) > 5 else ""
+    raise ValueError(
+        f"{path.parent.name}/{path.name} is still a scaffold: {len(pending)} value(s) "
+        f"left as TODO -- {shown}{more}.\n"
+        "Fill them in before running anything against this tournament; a config "
+        "half copied from last year is how a stale roster ships as a confident "
+        "projection."
+    )
 
 
 @dataclass(frozen=True)
@@ -64,6 +190,7 @@ class MainEvent:
     n_teams: int
     series_format: str
     grand_final_format: str
+    banner_slots: int
     pairings: list[tuple[str, str]]
     eliminated: list[str]
     lock_utc: datetime | None = None
@@ -97,6 +224,7 @@ class MainEvent:
             n_teams=int(raw.get("teams", 8)),
             series_format=str(raw.get("series_format", "bo3")),
             grand_final_format=str(raw.get("grand_final_format", "bo5")),
+            banner_slots=int(raw["banner_slots"]),
             pairings=pairs,  # type: ignore[arg-type]
             eliminated=list(raw.get("eliminated") or []),
             my_picks=dict(raw.get("my_picks") or {}),
@@ -115,13 +243,16 @@ class Tournament:
     n_teams: int
     direct_advance: int
     elimination_round_slots: int
+    banner_slots: int
     buckets: list[Bucket]
     fantasy_distinct_teams: bool
+    # OpenDota league id -> region, for the qualifiers that fed this event.
+    qualifier_leagues: dict[int, str] = field(default_factory=dict)
     main_event: MainEvent | None = None
 
     @classmethod
-    def load(cls) -> "Tournament":
-        raw = _load("tournament.yaml")
+    def load(cls, tournament_id: str | None = None) -> "Tournament":
+        raw = _load("tournament.yaml", tournament_id)
         gs = raw["group_stage"]
         buckets = [Bucket(**b) for b in raw["prediction_buckets"]]
         total = sum(b.count for b in buckets)
@@ -136,8 +267,12 @@ class Tournament:
             n_teams=gs["teams"],
             direct_advance=gs["direct_advance"],
             elimination_round_slots=gs["elimination_round_slots"],
+            banner_slots=gs["banner_slots"],
             buckets=buckets,
             fantasy_distinct_teams=raw["fantasy"].get("distinct_teams_required", False),
+            qualifier_leagues={
+                int(k): str(v) for k, v in (raw.get("qualifier_leagues") or {}).items()
+            },
             main_event=MainEvent.from_raw(raw.get("main_event")),
         )
 
@@ -171,8 +306,8 @@ class Scoring:
     coach_equipped: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
-    def load(cls) -> "Scoring":
-        raw = _load("scoring.yaml")
+    def load(cls, tournament_id: str | None = None) -> "Scoring":
+        raw = _load("scoring.yaml", tournament_id)
         unmeasurable = set(raw.get("unmeasurable") or [])
         stats = {
             k: Stat(
@@ -208,6 +343,12 @@ class Roster:
     teams: list[Team]
     verified: bool = False
     source: str = ""
+    # WHEN the roster was checked, not just whether. `verified: true` has no
+    # shelf life, and a roster is the most perishable thing in this config:
+    # squads change between events, stand-ins appear between stages, and orgs
+    # disband entirely. A date lets a gate refuse evidence that has aged out
+    # instead of trusting a boolean somebody set last season.
+    verified_utc: datetime | None = None
     aliases: dict[str, str] = field(default_factory=dict)
     # OpenDota team_id -> our team name, for ids that are the same org under a
     # second banner. `aliases` cannot cover these: it keys on the display name,
@@ -215,8 +356,8 @@ class Roster:
     extra_team_ids: dict[int, str] = field(default_factory=dict)
 
     @classmethod
-    def load(cls) -> "Roster":
-        raw = _load("teams.yaml")
+    def load(cls, tournament_id: str | None = None) -> "Roster":
+        raw = _load("teams.yaml", tournament_id)
         # IDs resolved by scripts/resolve_ids.py live outside the YAML so the
         # hand-maintained config keeps its comments and stays diffable.
         resolved = {}
@@ -255,6 +396,7 @@ class Roster:
         return cls(
             teams=teams,
             verified=bool(raw.get("verified", False)),
+            verified_utc=_parse_utc(raw.get("verified_utc")),
             source=str(raw.get("source", "")),
             extra_team_ids={
                 int(k): str(v) for k, v in (raw.get("also_team_ids") or {}).items()
@@ -284,20 +426,42 @@ class Roster:
 
 @dataclass
 class Config:
-    tournament: Tournament = field(default_factory=Tournament.load)
-    scoring: Scoring = field(default_factory=Scoring.load)
-    roster: Roster = field(default_factory=Roster.load)
+    """One event's configuration, loaded together.
+
+    `tournament_id` comes first and everything else is derived from it, so the
+    three files can never describe different events. Construct it bare --
+    `Config()` -- and the id resolves from $DOTA_TOURNAMENT, or from the sole
+    configured tournament when there is exactly one; with several configured and
+    none named, that resolution raises rather than picking.
+    """
+
+    tournament_id: str = field(default_factory=active_tournament_id)
+    tournament: Tournament = field(init=False)
+    scoring: Scoring = field(init=False)
+    roster: Roster = field(init=False)
+
+    def __post_init__(self) -> None:
+        self.tournament = Tournament.load(self.tournament_id)
+        self.scoring = Scoring.load(self.tournament_id)
+        self.roster = Roster.load(self.tournament_id)
+
+    @property
+    def dir(self) -> Path:
+        """This event's config directory. The place to look for banners.yaml,
+        patch.yaml and overrides.yaml, none of which Config itself reads."""
+        return tournament_dir(self.tournament_id)
 
     def warnings(self) -> list[str]:
         out = []
         if not self.scoring.verified:
             out.append(
-                "config/scoring.yaml is NOT verified against the client "
+                "%s/scoring.yaml is NOT verified against the client "
+                % self.dir.name +
                 "(version=%s)." % self.scoring.version
             )
         if not self.roster.verified:
             out.append(
-                "config/teams.yaml is NOT verified (source: %s). Confirm the 16 "
+                "%s/teams.yaml is NOT verified (source: %%s). Confirm the 16 " % self.dir.name +
                 "teams and their role assignments before locking picks."
                 % (self.roster.source or "unknown")
             )

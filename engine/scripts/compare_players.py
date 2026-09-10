@@ -26,7 +26,7 @@ from rich.table import Table
 
 from dota import pipeline
 from dota.banner import STAT_SOURCE
-from dota.config import CONFIG_DIR, Config
+from dota.config import Config, tournament_dir
 from dota.pipeline import SLOT_ROLES
 from dota.sources import OpenDota
 
@@ -44,7 +44,7 @@ def main() -> int:
     load_dotenv()
 
     cfg = Config()
-    banners = yaml.safe_load((CONFIG_DIR / "banners.yaml").read_text(encoding="utf-8"))
+    banners = yaml.safe_load((cfg.dir / "banners.yaml").read_text(encoding="utf-8"))
     spec: dict[str, float] = {k: float(v) for k, v in banners[args.slot].items()}
 
     a = pipeline.analyse(

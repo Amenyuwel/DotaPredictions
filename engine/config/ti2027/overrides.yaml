@@ -1,0 +1,5 @@
+# Pinned ids, written by scripts/resolve_ids.py. Hand-edit only to correct a
+# resolution it got wrong -- and if you do, say why on the line above it.
+
+teams: {}
+players: {}

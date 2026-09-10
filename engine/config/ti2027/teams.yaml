@@ -1,0 +1,133 @@
+# The 16 teams and their five players each.
+#
+# `verified` stays false until you have checked every roster against the
+# client or a broadcast -- scripts/gates.py refuses to publish while it is
+# false, and a stale roster is this project's most expensive failure: it
+# produces a confident wrong number and no error at all.
+#
+# Fill these by hand, or run `python -m scripts.discover_rosters` once the
+# qualifiers have finished and their league ids are in tournament.yaml.
+#
+# `verified_utc` is the day you ACTUALLY checked, and it is not optional:
+# gates.roster_freshness refuses a roster with no date, one older than
+# --max-roster-age, and -- for a Main Event run -- one last checked before
+# the group stage locked. Backdating it to make a publish go through is
+# the one edit here that silently breaks the model.
+
+verified: false
+verified_utc: ""
+source: ""
+
+teams:
+  - name: "TODO team 1"
+    players:
+      - {nick: "TODO", role: carry}
+      - {nick: "TODO", role: mid}
+      - {nick: "TODO", role: offlane}
+      - {nick: "TODO", role: soft_support}
+      - {nick: "TODO", role: hard_support}
+  - name: "TODO team 2"
+    players:
+      - {nick: "TODO", role: carry}
+      - {nick: "TODO", role: mid}
+      - {nick: "TODO", role: offlane}
+      - {nick: "TODO", role: soft_support}
+      - {nick: "TODO", role: hard_support}
+  - name: "TODO team 3"
+    players:
+      - {nick: "TODO", role: carry}
+      - {nick: "TODO", role: mid}
+      - {nick: "TODO", role: offlane}
+      - {nick: "TODO", role: soft_support}
+      - {nick: "TODO", role: hard_support}
+  - name: "TODO team 4"
+    players:
+      - {nick: "TODO", role: carry}
+      - {nick: "TODO", role: mid}
+      - {nick: "TODO", role: offlane}
+      - {nick: "TODO", role: soft_support}
+      - {nick: "TODO", role: hard_support}
+  - name: "TODO team 5"
+    players:
+      - {nick: "TODO", role: carry}
+      - {nick: "TODO", role: mid}
+      - {nick: "TODO", role: offlane}
+      - {nick: "TODO", role: soft_support}
+      - {nick: "TODO", role: hard_support}
+  - name: "TODO team 6"
+    players:
+      - {nick: "TODO", role: carry}
+      - {nick: "TODO", role: mid}
+      - {nick: "TODO", role: offlane}
+      - {nick: "TODO", role: soft_support}
+      - {nick: "TODO", role: hard_support}
+  - name: "TODO team 7"
+    players:
+      - {nick: "TODO", role: carry}
+      - {nick: "TODO", role: mid}
+      - {nick: "TODO", role: offlane}
+      - {nick: "TODO", role: soft_support}
+      - {nick: "TODO", role: hard_support}
+  - name: "TODO team 8"
+    players:
+      - {nick: "TODO", role: carry}
+      - {nick: "TODO", role: mid}
+      - {nick: "TODO", role: offlane}
+      - {nick: "TODO", role: soft_support}
+      - {nick: "TODO", role: hard_support}
+  - name: "TODO team 9"
+    players:
+      - {nick: "TODO", role: carry}
+      - {nick: "TODO", role: mid}
+      - {nick: "TODO", role: offlane}
+      - {nick: "TODO", role: soft_support}
+      - {nick: "TODO", role: hard_support}
+  - name: "TODO team 10"
+    players:
+      - {nick: "TODO", role: carry}
+      - {nick: "TODO", role: mid}
+      - {nick: "TODO", role: offlane}
+      - {nick: "TODO", role: soft_support}
+      - {nick: "TODO", role: hard_support}
+  - name: "TODO team 11"
+    players:
+      - {nick: "TODO", role: carry}
+      - {nick: "TODO", role: mid}
+      - {nick: "TODO", role: offlane}
+      - {nick: "TODO", role: soft_support}
+      - {nick: "TODO", role: hard_support}
+  - name: "TODO team 12"
+    players:
+      - {nick: "TODO", role: carry}
+      - {nick: "TODO", role: mid}
+      - {nick: "TODO", role: offlane}
+      - {nick: "TODO", role: soft_support}
+      - {nick: "TODO", role: hard_support}
+  - name: "TODO team 13"
+    players:
+      - {nick: "TODO", role: carry}
+      - {nick: "TODO", role: mid}
+      - {nick: "TODO", role: offlane}
+      - {nick: "TODO", role: soft_support}
+      - {nick: "TODO", role: hard_support}
+  - name: "TODO team 14"
+    players:
+      - {nick: "TODO", role: carry}
+      - {nick: "TODO", role: mid}
+      - {nick: "TODO", role: offlane}
+      - {nick: "TODO", role: soft_support}
+      - {nick: "TODO", role: hard_support}
+  - name: "TODO team 15"
+    players:
+      - {nick: "TODO", role: carry}
+      - {nick: "TODO", role: mid}
+      - {nick: "TODO", role: offlane}
+      - {nick: "TODO", role: soft_support}
+      - {nick: "TODO", role: hard_support}
+  - name: "TODO team 16"
+    players:
+      - {nick: "TODO", role: carry}
+      - {nick: "TODO", role: mid}
+      - {nick: "TODO", role: offlane}
+      - {nick: "TODO", role: soft_support}
+      - {nick: "TODO", role: hard_support}

@@ -1,0 +1,208 @@
+# Stat table copied from ti2026. verified_against_client is
+# FALSE: Valve changes point values between events, and a table carried
+# forward without re-checking is what scripts/gates.py exists to refuse.
+
+version: TODO
+verified_against_client: false
+stats:
+  kills:
+    per_unit: 107.0
+    color: red
+  deaths:
+    per_unit: -195.0
+    color: red
+    base: 1950.0
+  creep_score:
+    per_unit: 3.0
+    color: red
+  gold_per_min:
+    per_unit: 2.0
+    color: red
+  madstone_collected:
+    per_unit: 13.0
+    color: red
+  tower_kills:
+    per_unit: 352.0
+    color: red
+  observer_wards_planted:
+    per_unit: 117.0
+    color: blue
+  camps_stacked:
+    per_unit: 234.0
+    color: blue
+  rune_pickups:
+    per_unit: 141.0
+    color: blue
+  watchers_taken:
+    per_unit: 147.0
+    color: blue
+  lotuses_grabbed:
+    per_unit: 176.0
+    color: blue
+  smokes_used:
+    per_unit: 293.0
+    color: blue
+  roshan_kills:
+    per_unit: 1172.0
+    color: green
+  teamfight_participation:
+    per_unit: 2124.0
+    color: green
+  seconds_stunned:
+    per_unit: 10.0
+    color: green
+  tormentor_kills:
+    per_unit: 879.0
+    color: green
+  first_blood:
+    per_unit: 1934.0
+    color: green
+  courier_kills:
+    per_unit: 703.0
+    color: green
+unmeasurable:
+- watchers_taken
+- lotuses_grabbed
+emblem_quality:
+  tier_i: 0.1
+  tier_ii: 0.3
+  tier_iii: 0.6
+  tier_iv: 1.0
+  tier_v: 1.5
+emblem_traits:
+  fractal:
+    bonus: 0.6
+    condition: all emblem qualities on the banner differ
+  benevolent:
+    bonus: 0.0
+    adjacent_bonus: 0.2
+  vampiric:
+    bonus: 0.5
+    adjacent_bonus: -0.1
+  unique:
+    bonus: 0.3
+    condition: only Unique emblem on the banner
+  friendly:
+    bonus: 0.5
+    condition: at least 3 Friendly emblems on the banner
+banner_colors:
+- red
+- blue
+- green
+coach:
+  equipped:
+    prefix: Cerulean
+    suffix: the Clutch
+  titles:
+    suffixes:
+      the Clutch:
+        bonus: 0.16
+        condition: playing the last possible match of a series
+        p: 0.1923
+        expected: 0.0308
+      the Underdog:
+        bonus: 0.06
+        condition: games where the player loses
+        p: 0.4001
+        expected: 0.024
+        note: Worth less than the raw number suggests. The objective is E[max], so
+          only your best game is ever recorded, and your best game is usually a win.
+          This bonus pays precisely when you are not scoring.
+      the Lucky:
+        bonus: 0.21
+        condition: match time ends with an 8
+        p: 0.104
+        expected: 0.0218
+      the Decisive:
+        bonus: 0.24
+        condition: games lasting under 25 minutes
+        p: 0.0262
+        expected: 0.0063
+      the Patient:
+        bonus: 0.23
+        condition: first blood after 10 minutes
+        p: 0.0012
+        expected: 0.0003
+      the Flayed Twins Acolyte:
+        bonus: 0.09
+        condition: first blood before the starting horn
+        p: 0.0
+        expected: 0.0
+      the Tormented:
+        bonus: 0.23
+        condition: any player dies to a Tormentor
+        p: null
+      the Cruel:
+        bonus: 0.13
+        condition: a player is killed in their own fountain
+        p: null
+    prefixes:
+      Cerulean:
+        bonus: 0.11
+        condition: blue hero
+        tags:
+        - Blue
+        pool: 29
+      Royal:
+        bonus: 0.1
+        condition: purple hero
+        tags:
+        - Purple
+        pool: 20
+      Heroic:
+        bonus: 0.09
+        condition: caped or masked hero
+        tags:
+        - Cape
+        - Mask
+        - Masked
+        pool: 31
+      Golden:
+        bonus: 0.08
+        condition: yellow or brown hero
+        tags:
+        - Yellow
+        - Brown
+        pool: 25
+      Elemental:
+        bonus: 0.08
+        condition: aquatic, fiery or icy hero
+        tags:
+        - Aquatic
+        - Fiery
+        - Icy
+        pool: 26
+      Otherworldly:
+        bonus: 0.07
+        condition: undead, demon or spirit hero
+        tags:
+        - Undead
+        - Demon
+        - Spirit
+        pool: 26
+      Crimson:
+        bonus: 0.06
+        condition: red hero
+        tags:
+        - Red
+        pool: 30
+      Emerald:
+        bonus: 0.06
+        condition: green hero
+        tags:
+        - Green
+        pool: 23
+      Bestial:
+        bonus: null
+        condition: hero with horns or wings
+        tags:
+        - Horns
+        - Wings
+        pool: 24
+      Hirsute:
+        bonus: null
+        condition: bearded or fuzzy hero
+        tags:
+        - Bearded
+        - Fuzzy
+        pool: 36

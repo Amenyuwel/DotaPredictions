@@ -21,18 +21,10 @@ from rich.console import Console
 from rich.markup import escape
 from rich.table import Table
 
+from dota.config import Config
 from dota.sources import OpenDota
 
 console = Console()
-
-# The International 2026 regional qualifiers, as indexed by OpenDota.
-QUALIFIER_LEAGUES = {
-    19890: "North America",
-    19891: "South America",
-    19892: "Europe",
-    19893: "China",
-    19894: "Southeast Asia",
-}
 
 # OpenDota lane_role on a parsed match: 1 safelane, 2 mid, 3 offlane, 4 jungle.
 LANE_LABEL = {1: "safelane", 2: "mid", 3: "offlane", 4: "jungle"}
@@ -75,6 +67,12 @@ def main() -> int:
     )
     ap.add_argument("--team", help="only report teams whose name contains this")
     ap.add_argument(
+        "--tournament-id",
+        default="",
+        help="which config/<id>/ to read qualifier leagues from; default: "
+        "$DOTA_TOURNAMENT, or the only configured tournament",
+    )
+    ap.add_argument(
         "--recent",
         type=int,
         default=6,
@@ -84,9 +82,19 @@ def main() -> int:
     load_dotenv()
 
     od = OpenDota()
-    leagues = dict(QUALIFIER_LEAGUES)
+    # From this event's tournament.yaml, not from a constant in this file. The
+    # ids are a property of the tournament being onboarded, and a module
+    # constant would quietly survive into the next one.
+    cfg = Config(tournament_id=args.tournament_id) if args.tournament_id else Config()
+    leagues = dict(cfg.tournament.qualifier_leagues)
     for lid in args.league:
         leagues.setdefault(lid, f"league {lid}")
+    if not leagues:
+        console.print(
+            f"[red]{cfg.tournament_id}/tournament.yaml lists no qualifier_leagues, "
+            "and no --league was given. There is nothing to discover from.[/red]"
+        )
+        return 1
 
     # team_id -> {name, region, wins, losses, match_ids (newest first)}
     teams: dict[int, dict] = defaultdict(

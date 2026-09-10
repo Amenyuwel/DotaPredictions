@@ -1,0 +1,65 @@
+# Format copied from ti2026; every value that describes one
+# running of it has been blanked. Fill every TODO before publishing.
+
+name: TODO
+qualifier_leagues: {}
+lock_utc: TODO
+group_stage:
+  teams: 16
+  rounds: 5
+  series_format: bo3
+  banner_slots: 3
+  direct_advance: 3
+  elimination_round_slots: 10
+main_event:
+  teams: 8
+  series_format: bo3
+  grand_final_format: bo5
+  banner_slots: 5
+  lock_utc: TODO
+  league_id: null
+prediction_buckets:
+- id: undefeated
+  label: 4-0 (one undefeated team)
+  count: 1
+  points: 1.0
+- id: four_one
+  label: 4-1 (two teams)
+  count: 2
+  points: 1.0
+- id: elim_winner
+  label: Elimination Round Winner (five teams)
+  count: 5
+  points: 1.0
+- id: elim_loser
+  label: Elimination Round Loser (five teams)
+  count: 5
+  points: 1.0
+- id: one_four
+  label: 1-4 (two teams)
+  count: 2
+  points: 1.0
+- id: winless
+  label: 0-4 (one team)
+  count: 1
+  points: 1.0
+fantasy:
+  slots:
+    support_duo:
+      description: Both supports (soft + hard) from ONE team
+      roles:
+      - soft_support
+      - hard_support
+      same_team: true
+    core_duo:
+      description: Safelane carry + offlaner from ONE team
+      roles:
+      - carry
+      - offlane
+      same_team: true
+    mid:
+      description: Any single mid laner
+      roles:
+      - mid
+      same_team: false
+  distinct_teams_required: false

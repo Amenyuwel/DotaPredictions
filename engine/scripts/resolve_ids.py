@@ -17,7 +17,7 @@ from rich.console import Console
 from rich.markup import escape
 from rich.table import Table
 
-from dota.config import CONFIG_DIR, DATA_DIR, Roster
+from dota.config import DATA_DIR, Roster, tournament_dir
 from dota.resolve import problems, resolve, to_json
 from dota.sources import OpenDota
 
@@ -32,8 +32,8 @@ COLOURS = {
 }
 
 
-def load_overrides() -> dict:
-    path = Path(CONFIG_DIR) / "overrides.yaml"
+def load_overrides(tournament_id: str | None = None) -> dict:
+    path = tournament_dir(tournament_id) / "overrides.yaml"
     if not path.exists():
         return {}
     return yaml.safe_load(path.read_text(encoding="utf-8")) or {}

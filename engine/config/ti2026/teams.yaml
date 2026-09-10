@@ -27,6 +27,12 @@ also_team_ids:
   10182299: "L1GA TEAM"    # OpenDota "L1 TEAM" (1-9), 24 sampled games
 
 verified: true
+# WHEN, not just whether. A roster is the most perishable thing in this config,
+# and `verified: true` alone has no shelf life -- squads change between events,
+# stand-ins appear between stages, orgs disband. scripts/gates.py refuses a
+# roster that has aged out, and refuses a Main Event run whose roster was last
+# checked before the Group Stage ended.
+verified_utc: "2026-07-31T00:00:00Z"
 source: "OpenDota qualifier leagues 19890-19894 + /teams/{id}/players, 2026-07-31"
 
 teams:
