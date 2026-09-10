@@ -46,6 +46,10 @@ export interface RankRequest {
   /** Required: core and support are duos, mid is one player, so the unit being
    * ranked depends on which slot the banner is for. */
   role: "core" | "mid" | "support"
+  /** Which run to score against. Omitted means the newest, which is only
+   * correct on a page that is not offering a choice. */
+  tournamentId?: string
+  stage?: Stage
 }
 
 export function rankPlayers(body: RankRequest) {

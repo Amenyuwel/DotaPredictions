@@ -4,16 +4,28 @@ import { config } from "../config.js"
 import { runStore } from "../run-store.js"
 
 /**
- * GET /api/run/current
+ * GET /api/run/current?tournamentId=&stage=
  *
  * Returns the metadata and catalogues a client needs to build a request: the
- * run itself, the teams, the players and the emblem catalogue. Deliberately NOT
- * the sample matrices -- those are megabytes of Float32 that only the scorer
- * reads, and shipping them to a browser would be sending data to be ignored.
+ * run itself, the teams, the players, the emblem catalogue and the scoring
+ * table. Deliberately NOT the sample matrices -- those are megabytes of Float32
+ * that only the scorer reads, and shipping them to a browser would be sending
+ * data to be ignored.
+ *
+ * `scoring` travels because an emblem's COLOUR lives there (`stats[stat].color`)
+ * and nowhere else in the payload. The alternative -- stamping a colour onto
+ * each emblem row here -- would be a second copy of a table that already exists,
+ * and two copies of a scoring table drift silently.
+ *
+ * Both query parameters narrow; neither is required. With none, the newest run
+ * of any stage answers, which is what a cold page load means. `available` ships
+ * alongside so the client can offer the others without a second round trip --
+ * and so a stage with no published run is absent from the switcher rather than
+ * selectable and then broken.
  */
 export const runRouter: Router = Router()
 
-runRouter.get("/run/current", (_req, res) => {
+runRouter.get("/run/current", (req, res) => {
   const state = runStore.state
 
   if (state.status !== "ready") {
@@ -24,13 +36,34 @@ runRouter.get("/run/current", (_req, res) => {
       reason: state.reason,
       hint:
         state.status === "unconfigured"
-          ? "Set RUN_FILE to a `publish.py --out` payload, or MONGODB_URI."
+          ? "Set RUN_FILE to a `publish.py --out` payload, or SUPABASE_URL and SUPABASE_SECRET_KEY."
           : "Publish one with `python -m scripts.publish` from engine/.",
     })
     return
   }
 
-  const { run, teams, players, emblems } = state.payload
+  const tournamentId = asString(req.query.tournamentId)
+  const stage = asString(req.query.stage)
+  const payload = runStore.find(tournamentId, stage)
+
+  if (!payload) {
+    // Asked for a stage nobody has published. Not a fallback to another stage:
+    // a Group Stage question answered with Main Event numbers is a wrong answer
+    // wearing the right shape.
+    res.status(404).json({
+      error: "no_such_run",
+      reason: `no current run for ${tournamentId ?? "any tournament"} / ${stage ?? "any stage"}`,
+      hint: "Publish it with `python -m scripts.publish --stage <stage>` from engine/.",
+      available: runStore.available,
+    })
+    return
+  }
+
+  const { run, scoring, teams, players, emblems } = payload
   res.set("Cache-Control", `public, max-age=${config.runCacheSeconds}`)
-  res.json({ run, teams, players, emblems })
+  res.json({ run, scoring, teams, players, emblems, available: runStore.available })
 })
+
+function asString(value: unknown): string | undefined {
+  return typeof value === "string" && value.length > 0 ? value : undefined
+}

@@ -23,16 +23,28 @@ export const rankRouter: Router = Router()
 interface RankBody {
   emblems?: { emblemId?: string; order?: number }[]
   role?: FantasyRole
+  /** Which run to score against. Both narrow; neither is required. */
+  tournamentId?: string
+  stage?: string
 }
 
-/** Decoded sample matrices, built once per run rather than per request. */
-let cachedIndex: { runId: string; index: RunIndex } | null = null
+/**
+ * Decoded sample matrices, built once per run rather than per request.
+ *
+ * Keyed by runId rather than held as a single slot, because two stages are now
+ * reachable and a client switching between them would otherwise re-decode
+ * megabytes of Float32 on every toggle. Bounded, because the key comes from the
+ * store rather than from a request: it can only ever hold the runs that were
+ * loaded at boot.
+ */
+const indices = new Map<string, RunIndex>()
 
 function indexFor(payload: RunPayload): RunIndex {
-  if (cachedIndex?.runId !== payload.run.runId) {
-    cachedIndex = { runId: payload.run.runId, index: indexRun(payload) }
-  }
-  return cachedIndex.index
+  const existing = indices.get(payload.run.runId)
+  if (existing) return existing
+  const index = indexRun(payload)
+  indices.set(payload.run.runId, index)
+  return index
 }
 
 /**
@@ -61,13 +73,20 @@ function remember<T>(key: string, compute: () => T): T {
 }
 
 rankRouter.post("/player/rank", (req, res) => {
-  const payload = runStore.payload
+  const body = (req.body ?? {}) as RankBody
+  const payload = runStore.find(body.tournamentId, body.stage)
   if (!payload) {
-    res.status(404).json({ error: "no_current_run", reason: runStore.state.status })
+    res.status(404).json({
+      error: "no_current_run",
+      reason:
+        runStore.state.status === "ready"
+          ? `no current run for ${body.tournamentId ?? "any tournament"} / ${body.stage ?? "any stage"}`
+          : runStore.state.reason,
+      available: runStore.available,
+    })
     return
   }
 
-  const body = (req.body ?? {}) as RankBody
   const role = body.role
   if (role !== "core" && role !== "mid" && role !== "support") {
     res.status(400).json({

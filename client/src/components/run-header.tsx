@@ -1,3 +1,4 @@
+import type { ReactNode } from "react"
 import { AlertTriangle, Database } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
@@ -18,13 +19,23 @@ const STAGE_LABEL: Record<RunMeta["stage"], string> = {
  * confident wrong number and no error. So the run timestamp and data window are
  * chrome, not a detail page.
  */
-export function RunHeader({ run }: { run: RunMeta }) {
+export function RunHeader({
+  run,
+  account,
+  stages,
+}: {
+  run: RunMeta
+  account?: ReactNode
+  stages?: ReactNode
+}) {
   return (
     <header className="border-b">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-3 gap-y-2 px-6 py-4">
         <h1 className="text-base font-semibold tracking-tight">DotaPredictions</h1>
         <Badge variant="secondary">{run.tournamentId}</Badge>
         <Badge variant="outline">{STAGE_LABEL[run.stage]}</Badge>
+
+        {stages}
 
         <Separator orientation="vertical" className="mx-1 hidden h-5 sm:block" />
 
@@ -39,6 +50,8 @@ export function RunHeader({ run }: { run: RunMeta }) {
         <p className="text-muted-foreground ml-auto text-xs">
           Published {timestamp(run.createdAt)}
         </p>
+
+        {account}
 
         {run.gatesForced.length > 0 && (
           <Badge variant="destructive" className="gap-1">

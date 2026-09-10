@@ -54,6 +54,10 @@ export interface RunMeta {
   runId: string
   tournamentId: string
   stage: Stage
+  /**
+   * Emblems per War Banner in this stage: three in a Group Stage, five in a Main Event. Carried on the run because it is a property of the period, not of the word 'main' -- a client that infers it from the stage name is one format change away from scoring a banner it never saw.
+   */
+  bannerSlots: number
   schemaVersion: 1
   createdAt: string
   /**

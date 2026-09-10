@@ -18,11 +18,16 @@ healthRouter.get("/health", (_req, res) => {
     status: state.status,
     ...(state.status === "ready"
       ? {
-          runId: state.payload.run.runId,
-          tournamentId: state.payload.run.tournamentId,
-          stage: state.payload.run.stage,
-          loadedAt: state.loadedAt,
-          gatesForced: state.payload.run.gatesForced,
+          // Every loaded run, not just the newest. A deployment serving one
+          // stage and a deployment serving two are different situations, and
+          // the difference is invisible if health reports only the first.
+          runs: state.runs.map(({ payload, loadedAt }) => ({
+            runId: payload.run.runId,
+            tournamentId: payload.run.tournamentId,
+            stage: payload.run.stage,
+            loadedAt,
+            gatesForced: payload.run.gatesForced,
+          })),
         }
       : { reason: state.reason }),
   })

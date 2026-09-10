@@ -14,17 +14,19 @@ async function main(): Promise<void> {
   try {
     const state = await loadCurrentRun()
     if (state.status === "ready") {
-      const { run } = state.payload
-      console.log(
-        `[server] serving ${run.tournamentId}/${run.stage} run ${run.runId} ` +
-          `(${state.payload.playerSamples.length} player samples, ` +
-          `${state.payload.stageProjections.length} projections)`,
-      )
-      if (run.gatesForced.length > 0) {
-        console.warn(
-          `[server] this run was published with ${run.gatesForced.length} freshness ` +
-            `gate(s) overridden: ${run.gatesForced.join(", ")}`,
+      for (const { payload } of state.runs) {
+        const { run } = payload
+        console.log(
+          `[server] serving ${run.tournamentId}/${run.stage} run ${run.runId} ` +
+            `(${payload.playerSamples.length} player samples, ` +
+            `${payload.stageProjections.length} projections)`,
         )
+        if (run.gatesForced.length > 0) {
+          console.warn(
+            `[server] this run was published with ${run.gatesForced.length} freshness ` +
+              `gate(s) overridden: ${run.gatesForced.join(", ")}`,
+          )
+        }
       }
     } else {
       console.warn(`[server] no run loaded (${state.status}): ${state.reason}`)

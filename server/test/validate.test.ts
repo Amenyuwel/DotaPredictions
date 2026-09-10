@@ -26,6 +26,7 @@ function validPayload() {
       runId: "r1",
       tournamentId: "ti2026",
       stage: "main",
+      bannerSlots: 5,
       schemaVersion: 1,
       createdAt: "2026-08-20T00:00:00.000Z",
       engineVersion: "abc1234",
