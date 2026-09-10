@@ -5,6 +5,10 @@ import tailwindcss from "@tailwindcss/vite"
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  // One .env for the monorepo, at the repo root, because the engine already
+  // reads its keys from there. Only VITE_-prefixed vars reach the bundle, so
+  // SUPABASE_SECRET_KEY sitting in the same file stays out of the browser.
+  envDir: path.resolve(__dirname, ".."),
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

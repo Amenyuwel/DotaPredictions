@@ -1,0 +1,146 @@
+import { useState } from "react"
+
+import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { signIn, type OAuthProvider } from "@/lib/supabase"
+
+/**
+ * Sign in, or decline to.
+ *
+ * The guest option is a real answer, not a nudge toward the account, so it says
+ * exactly what is lost by taking it: nothing is saved. A tool that hides the
+ * cost of the free path and then quietly discards the user's work is worse than
+ * one with no accounts at all.
+ *
+ * Every projection is identical either way. An account buys persistence and
+ * nothing else -- the model does not know who is asking.
+ */
+export function AuthDialog({
+  open,
+  onOpenChange,
+  onGuest,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onGuest: () => void
+}) {
+  const [pending, setPending] = useState<OAuthProvider | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  async function start(provider: OAuthProvider) {
+    setError(null)
+    setPending(provider)
+    try {
+      // On success this navigates away to the provider, so there is no success
+      // branch to write. Only the failure path returns here.
+      await signIn(provider)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+      setPending(null)
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Save your banners</DialogTitle>
+          <DialogDescription>
+            Sign in to keep the banners you build. Rankings are the same either way — an
+            account only decides whether they are still here tomorrow.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="grid gap-2">
+          <Button
+            variant="outline"
+            size="lg"
+            className="justify-start"
+            disabled={pending !== null}
+            onClick={() => start("google")}
+          >
+            <GoogleMark />
+            {pending === "google" ? "Opening Google…" : "Continue with Google"}
+          </Button>
+
+          <Button
+            variant="outline"
+            size="lg"
+            className="justify-start"
+            disabled={pending !== null}
+            onClick={() => start("github")}
+          >
+            <GitHubMark />
+            {pending === "github" ? "Opening GitHub…" : "Continue with GitHub"}
+          </Button>
+        </div>
+
+        {/* Announced rather than merely rendered: a sign-in failure that only
+            appears visually is invisible to anyone who just pressed Enter on a
+            button and is listening. */}
+        <p role="alert" aria-live="polite" className="min-h-5 text-xs text-destructive">
+          {error}
+        </p>
+
+        <DialogFooter className="sm:flex-col sm:items-stretch sm:gap-2">
+          <Button
+            variant="ghost"
+            size="lg"
+            disabled={pending !== null}
+            onClick={() => {
+              onGuest()
+              onOpenChange(false)
+            }}
+          >
+            Continue as guest
+          </Button>
+          <p className="text-muted-foreground text-center text-xs">
+            As a guest nothing is saved. Close the tab and the banner is gone.
+          </p>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/* Brand marks are inline SVG rather than an icon package: lucide carries no
+   Google mark, and a provider button whose logo silently fails to load is a
+   button nobody recognises. aria-hidden because the text beside them says it. */
+
+function GoogleMark() {
+  return (
+    <svg viewBox="0 0 18 18" className="size-4" aria-hidden focusable="false">
+      <path
+        fill="#4285F4"
+        d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62Z"
+      />
+      <path
+        fill="#34A853"
+        d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.8.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.02-3.7H.96v2.34A9 9 0 0 0 9 18Z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M3.98 10.72a5.4 5.4 0 0 1 0-3.44V4.94H.96a9 9 0 0 0 0 8.12l3.02-2.34Z"
+      />
+      <path
+        fill="#EA4335"
+        d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0A9 9 0 0 0 .96 4.94l3.02 2.34C4.68 5.16 6.66 3.58 9 3.58Z"
+      />
+    </svg>
+  )
+}
+
+function GitHubMark() {
+  return (
+    <svg viewBox="0 0 16 16" className="size-4" fill="currentColor" aria-hidden focusable="false">
+      <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z" />
+    </svg>
+  )
+}
