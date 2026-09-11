@@ -3,13 +3,41 @@
 Optimiser for the two things The International's compendium asks you to fill in:
 the **Predictions** grid and the **Fantasy** roster.
 
-Both are driven by one Monte Carlo simulation of the Swiss group stage, because
-both questions reduce to the same unknown - how far each team goes.
+Both reduce to the same unknown - how far each team goes - so both are answered
+from one simulation. Team strengths are fitted from past results, the tournament
+is then replayed thousands of times, and every answer is read off how often each
+outcome actually happened.
+
+The repo is two halves:
+
+* **The engine** (`engine/`, Python) does the modelling and prints to a
+  terminal: a filled grid, a ranked roster, and the audit trail behind both.
+  Every number in this file comes from it.
+* **The web tool** (`server/` + `client/`, TypeScript) answers the two banner
+  questions interactively - which players score best through a banner you own,
+  and which banner a given player should roll toward. It reads a snapshot the
+  engine publishes and never runs Python itself.
+
+**To run something, go straight to [Setup](#setup).** Everything before it
+explains what the model does and why, and none of that is needed to use it.
 
 The worked example throughout is **TI 2026**, which is the event this was built
 for and the one every number below is measured on. The engine is not limited to
 it: each tournament has its own config directory, and `scripts/new_tournament.py`
 scaffolds the next one. The numbers, though, are TI 2026's.
+
+## What is in this file
+
+| Section | What it answers |
+|---|---|
+| [The idea](#the-idea) | Why a grid is an assignment problem, why fantasy rewards variance, and what the model measured rather than assumed |
+| [Setup](#setup) | Virtualenv, optional API keys, Supabase, and running the two web processes |
+| [Use](#use) | Every CLI command, the tournament timeline, and onboarding the next International |
+| [The patch layer](#the-patch-layer) | How a gameplay patch is priced, and why it is off by default |
+| [The scoring values](#the-scoring-values-are-verified---dont-re-screenshot-them) | Why `scoring.yaml` is not to be re-transcribed |
+| [Teams and the naming trap](#teams-and-the-naming-trap) | Why names are resolved per roster, never globally |
+| [Layout](#layout) | Where every file lives |
+| [What limits the accuracy](#what-limits-the-accuracy) | Every known way the answer is wrong, grouped by kind |
 
 ## The idea
 
@@ -61,6 +89,10 @@ behave nothing alike:
 | Series per team | 4-6, guaranteed | 2-6, earned |
 | Formats | every series Bo3 | Bo3, except a Bo5 Grand Final |
 | Does survival matter? | barely - see below | yes |
+
+*Swiss* pairs each team against another on a similar record every round instead
+of running a fixed bracket, and here a team drops out at four losses - which is
+what guarantees the 4-6 series below.
 
 The Main Event inverts the group-stage conclusion. In the Swiss, a drop-out
 format guarantees every
@@ -688,46 +720,64 @@ you what to pin.
 
 ## Layout
 
-The repo is a monorepo: `engine/` is this Python model, `server/` and `client/`
-are the web tool built on top of it, `shared/` holds the data contract between
-them, and `supabase/migrations/` holds the schema they share. See
-`docs/web-tool-build-plan.md`.
+A monorepo of four parts: `engine/` is the Python model, `server/` and
+`client/` are the web tool built on top of it, and `shared/` holds the data
+contract between them. `supabase/migrations/` holds the schema the web half
+shares. See `docs/web-tool-build-plan.md`.
+
+Paths below are from the repo root. Note that `docs/` is a root directory
+rather than part of the engine, which is where the transcribed HOW TO PLAY
+lives.
 
 ```
 engine/
-config/
-  active.yaml        which event runs when nothing names one
-  watch.yaml         when to look for the next edition, and when to stop
-  hero_adjectives.yaml  hero -> Valve appearance flags, for coach Title prefixes
-                        GLOBAL: it comes from the game client, not from an event
-  ti2026/            one directory per tournament
-    teams.yaml       16 teams, five players each, with roles
-    overrides.yaml   pinned team_ids and account_ids
-    scoring.yaml     fantasy point values  <- verify against the client
-    tournament.yaml  format, buckets, lock times, banner slots per stage,
+  config/
+    active.yaml      which event runs when nothing names one
+    watch.yaml       when to look for the next edition, and when to stop
+    hero_adjectives.yaml  hero -> Valve appearance flags, for coach Title prefixes
+                     GLOBAL: it comes from the game client, not from an event
+    ti2026/          one directory per tournament
+      teams.yaml     16 teams, five players each, with roles
+      overrides.yaml pinned team_ids and account_ids
+      scoring.yaml   fantasy point values  <- verify against the client
+      tournament.yaml  format, buckets, lock times, banner slots per stage,
                      qualifier league ids, the drawn Main Event bracket
-    banners.yaml     the emblems you rolled: stat, tier, trait and POSITION
-    patch.yaml       gameplay-patch prior  <- hand-entered, one comment per line
+      banners.yaml   the emblems you rolled: stat, tier, trait and POSITION
+      patch.yaml     gameplay-patch prior  <- hand-entered, one comment per line
+  dota/
+    sources/         OpenDota + STRATZ adapters behind one interface
+    resolve.py       roster-scoped name -> ID resolution
+    ratings.py       Bradley-Terry MLE, recency weighted, L2 shrinkage
+    swiss.py         Monte Carlo of the 16-team drop-out Swiss
+    bracket.py       Monte Carlo of the 8-team Main Event double elimination
+    draft.py         pick/ban availability per hero, per opponent
+    h2h.py           pairwise records + the validation that rejects them
+    emblems.py       banner arithmetic incl. positional traits, order optimiser
+    titles.py        coach Title conditions, applied per game
+    fantasy.py       per-player projection
+    patch.py         applies the event's patch.yaml to stat lines and ratings
+    optimize.py      Hungarian + Murty k-best, exhaustive roster search
+    pipeline.py      wires it together
+    report.py        terminal tables
+  scripts/           CLI entry points, incl. publish.py for the web tool
+  tests/             structural checks
+  data/              fetch cache, and resolved_ids.json
+  out/analysis.json  full numeric output of the last run
+
+server/              Express; serves a published run, scores what the client asks
+  src/routes/        one file per endpoint: health, run, rank, optimize, target
+  src/scoring/       the scorers those endpoints call
+  test/              node's test runner through tsx; npm test
+
+client/              React + Vite SPA. See client/README.md
+shared/              run-schema.json, and the types generated from it
+supabase/migrations/ runs + saved_banners + saved_rosters, with their RLS
 docs/
-  ti2026-how-to-play.md  the client's HOW TO PLAY, transcribed. The reference.
-dota/
-  sources/           OpenDota + STRATZ adapters behind one interface
-  resolve.py         roster-scoped name -> ID resolution
-  ratings.py         Bradley-Terry MLE, recency weighted, L2 shrinkage
-  swiss.py           Monte Carlo of the 16-team drop-out Swiss
-  bracket.py         Monte Carlo of the 8-team Main Event double elimination
-  draft.py           pick/ban availability per hero, per opponent
-  h2h.py             pairwise records + the validation that rejects them
-  emblems.py         banner arithmetic incl. positional traits, order optimiser
-  titles.py          coach Title conditions, applied per game
-  fantasy.py         per-player projection
-  patch.py           applies the event's patch.yaml to stat lines and ratings
-  optimize.py        Hungarian + Murty k-best, exhaustive roster search
-  pipeline.py        wires it together
-  report.py          terminal tables
-scripts/             CLI entry points
-tests/               structural checks
-out/analysis.json    full numeric output of the last run
+  ti2026-how-to-play.md   the client's HOW TO PLAY, transcribed. The reference.
+  ti2026-bracket-outcomes.md  the enumerated Main Event tree
+  ti2026-main-event-picks.md  a written-up run
+  web-tool-build-plan.md
+public/              two compendium screenshots; nothing in the repo links them
 ```
 
 ## What limits the accuracy
