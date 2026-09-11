@@ -7,7 +7,7 @@
  * component and a hand-typed string in another are two spellings of one name,
  * and they drift the moment a role is renamed.
  */
-import type { FantasyRole } from "@/types/run"
+import type { FantasyRole, Lane } from "@/types/run"
 
 export const ROLE_LABEL: Record<FantasyRole, string> = {
   core: "Core",
@@ -22,3 +22,19 @@ export const ROLE_DETAIL: Record<FantasyRole, string> = {
   mid: "One player",
   support: "Soft + Hard Support",
 }
+
+/** Lane key -> the position a reader knows it by. Separate from the role
+ * because a role is two lanes for core and support, and a player picker has to
+ * say which half of the duo it is offering. */
+export const LANE_LABEL: Record<Lane, string> = {
+  carry: "Carry",
+  mid: "Mid",
+  offlane: "Offlane",
+  soft_support: "Soft support",
+  hard_support: "Hard support",
+}
+
+/** Board order, not alphabetical: position 1 through 5, the way a roster is
+ * always read. `LANE_LABEL`'s own key order would do it, but relying on the
+ * declaration order of an object as a sort key is a rule nothing enforces. */
+export const LANE_ORDER: Lane[] = ["carry", "mid", "offlane", "soft_support", "hard_support"]

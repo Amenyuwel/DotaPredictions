@@ -55,22 +55,33 @@ export function recencyWeights(
 }
 
 /**
- * One period score per simulated run.
+ * E[best series] for one pool of observed game scores.
  *
  * The schedule comes from the simulation, not from history: observed games are
  * a pool to draw from, and `series`/`decider` say how many games each series
  * has and whether it went the distance. A games total could not express either.
+ *
+ * Exported, and returning the mean rather than the per-simulation array,
+ * because the banner search needs tens of thousands of these and nothing else
+ * `project` does. It screens candidates against a CDF it built once and a small
+ * sim budget, then rescores the finalists through `project` for their interval;
+ * at 47,520 candidates an allocation apiece is the entire cost.
+ *
+ * `rng` is the caller's, deliberately. A search that seeds it identically for
+ * every candidate compares them on the SAME simulated schedule drawing the SAME
+ * games, which is what makes a small budget separate banners rather than noise.
  */
-function periodScores(
+export function expectedBestSeries(
   pool: Float64Array,
   cdf: Float64Array,
   projection: DecodedProjection,
   rng: () => number,
   sims: number,
   deciderBonus: number,
-): Float64Array {
+): number {
   const { series, decider, maxSeries, nShapeSamples } = projection
-  const out = new Float64Array(sims)
+  if (sims <= 0 || pool.length === 0) return 0
+  let total = 0
 
   for (let s = 0; s < sims; s++) {
     // Draw a simulated period rather than walking them in order, so `sims` can
@@ -104,15 +115,9 @@ function periodScores(
       const seriesScore = games >= 2 ? top1 + top2 : top1
       if (seriesScore > best) best = seriesScore
     }
-    out[s] = best
+    total += best
   }
-  return out
-}
-
-const mean = (xs: Float64Array) => {
-  let t = 0
-  for (const x of xs) t += x
-  return xs.length ? t / xs.length : 0
+  return total / sims
 }
 
 function percentile(sorted: number[], p: number): number {
@@ -132,9 +137,13 @@ export function project(
   if (pool.length === 0) return { score: 0, ci: { lo: 0, hi: 0 }, sd: 0 }
 
   const deciderBonus = opts.deciderBonus ?? 0
-  const cdf = cdfOf(weights)
-  const score = mean(
-    periodScores(pool, cdf, projection, makeRng(opts.seed), opts.sims, deciderBonus),
+  const score = expectedBestSeries(
+    pool,
+    cdfOf(weights),
+    projection,
+    makeRng(opts.seed),
+    opts.sims,
+    deciderBonus,
   )
 
   if (opts.boot <= 0) return { score, ci: { lo: score, hi: score }, sd: 0 }
@@ -149,15 +158,13 @@ export function project(
   for (let b = 0; b < opts.boot; b++) {
     const reweighted = dirichletReweight(rng, weights, scratch)
     draws.push(
-      mean(
-        periodScores(
-          pool,
-          cdfOf(reweighted),
-          projection,
-          makeRng(opts.seed + 2 + b),
-          Math.max(1, Math.floor(opts.sims / 4)),
-          deciderBonus,
-        ),
+      expectedBestSeries(
+        pool,
+        cdfOf(reweighted),
+        projection,
+        makeRng(opts.seed + 2 + b),
+        Math.max(1, Math.floor(opts.sims / 4)),
+        deciderBonus,
       ),
     )
   }

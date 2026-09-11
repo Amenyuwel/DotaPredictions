@@ -61,7 +61,25 @@ runRouter.get("/run/current", (req, res) => {
 
   const { run, scoring, teams, players, emblems } = payload
   res.set("Cache-Control", `public, max-age=${config.runCacheSeconds}`)
-  res.json({ run, scoring, teams, players, emblems, available: runStore.available })
+  res.json({
+    run,
+    scoring,
+    teams,
+    players,
+    emblems,
+    // The teams this stage actually projects, which is NOT every team with a
+    // roster in the payload. A Main Event run carries all sixteen rosters and
+    // eight projections, so a picker built from `teams` would offer eight sides
+    // that were knocked out -- selectable, and then a 404. Same rule as the
+    // stage switcher: what cannot be answered is absent rather than offered.
+    stageTeamIds: payload.stageProjections.map((p) => p.teamId),
+    // Not a property of the run -- a property of THIS server's latency budget.
+    // It ships with the run anyway because the client must not offer a choice
+    // the server will refuse, and a second copy of the number in the browser
+    // would start refusing at the wrong place the day this one is tuned.
+    limits: { maxInventory: config.search.maxInventory },
+    available: runStore.available,
+  })
 })
 
 function asString(value: unknown): string | undefined {

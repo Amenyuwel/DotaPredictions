@@ -12,15 +12,19 @@
  * number are two answers that can disagree, and the one the user sees would be
  * whichever happened to run last.
  */
-import type { RankedUnit } from "@/types/run"
-
 /**
  * How to label a row. `lead` is reserved for a gap the interval supports;
  * anything overlapping is `tied`, and the UI must give both the same weight.
  */
 export type Verdict = "lead" | "tied"
 
-export function verdictFor(unit: RankedUnit, best: RankedUnit, tied: string[]): Verdict {
-  if (unit.unitId === best.unitId) return tied.length > 0 ? "tied" : "lead"
-  return tied.includes(unit.unitId) ? "tied" : "lead"
+/**
+ * Takes ids rather than rows, because both directions of the tool rank
+ * something: units through a fixed banner, banners for a fixed unit. The rule
+ * is a property of the intervals, not of what they happen to be measuring, and
+ * a second copy of it for banners would be a second answer to one question.
+ */
+export function verdictFor(id: string, bestId: string, tied: string[]): Verdict {
+  if (id === bestId) return tied.length > 0 ? "tied" : "lead"
+  return tied.includes(id) ? "tied" : "lead"
 }

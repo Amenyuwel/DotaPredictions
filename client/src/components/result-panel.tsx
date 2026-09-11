@@ -1,28 +1,28 @@
 import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Caveats } from "@/components/caveats"
-import { percent, points } from "@/lib/format"
+import { TieNote } from "@/components/tie-note"
+import { TournamentContext } from "@/components/tournament-context"
+import { points } from "@/lib/format"
 import { verdictFor } from "@/lib/ranking"
 import type { AnswerResponse, RankedUnit } from "@/types/run"
 
 /**
- * One panel, shared by both entry paths, because both ask the same question in
- * opposite directions and an answer should not change shape with the route.
+ * Which units score best through a fixed banner.
+ *
+ * The chrome around the list -- the tie sentence, the tournament context, the
+ * caveats -- is shared with the banner direction rather than restated here.
+ * Both answers are a ranked list with intervals on it, and a reader who saw one
+ * of them hedge and the other not would reasonably conclude the second knew
+ * more.
  */
 export function ResultPanel({ answer }: { answer: AnswerResponse }) {
   const best = answer.best
   if (!best) return null
   const units = [best, ...answer.alternatives]
-  const anyTie = answer.tied.length > 0
 
   return (
     <div className="space-y-4">
-      {anyTie && (
-        <p className="text-muted-foreground text-sm">
-          {answer.tied.length + 1} results cannot be separated at this sample size. They are
-          shown as tied, in no meaningful order.
-        </p>
-      )}
+      <TieNote tied={answer.tied.length} />
 
       <ul className="space-y-2">
         {units.map((unit, i) => (
@@ -30,21 +30,12 @@ export function ResultPanel({ answer }: { answer: AnswerResponse }) {
             key={unit.unitId}
             unit={unit}
             rank={i + 1}
-            tied={verdictFor(unit, best, answer.tied) === "tied"}
+            tied={verdictFor(unit.unitId, best.unitId, answer.tied) === "tied"}
           />
         ))}
       </ul>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm">Tournament context</CardTitle>
-        </CardHeader>
-        <CardContent className="grid grid-cols-3 gap-4 text-sm">
-          <Stat label="Expected series" value={answer.tournamentContext.expectedSeries.toFixed(2)} />
-          <Stat label="Advances" value={percent(answer.tournamentContext.advanceProb)} />
-          <Stat label="Out early" value={percent(answer.tournamentContext.eliminationRisk)} />
-        </CardContent>
-      </Card>
+      <TournamentContext {...answer.tournamentContext} />
 
       <Caveats items={answer.caveats} />
     </div>
@@ -72,14 +63,5 @@ function UnitRow({ unit, rank, tied }: { unit: RankedUnit; rank: number; tied: b
       {tied && <Badge variant="secondary">tied</Badge>}
       <span className="text-sm font-semibold tabular-nums">{points(unit.score)}</span>
     </li>
-  )
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <dt className="text-muted-foreground text-xs">{label}</dt>
-      <dd className="font-medium tabular-nums">{value}</dd>
-    </div>
   )
 }

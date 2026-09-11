@@ -7,6 +7,7 @@ import addFormats from "ajv-formats"
 import type {
   Emblem,
   FantasyRole,
+  Lane,
   Player,
   PlayerSamples,
   RunPayload,
@@ -113,4 +114,4 @@ function base64Bytes(value: unknown): number {
   return typeof value === "string" ? Buffer.from(value, "base64").byteLength : -1
 }
 
-export type { Emblem, FantasyRole, Player, PlayerSamples, RunPayload, Scoring, StageProjection }
+export type { Emblem, FantasyRole, Lane, Player, PlayerSamples, RunPayload, Scoring, StageProjection }

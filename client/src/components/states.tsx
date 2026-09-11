@@ -24,10 +24,20 @@ export function LoadingRun() {
  * is not there — and a different one from a request it actually rejected. */
 const GATEWAY = new Set([502, 503, 504])
 
+/** The two 404s that mean "publish something".
+ *
+ * Matched on the server's own code rather than on the status, because other
+ * 404s exist and their fix is the opposite: asking for a team that is not in
+ * this stage is a 404, and telling someone to run `publish.py` over it would
+ * send them to fix a file that is already correct. A 404 with no code at all
+ * predates the codes and is read the old way. */
+const NOT_PUBLISHED = new Set(["no_current_run", "no_such_run"])
+
 export function RunError({ error }: { error: unknown }) {
-  const notPublished = error instanceof ApiError && error.status === 404
-  const unreachable =
-    !(error instanceof ApiError) || GATEWAY.has((error as ApiError).status)
+  const api = error instanceof ApiError ? error : null
+  const notPublished =
+    api?.status === 404 && (api.code === null || NOT_PUBLISHED.has(api.code))
+  const unreachable = api === null || GATEWAY.has(api.status)
 
   return (
     <Alert variant={notPublished ? "default" : "destructive"}>
@@ -56,6 +66,9 @@ export function RunError({ error }: { error: unknown }) {
             shown until it answers, because a guessed number is worse than none.
           </p>
         )}
+        {/* The server's sentence, not one written here. It is the side that
+            knows which of its own rules the request broke. */}
+        {!notPublished && api?.reason && <p>{api.reason}</p>}
         {error instanceof Error && (
           <p className="text-muted-foreground font-mono text-xs">{error.message}</p>
         )}

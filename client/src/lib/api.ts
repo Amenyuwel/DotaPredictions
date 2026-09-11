@@ -5,20 +5,32 @@
  * responses, so a change to transport or URL shape stops here. Same boundary
  * rule the engine keeps between `sources/` and its models.
  */
-import type { AnswerResponse, CurrentRun, Stage } from "@/types/run"
+import type { AnswerResponse, BannerAnswer, CurrentRun, FantasyRole, Stage } from "@/types/run"
 
-/** Thrown for any non-2xx. Carries the status so callers can tell "no run
- * published yet" (404) from "the server is broken" (500) — different problems
- * with different answers for the user. */
+/** Thrown for any non-2xx.
+ *
+ * Carries the status so callers can tell "the server is broken" (500) from a
+ * request it actually rejected, and carries the server's own `error` code and
+ * `reason` so they can tell one 404 from another. That second part is
+ * load-bearing: "nothing published for this stage" and "that team is not in
+ * this stage" are both 404, and the first one's fix — run `publish.py` — is
+ * useless advice for the second. */
 export class ApiError extends Error {
-  // Declared rather than a constructor parameter property: the client compiles
+  // Declared rather than constructor parameter properties: the client compiles
   // with `erasableSyntaxOnly`, which forbids syntax that emits runtime code.
   readonly status: number
+  /** The server's machine-readable `error`, when it sent one. */
+  readonly code: string | null
+  /** The server's own sentence about what went wrong. Preferred over anything
+   * written here, because it is the side that knows. */
+  readonly reason: string | null
 
-  constructor(message: string, status: number) {
+  constructor(message: string, status: number, code: string | null, reason: string | null) {
     super(message)
     this.name = "ApiError"
     this.status = status
+    this.code = code
+    this.reason = reason
   }
 }
 
@@ -28,7 +40,24 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     headers: { "content-type": "application/json", ...init?.headers },
   })
   if (!res.ok) {
-    throw new ApiError(`${init?.method ?? "GET"} ${path} -> ${res.status}`, res.status)
+    // A failure body is best-effort: a proxy or a load balancer answering for a
+    // server that is not there sends HTML, and losing the status to a parse
+    // error would turn "nothing is listening" into "something unknown broke".
+    let code: string | null = null
+    let reason: string | null = null
+    try {
+      const body = (await res.json()) as { error?: string; reason?: string }
+      code = body.error ?? null
+      reason = body.reason ?? null
+    } catch {
+      // no JSON body; the status is the whole message
+    }
+    throw new ApiError(
+      `${init?.method ?? "GET"} ${path} -> ${res.status}`,
+      res.status,
+      code,
+      reason,
+    )
   }
   return (await res.json()) as T
 }
@@ -45,7 +74,7 @@ export interface RankRequest {
   emblems: { emblemId: string; order: number }[]
   /** Required: core and support are duos, mid is one player, so the unit being
    * ranked depends on which slot the banner is for. */
-  role: "core" | "mid" | "support"
+  role: FantasyRole
   /** Which run to score against. Omitted means the newest, which is only
    * correct on a page that is not offering a choice. */
   tournamentId?: string
@@ -54,6 +83,24 @@ export interface RankRequest {
 
 export function rankPlayers(body: RankRequest) {
   return request<AnswerResponse>("/api/player/rank", {
+    method: "POST",
+    body: JSON.stringify(body),
+  })
+}
+
+export interface OptimizeRequest {
+  /** Which slot wears the banner. Core and support are duos, mid is one
+   * player, and the same emblems are worth different amounts to each. */
+  role: FantasyRole
+  teamId: number
+  /** The emblems you own. Unordered: the order is what is being asked for. */
+  inventory: { emblemId: string }[]
+  tournamentId?: string
+  stage?: Stage
+}
+
+export function optimiseBanner(body: OptimizeRequest) {
+  return request<BannerAnswer>("/api/banner/optimize", {
     method: "POST",
     body: JSON.stringify(body),
   })

@@ -802,6 +802,16 @@ Worse than noise, because it is silent, systematic, and no interval covers it.
   used, which is correct for teammate correlation but shrinks the sample further.
 * **Monte Carlo noise** on top: 20,000 bracket sims and 8,000 period draws leave
   a few tenths of a percent, well inside the sampling band.
+* **The web tool's banner search is screened, not exhaustive at full
+  precision.** `POST /api/banner/optimize` enumerates *every* legal arrangement
+  of an inventory — twelve owned emblems in five slots is 47,520 once mirror
+  images are folded together — but scores them at 240 simulations and rescores
+  only the leading ten emblem sets at 2,000 with an interval. The screen draws
+  the same games for every candidate, so the comparison is paired rather than
+  noisy, and an arrangement it misplaces was by construction within its own
+  sampling error of the one that beat it. It is still a screen: the list on
+  screen says how many were rescored, and a banner that missed the cut by a
+  hair is not reported as excluded.
 
 ### 4. Fitted-correction error
 

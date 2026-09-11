@@ -63,6 +63,23 @@ export const config = {
    */
   scoring: { sims: 2000, boot: 60, seed: 20260813 },
 
+  /**
+   * The banner search, which is the same estimator run at two precisions.
+   *
+   * `screenSims` scores every legal arrangement of the inventory; `keep`
+   * distinct emblem sets are then rescored at `scoring.sims` with a bootstrap
+   * interval. The screen re-seeds identically per candidate, so it compares
+   * them on one simulated schedule drawing one set of games -- which is why a
+   * couple of hundred simulations separate banners there and would not here.
+   *
+   * `maxInventory` is a latency bound, not a rule of the game. Owned emblems in
+   * `run.bannerSlots` slots is a permutation count: twelve in five is 95,040
+   * arrangements, 47,520 once mirror images are folded together, and that is
+   * the point where an exhaustive screen still fits inside a request. Raising
+   * it costs roughly a factor per extra emblem.
+   */
+  search: { screenSims: 240, keep: 10, maxInventory: 12 },
+
   /** Runs are immutable, so the current run can be cached hard. */
   runCacheSeconds: 3600,
 

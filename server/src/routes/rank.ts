@@ -1,13 +1,13 @@
-import { createHash } from "node:crypto"
-
 import { Router } from "express"
 
 import { config } from "../config.js"
+import { createMemo } from "../memo.js"
 import { runStore } from "../run-store.js"
+import { overlapping, unmeasurableCaveats } from "../scoring/answer.js"
 import { slotGameScores } from "../scoring/banner.js"
-import { indexRun, type RunIndex } from "../scoring/decode.js"
 import type { DecodedProjection } from "../scoring/decode.js"
 import { project, recencyWeights } from "../scoring/project.js"
+import { indexFor, unitsOf } from "../scoring/units.js"
 import type { Emblem, FantasyRole, Player, RunPayload } from "../validate.js"
 
 /**
@@ -28,49 +28,7 @@ interface RankBody {
   stage?: string
 }
 
-/**
- * Decoded sample matrices, built once per run rather than per request.
- *
- * Keyed by runId rather than held as a single slot, because two stages are now
- * reachable and a client switching between them would otherwise re-decode
- * megabytes of Float32 on every toggle. Bounded, because the key comes from the
- * store rather than from a request: it can only ever hold the runs that were
- * loaded at boot.
- */
-const indices = new Map<string, RunIndex>()
-
-function indexFor(payload: RunPayload): RunIndex {
-  const existing = indices.get(payload.run.runId)
-  if (existing) return existing
-  const index = indexRun(payload)
-  indices.set(payload.run.runId, index)
-  return index
-}
-
-/**
- * Memoised answers, keyed by request body and run.
- *
- * A projection costs thousands of draws, the inputs are a small set of emblem
- * ids, and a run is immutable -- so the same question has the same answer for
- * the life of the process. The cap is a plain LRU: this is a public endpoint
- * with no auth, and an unbounded map keyed on user input is a memory leak
- * waiting for a bored visitor.
- */
-const MEMO_LIMIT = 500
-const memo = new Map<string, unknown>()
-
-function remember<T>(key: string, compute: () => T): T {
-  const hit = memo.get(key)
-  if (hit !== undefined) {
-    memo.delete(key) // re-insert to make it most-recently-used
-    memo.set(key, hit)
-    return hit as T
-  }
-  const value = compute()
-  memo.set(key, value)
-  if (memo.size > MEMO_LIMIT) memo.delete(memo.keys().next().value!)
-  return value
-}
+const memo = createMemo(500)
 
 rankRouter.post("/player/rank", (req, res) => {
   const body = (req.body ?? {}) as RankBody
@@ -124,13 +82,8 @@ rankRouter.post("/player/rank", (req, res) => {
     return
   }
 
-  const key = createHash("sha1")
-    .update(payload.run.runId)
-    .update(role)
-    .update(banner.map((e) => e.emblemId).join("|"))
-    .digest("hex")
-
-  res.json(remember(key, () => rank(payload, banner, role)))
+  const key = memo.key(payload.run.runId, role, banner.map((e) => e.emblemId).join("|"))
+  res.json(memo.remember(key, () => rank(payload, banner, role)))
 })
 
 /** One candidate answer, before it is trimmed for the wire. */
@@ -146,53 +99,38 @@ interface ScoredUnit {
   projection: DecodedProjection
 }
 
-const LANES: Record<FantasyRole, string[]> = {
-  core: ["carry", "offlane"],
-  mid: ["mid"],
-  support: ["soft_support", "hard_support"],
-}
-
 function rank(payload: RunPayload, banner: Emblem[], role: FantasyRole) {
   const index = indexFor(payload)
   const asOf = Date.parse(payload.run.params.asOf) / 1000
   const halfLife = payload.run.params.statHalfLife
 
-  const byTeam = new Map<number, Player[]>()
-  for (const p of payload.players) {
-    if (!LANES[role].includes(p.lane)) continue
-    byTeam.set(p.teamId, [...(byTeam.get(p.teamId) ?? []), p])
-  }
-
   const units: ScoredUnit[] = []
-  for (const [teamId, players] of byTeam) {
-    const projection = index.projectionOf.get(teamId)
-    // A team with no projection is not in this stage -- eliminated teams are
-    // absent rather than scored as zero.
-    if (!projection) continue
-
-    const members = players.map((p) => index.samplesOf.get(p.playerId)).filter((s) => !!s)
-    if (members.length !== players.length) continue
-
-    const { scores, startTime, weight } = slotGameScores(members, banner, payload.scoring, index)
+  for (const unit of unitsOf(payload, role, index)) {
+    const { scores, startTime, weight } = slotGameScores(
+      unit.members,
+      banner,
+      payload.scoring,
+      index,
+    )
     if (scores.length === 0) continue
 
     const weights = recencyWeights(startTime, weight, halfLife, asOf)
-    const { score, ci } = project(scores, weights, projection, {
+    const { score, ci } = project(scores, weights, unit.projection, {
       sims: config.scoring.sims,
       boot: config.scoring.boot,
       seed: config.scoring.seed,
     })
 
     units.push({
-      unitId: `${role}/${teamId}`,
-      teamId,
-      role,
-      players,
+      unitId: unit.unitId,
+      teamId: unit.teamId,
+      role: unit.role,
+      players: unit.players,
       score,
       ci,
       nGames: scores.length,
-      warnings: members.flatMap((m) => m.warnings),
-      projection,
+      warnings: unit.members.flatMap((m) => m.warnings),
+      projection: unit.projection,
     })
   }
 
@@ -205,9 +143,7 @@ function rank(payload: RunPayload, banner: Emblem[], role: FantasyRole) {
   // Overlapping intervals are a tie, not a ranking. On these banners that is the
   // common case, and printing 1-2-3 over it would state a distinction the
   // sampling error denies.
-  const tied = units
-    .filter((u) => u.unitId !== best.unitId && u.ci.lo <= best.ci.hi && best.ci.lo <= u.ci.hi)
-    .map((u) => u.unitId)
+  const tied = overlapping(best, units, (u) => u.unitId)
 
   const shape = (u: ScoredUnit) => ({
     unitId: u.unitId,
@@ -217,16 +153,6 @@ function rank(payload: RunPayload, banner: Emblem[], role: FantasyRole) {
     score: u.score,
     ci: u.ci,
   })
-
-  const unmeasurable = banner.filter((e) => !e.measurable)
-  const caveats = [
-    ...unmeasurable.map(
-      (e) =>
-        `${e.displayName}: no data for ${e.stat} at any depth, so it scores 0 for ` +
-        `every unit. It is worth real points in the client -- the model cannot see them.`,
-    ),
-    ...new Set(best.warnings),
-  ]
 
   return {
     runId: payload.run.runId,
@@ -239,6 +165,6 @@ function rank(payload: RunPayload, banner: Emblem[], role: FantasyRole) {
       advanceProb: best.projection.advanceProb,
       eliminationRisk: best.projection.eliminationRisk,
     },
-    caveats,
+    caveats: [...unmeasurableCaveats(banner), ...new Set(best.warnings)],
   }
 }
