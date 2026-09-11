@@ -42,6 +42,21 @@ import { drawPlan, scorePlan } from "./screen.js"
 export interface SearchOptions {
   /** Emblems on a banner in this stage. Read off the run, never inferred. */
   slots: number
+  /** The colour each slot must carry, in banner order. Null only for a payload
+   * published before the rule was on the wire, and then order is unconstrained
+   * -- which is the old, wrong behaviour, so the route says so in its caveats. */
+  slotColors: string[] | null
+  /**
+   * The quality each slot must carry, in banner order, or null for "anywhere".
+   *
+   * Only the custom goal sets it, and only because the reader put those tiers
+   * on those rows themselves. Without it this pass is free to swap two emblems
+   * of the same colour -- which is a better banner and the right answer to the
+   * question the ladder asks, but it moves a tier the reader had just set, and
+   * an edit that lands on a different row is indistinguishable from one that
+   * did nothing.
+   */
+  slotTiers?: string[] | null
   /** Simulated periods per candidate in the screen. */
   screenSims: number
   /** Distinct emblem sets rescored at full precision. */
@@ -131,12 +146,29 @@ export function searchBanner(
   const bySet = new Map<number, SetBest>()
   let arrangements = 0
 
+  const colors = opts.slotColors
+  const tiers = opts.slotTiers ?? null
+  // The fold is only sound when the reversed banner is legal, which now means
+  // both rows reading the same backwards: a pinned tier row that does not would
+  // have its mirror discarded without ever being generated.
+  const mirrorSafe =
+    (colors === null ||
+      colors.every((color, i) => color === colors[colors.length - 1 - i])) &&
+    (tiers === null || tiers.every((tier, i) => tier === tiers[tiers.length - 1 - i]))
+
   const walk = (depth: number, mask: number) => {
     if (depth === opts.slots) {
       // The mirror image scores the same banner, so only one of the pair is
       // kept. Every index is distinct, so the comparison is decided at the
       // first slot and never needs the rest of the array.
-      if (order[0]! > order[opts.slots - 1]!) return
+      //
+      // Only sound when the reversed banner is itself legal. Slot colours are
+      // fixed by role and only Core's and Support's rows read the same
+      // backwards -- mid is red blue green red green, whose reverse is a
+      // different row -- so folding there would discard an arrangement whose
+      // mirror the search never generates, and the discarded one could be the
+      // answer.
+      if (mirrorSafe && order[0]! > order[opts.slots - 1]!) return
       arrangements += 1
 
       const mults = multipliers(banner, scoring)
@@ -164,11 +196,21 @@ export function searchBanner(
       return
     }
 
+    // The colour of this slot, which is six of the eighteen stats and not a
+    // preference. Checking it here rather than at depth `slots` is most of the
+    // search: an inventory of twelve in five slots drops from 47,520
+    // arrangements to the handful whose emblems can actually sit where they are
+    // being put.
+    const want = opts.slotColors?.[depth] ?? null
+    const wantTier = tiers?.[depth] ?? null
+
     for (let i = 0; i < inventory.length; i++) {
       const emblem = inventory[i]!
-      // A banner may repeat a colour but never a stat -- the client's rule, and
-      // the same one `/api/player/rank` enforces on the way in.
+      // No stat twice -- the client's rule, and the same one `/api/player/rank`
+      // enforces on the way in.
       if (takenIndex[i] || takenStat.has(emblem.stat)) continue
+      if (want !== null && scoring.stats[emblem.stat]?.color !== want) continue
+      if (wantTier !== null && emblem.tier !== wantTier) continue
       takenIndex[i] = true
       takenStat.add(emblem.stat)
       order.push(i)

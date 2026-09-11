@@ -6,8 +6,29 @@ not "good" or "bad" in the abstract -- they are worth exactly what their best
 red, blue and green stat pay, and two players with identical overall quality
 can differ hugely once you price only three stats.
 
-A banner carries one emblem of each colour, so the three choices are
-independent: take the highest-paying measurable stat in each colour.
+KNOWN WRONG, and left that way deliberately rather than half-fixed.
+
+`best_banner` below assumes a banner carries one emblem of each colour, so the
+three choices are independent: take the highest-paying measurable stat in each
+colour. That is not the rule. The colour of each SLOT is fixed by role --
+
+    core     red green red green red
+    mid      red blue  green red   green
+    support  blue green blue green blue
+
+-- so a Core banner is three reds and two greens and a Support banner has no red
+slot at all. See `banner_slot_colors` in config/<tournament>/scoring.yaml, and
+`Scoring.slot_colors_for`, which is the reader; every banner transcribed in
+banners.yaml matches those rows.
+
+What that means here: `best_banner` returns a three-emblem, one-per-colour plan
+that no period actually uses. It under-counts Core (which gets three red slots,
+not one) and offers Support a red stat it can never wear. The web tool's
+`/api/banner/target` was wrong the same way and is now correct -- it reads the
+colour row and searches within it. The same fix belongs here, and it is not a
+one-line change: `fantasy.py` consumes `BannerPlan` as three colours, so the
+shape of the plan has to change with it. Do that as its own piece of work
+rather than patching around the edges.
 
 Base values are extremely unequal (Creep Score pays 3 per unit, Roshan 1,172),
 so raw rates are meaningless until multiplied through. A carry's 580 last hits
@@ -31,6 +52,7 @@ STAT_SOURCE = {
     "camps_stacked": "camps_stacked",
     "rune_pickups": "rune_pickups",
     "smokes_used": "smokes_used",
+    "watchers_taken": "watchers_taken",
     "roshan_kills": "roshan_kills",
     "tormentor_kills": "tormentor_kills",
     "madstone_collected": "madstone_collected",
@@ -115,6 +137,11 @@ def best_banner(
     multipliers: dict[str, float] | None = None,
 ) -> BannerPlan:
     """Highest-paying measurable stat in each colour.
+
+    See the module docstring: this one-per-colour shape is NOT a real banner.
+    A role's slots are fixed colours and repeat -- core is red green red green
+    red -- so a real banner wants several stats of one colour and none of
+    another. Treat what this returns as a per-colour ceiling, not a plan.
 
     `multipliers` optionally applies a per-colour emblem multiplier. It cannot
     change which stat wins a colour -- the multiplier scales whatever sits in

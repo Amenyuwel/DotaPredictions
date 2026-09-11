@@ -13,7 +13,7 @@ import type { AnswerResponse, BannerAnswer, CurrentRun, FantasyRole, Stage } fro
  * request it actually rejected, and carries the server's own `error` code and
  * `reason` so they can tell one 404 from another. That second part is
  * load-bearing: "nothing published for this stage" and "that team is not in
- * this stage" are both 404, and the first one's fix — run `publish.py` — is
+ * this stage" are both 404, and the first one's fix -- run `publish.py` -- is
  * useless advice for the second. */
 export class ApiError extends Error {
   // Declared rather than constructor parameter properties: the client compiles
@@ -101,6 +101,30 @@ export interface OptimizeRequest {
 
 export function optimiseBanner(body: OptimizeRequest) {
   return request<BannerAnswer>("/api/banner/optimize", {
+    method: "POST",
+    body: JSON.stringify(body),
+  })
+}
+
+export interface TargetRequest {
+  /** Which slot wears the banner. Core and support are duos, mid is one
+   * player, and the same emblems are worth different amounts to each. */
+  role: FantasyRole
+  teamId: number
+  /** Which rung of the ladder to answer. Omitted is the realistic one -- the
+   * ceiling is a number to know, not the thing to aim at. */
+  goal?: string
+  /** For `goal: "custom"`: the quality of each emblem you actually have, one
+   * per slot. Refused rather than trimmed if it is the wrong length. */
+  qualities?: string[]
+  tournamentId?: string
+  stage?: Stage
+}
+
+/** The banner to go and roll for, over the whole catalog. No inventory: what
+ * you own is the other question. */
+export function targetBanner(body: TargetRequest) {
+  return request<BannerAnswer>("/api/banner/target", {
     method: "POST",
     body: JSON.stringify(body),
   })

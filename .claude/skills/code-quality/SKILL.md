@@ -1,6 +1,6 @@
 ---
 name: code-quality
-description: Standards for writing and reviewing clean, correct, maintainable code in any language, built on KISS, YAGNI, DRY, and SOLID, with a firm default against over-engineering and unnecessary packages. Use this skill whenever writing new code, refactoring, fixing bugs, reviewing a diff or PR, or when the user asks to "clean up", "improve", "make production-ready", or "review" code — even if they don't say "quality". Also use for scripts over ~20 lines, since small scripts grow into big ones.
+description: Standards for writing and reviewing clean, correct, maintainable code in any language, built on KISS, YAGNI, DRY, and SOLID, with a firm default against over-engineering and unnecessary packages. Use this skill whenever writing new code, refactoring, fixing bugs, reviewing a diff or PR, or when the user asks to "clean up", "improve", "make production-ready", or "review" code - even if they don't say "quality". Also use for scripts over ~20 lines, since small scripts grow into big ones.
 ---
 
 # Code Quality
@@ -11,11 +11,11 @@ Goal: code a new teammate can read, trust, and change safely six months from now
 
 When goals conflict, resolve in this order:
 
-1. **Correct** — does what it claims, including edge cases.
-2. **Clear** — intent obvious from reading it once.
-3. **Safe** — fails loudly, validates input, no secrets or injection holes.
-4. **Simple** — fewest moving parts that meet the need.
-5. **Fast** — only optimize what's measured or obviously hot.
+1. **Correct** - does what it claims, including edge cases.
+2. **Clear** - intent obvious from reading it once.
+3. **Safe** - fails loudly, validates input, no secrets or injection holes.
+4. **Simple** - fewest moving parts that meet the need.
+5. **Fast** - only optimize what's measured or obviously hot.
 
 A clever 3-line solution that nobody can debug loses to a plain 10-line one.
 
@@ -23,26 +23,26 @@ A clever 3-line solution that nobody can debug loses to a plain 10-line one.
 
 These four principles guide every design decision. They sometimes pull in different directions; when they do, **KISS and YAGNI win**. Simplicity is the default, and complexity must earn its place.
 
-### KISS — Keep It Simple
+### KISS - Keep It Simple
 Choose the most straightforward solution that fully meets the current requirement. A plain function beats a class; a class beats a hierarchy; a module beats a framework. If a junior developer couldn't follow the code in one read, simplify it before shipping.
 
-### YAGNI — You Aren't Gonna Need It
-Build only what is required now. Don't add options, hooks, extension points, config flags, generic type parameters, or "future-proof" layers for requirements nobody has stated. Speculative code costs reading time, testing time, and maintenance forever, and the imagined future usually arrives in a different shape than predicted. When the need becomes real, add it then — with better information.
+### YAGNI - You Aren't Gonna Need It
+Build only what is required now. Don't add options, hooks, extension points, config flags, generic type parameters, or "future-proof" layers for requirements nobody has stated. Speculative code costs reading time, testing time, and maintenance forever, and the imagined future usually arrives in a different shape than predicted. When the need becomes real, add it then - with better information.
 
-### DRY — Don't Repeat Yourself
-DRY is about **knowledge**, not text. Each business rule, constant, or piece of logic should have one authoritative home, so a change happens in one place. But two pieces of code that look alike and change for different reasons are *not* duplication — merging them couples unrelated things.
+### DRY - Don't Repeat Yourself
+DRY is about **knowledge**, not text. Each business rule, constant, or piece of logic should have one authoritative home, so a change happens in one place. But two pieces of code that look alike and change for different reasons are *not* duplication - merging them couples unrelated things.
 
 - Apply the **rule of three**: tolerate a second copy; abstract on the third, once the real shape of the pattern is clear.
 - Duplication is far cheaper than the wrong abstraction. If an abstraction starts sprouting flags and special cases to serve its callers, inline it back.
 
-### SOLID — apply pragmatically
+### SOLID - apply pragmatically
 SOLID helps keep larger, object-oriented codebases changeable. Use it as a lens for spotting problems, not a template to stamp onto every file. Taken literally everywhere, it produces exactly the over-engineering this skill forbids.
 
-- **S — Single Responsibility**: a module/class/function has one reason to change. This one applies everywhere, in any paradigm.
-- **O — Open/Closed**: extend behavior by adding code rather than editing stable code — *once there are real, recurring variations*. Don't pre-build extension points for one case.
-- **L — Liskov Substitution**: a subtype must work anywhere its parent does, without surprises. If a subclass has to throw "not supported" for an inherited method, the hierarchy is wrong — prefer composition.
-- **I — Interface Segregation**: keep interfaces small and client-specific; nobody should depend on methods they don't use.
-- **D — Dependency Inversion**: core logic depends on abstractions, not concrete I/O — *where it enables testing or genuinely swappable implementations*. Passing a function or object as a parameter is usually enough; a DI container rarely is needed.
+- **S - Single Responsibility**: a module/class/function has one reason to change. This one applies everywhere, in any paradigm.
+- **O - Open/Closed**: extend behavior by adding code rather than editing stable code - *once there are real, recurring variations*. Don't pre-build extension points for one case.
+- **L - Liskov Substitution**: a subtype must work anywhere its parent does, without surprises. If a subclass has to throw "not supported" for an inherited method, the hierarchy is wrong - prefer composition.
+- **I - Interface Segregation**: keep interfaces small and client-specific; nobody should depend on methods they don't use.
+- **D - Dependency Inversion**: core logic depends on abstractions, not concrete I/O - *where it enables testing or genuinely swappable implementations*. Passing a function or object as a parameter is usually enough; a DI container rarely is needed.
 
 ## Over-engineering: refuse by default
 
@@ -52,9 +52,9 @@ Default stance: **don't build it**. Complexity is only justified when at least o
 2. A **measured problem** exists (profiled slowness, observed bugs, real scale).
 3. The **existing codebase convention** already uses the pattern, so matching it is the simpler choice.
 4. The **user explicitly insists** after hearing the trade-off.
-5. The **simple fix would be unsafe** — it leaves edge cases unhandled or risks breaking production (see "Fixes and patches" below).
+5. The **simple fix would be unsafe** - it leaves edge cases unhandled or risks breaking production (see "Fixes and patches" below).
 
-Common over-engineering signals — remove or avoid these unless one of the conditions above holds:
+Common over-engineering signals - remove or avoid these unless one of the conditions above holds:
 
 - An interface or abstract base class with only one implementation
 - Factories, builders, registries, or strategy patterns for a single case
@@ -82,10 +82,10 @@ But "simple" only counts if it's also correct. Before settling on a patch, check
 
 Decide:
 
-- **Patch passes the checks** → ship the simple patch. Don't refactor surrounding code "while you're there" — mention it as a follow-up instead.
+- **Patch passes the checks** → ship the simple patch. Don't refactor surrounding code "while you're there" - mention it as a follow-up instead.
 - **Patch creates edge cases or production risk** → use the cleaner, more thorough solution, even if it's a bigger change. This is legitimate complexity, not over-engineering: it serves a real, present correctness need.
 
-When escalating, tell the user briefly: what the simple patch would have been, what specifically it would break or miss, and why the fuller fix avoids it. Keep the fuller fix as small as it can be while still being correct — escalating means "enough to be safe," not "rewrite the module." If both options are reasonable and the risk is a judgment call (e.g. an edge case that may never occur in their data), present both with the trade-off and let the user choose.
+When escalating, tell the user briefly: what the simple patch would have been, what specifically it would break or miss, and why the fuller fix avoids it. Keep the fuller fix as small as it can be while still being correct - escalating means "enough to be safe," not "rewrite the module." If both options are reasonable and the risk is a judgment call (e.g. an edge case that may never occur in their data), present both with the trade-off and let the user choose.
 
 ## Packages: refuse by default
 
@@ -93,9 +93,9 @@ Every dependency is code you don't control: security exposure, breaking upgrades
 
 Before adding anything, check in order:
 
-1. **Standard library / platform** — can the language or browser already do it? (e.g. `fetch`, `URL`, `Intl`, `structuredClone`, Python's `pathlib`, `dataclasses`, `itertools`, `json`, `argparse`)
-2. **Already installed** — does the project already depend on something that covers it?
-3. **Small code** — can ~20–30 clear lines do it? Then write them.
+1. **Standard library / platform** - can the language or browser already do it? (e.g. `fetch`, `URL`, `Intl`, `structuredClone`, Python's `pathlib`, `dataclasses`, `itertools`, `json`, `argparse`)
+2. **Already installed** - does the project already depend on something that covers it?
+3. **Small code** - can ~20-30 clear lines do it? Then write them.
 
 Add a package only when the problem is **genuinely hard to get right** and a mistake is costly: cryptography, authentication, timezone/date arithmetic, parsing complex formats (CSV edge cases, PDF, XML), HTML sanitization, database drivers, or a framework the project is built on.
 
@@ -103,7 +103,7 @@ When a package is justified:
 - Pick well-maintained, widely-used, small-footprint options.
 - Tell the user in one line what it's for and why the stdlib/hand-rolled option isn't enough.
 - Never add a package for trivial helpers (padding strings, checking odd numbers, one lodash function, a single date format).
-- Dev tooling (formatter, linter, test runner) is fine — it doesn't ship to users.
+- Dev tooling (formatter, linter, test runner) is fine - it doesn't ship to users.
 
 ## Before writing
 
@@ -175,7 +175,7 @@ def ship(order):
 - Least privilege for credentials and file permissions.
 
 ### Performance
-- Pick the right data structure first (set/dict lookups vs list scans) — that's most of the win.
+- Pick the right data structure first (set/dict lookups vs list scans) - that's most of the win.
 - Watch for N+1 queries and work inside loops that could be hoisted.
 - Don't micro-optimize without a measurement. Leave a comment when you do optimize, with the reason.
 
@@ -190,7 +190,7 @@ def ship(order):
 ## Refactoring
 
 - Refactor in small steps with tests green between each.
-- Don't mix refactoring and behavior changes in one commit/diff — reviewers can't verify either.
+- Don't mix refactoring and behavior changes in one commit/diff - reviewers can't verify either.
 - Rule of three: abstract on the third repetition, not the first.
 - Refactoring toward simpler is always welcome. Refactoring toward more layers needs a current reason.
 
@@ -198,11 +198,11 @@ def ship(order):
 
 When asked to review, check in priority order and report findings grouped by severity:
 
-- **Blocking** — bugs, security holes, data loss risk, broken edge cases, missing error handling.
-- **Should fix** — over-engineering (speculative abstractions, unneeded layers or patterns), unnecessary dependencies, unclear naming, oversized functions, missing tests, duplicated knowledge, wrong abstraction.
-- **Nit** — style, minor naming, formatting (skip if a formatter/linter would catch it).
+- **Blocking** - bugs, security holes, data loss risk, broken edge cases, missing error handling.
+- **Should fix** - over-engineering (speculative abstractions, unneeded layers or patterns), unnecessary dependencies, unclear naming, oversized functions, missing tests, duplicated knowledge, wrong abstraction.
+- **Nit** - style, minor naming, formatting (skip if a formatter/linter would catch it).
 
-For each finding give: location, the problem, why it matters, and a concrete fix (code snippet when useful). Mention what's done well briefly — it tells the author what to keep doing. Don't pad reviews; if the code is solid, say so.
+For each finding give: location, the problem, why it matters, and a concrete fix (code snippet when useful). Mention what's done well briefly - it tells the author what to keep doing. Don't pad reviews; if the code is solid, say so.
 
 ## Before delivering code
 
@@ -213,12 +213,12 @@ Run through this quickly:
 - [ ] No hardcoded secrets, URLs, or magic numbers
 - [ ] Names read clearly without comments
 - [ ] No dead code, debug prints, or commented-out blocks
-- [ ] Simplest design that meets the current requirement — no speculative features or abstractions
+- [ ] Simplest design that meets the current requirement - no speculative features or abstractions
 - [ ] Fixes address the root cause; simple patch checked for edge cases and production risk before choosing it
 - [ ] No new package that stdlib or a few lines could replace
 - [ ] Matches existing project conventions
 - [ ] Tests added or updated (or noted why not)
-- [ ] Runs — if you can execute it, execute it
+- [ ] Runs - if you can execute it, execute it
 
 ## Language-specific guidance
 

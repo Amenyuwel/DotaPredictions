@@ -6,7 +6,7 @@
  * second hand-kept copy of a contract drifts from the first silently, which is
  * exactly what the schema exists to prevent.
  *
- * What IS declared here is the API response envelope — the shape of an *answer*
+ * What IS declared here is the API response envelope -- the shape of an *answer*
  * rather than of a *run*. It is not in the schema because the engine does not
  * produce it; the server computes it per request. If it ever needs to be shared
  * with another consumer, it gets its own schema and this block disappears too.
@@ -41,10 +41,10 @@ export interface AvailableRun {
 }
 
 /** What `GET /api/run/current` returns: metadata and catalogues, no sample
- * matrices — those are megabytes only the scorer reads.
+ * matrices -- those are megabytes only the scorer reads.
  *
  * `available` lists every run the server holds, so a switcher can offer the
- * other stages without a second round trip — and so a stage nobody has
+ * other stages without a second round trip -- and so a stage nobody has
  * published is absent from the switcher rather than selectable and then
  * broken.
  *
@@ -86,7 +86,7 @@ export interface AnswerResponse {
   /** null when no unit in this stage has a joint sample to score. */
   best: RankedUnit | null
   alternatives: RankedUnit[]
-  /** Units whose interval overlaps `best` — rendered as tied, never as losers. */
+  /** Units whose interval overlaps `best` -- rendered as tied, never as losers. */
   tied: string[]
   tournamentContext: {
     expectedSeries: number
@@ -109,8 +109,90 @@ export interface RankedBanner {
   ci: { lo: number; hi: number }
 }
 
-/** What `POST /api/banner/optimize` returns: the other direction of the same
- * question, with a banner where the ranked answer used to be a duo. */
+/**
+ * What the search compared, which is not the same thing in both directions.
+ *
+ * `/api/banner/optimize` walks every arrangement of an inventory. The target
+ * search cannot -- the catalog in five slots is about 10^13 orderings -- so it
+ * solves the quality-and-trait half exactly and screens the stat half. Those
+ * are different claims, and the reader is the only one who can decide whether
+ * the difference matters, so `kind` is on the wire rather than inferred from
+ * which screen happens to be open.
+ */
+export type BannerSearchDetail =
+  | {
+      kind: "inventory"
+      inventory: number
+      slots: number
+      arrangements: number
+      subsets: number
+      rescored: number
+      screenSims: number
+      sims: number
+      /** Matches where every member of the unit played. */
+      nGames: number
+    }
+  | {
+      kind: "catalog"
+      slots: number
+      /** Emblems the run can generate, all of them in scope. */
+      catalog: number
+      /** Quality/trait configurations on the Pareto front, all compared. */
+      profiles: number
+      /** Stats that entered the search, of `statsTotal`. The approximation. */
+      statsConsidered: number
+      statsTotal: number
+      candidates: number
+      arrangements: number
+      rescored: number
+      screenSims: number
+      sims: number
+      nGames: number
+    }
+
+/** What `POST /api/banner/optimize` and `POST /api/banner/target` return: the
+ * other direction of the same question, with a banner where the ranked answer
+ * used to be a duo. Both shapes are identical apart from `search`, so one panel
+ * draws them and a reader comparing goal against inventory compares like with
+ * like. */
+/**
+ * One rung of the goal ladder.
+ *
+ * A goal is a statement about QUALITY, because quality is the half of a banner
+ * no token can buy: the client rerolls a stat or a trait and never a tier. So
+ * `qualities` is what the answer assumes you crafted, and everything else in
+ * the banner is what the search bought with rerolls inside that hand.
+ *
+ * Sent by the server with every answer rather than written down here. A second
+ * definition of "Ambitious" in the client is one that drifts from the one the
+ * search actually used, and the label would go on drawing either way.
+ */
+export interface Goal {
+  id: "realistic" | "ambitious" | "extreme" | "perfect"
+  label: string
+  /** Worst first, at this period's length. */
+  qualities: string[]
+  /** What this rung asks of the reader, in one sentence. */
+  asks: string
+}
+
+/**
+ * What the rerolls to reach a banner cost, and whether the period pays for it.
+ *
+ * Neither reroll is a choice -- a stat reroll lands on a stat of that colour
+ * that is new and not already worn, a trait reroll on a different trait -- so
+ * reaching a NAMED banner costs several tokens per emblem. `tokens` is null
+ * where the client's budget for that period was never transcribed, and
+ * `withinBudget` is then null too rather than a reassuring number.
+ */
+export interface RerollCost {
+  statPools: number[]
+  traitPool: number
+  expected: number
+  tokens: number | null
+  withinBudget: number | null
+}
+
 export interface BannerAnswer {
   runId: string
   computedAt: string
@@ -121,25 +203,23 @@ export interface BannerAnswer {
   /** The best arrangement of each OTHER emblem set. Never a reordering of the
    * winner -- what the order is worth is `worstOrder`, said once. */
   alternatives: RankedBanner[]
-  /** Banner ids whose interval overlaps `best` — rendered as tied. */
+  /** Banner ids whose interval overlaps `best` -- rendered as tied. */
   tied: string[]
   /** The winning emblems in their WORST order, so the value of order alone is a
    * measured gap. Null when the set has only one arrangement. */
   worstOrder: RankedBanner | null
   reason: string | null
+  /** Which rung this answer is. Absent from the inventory direction, which is
+   * about emblems you already hold and so has no crafting to assume. */
+  goal?: Goal
+  /** Every rung, so the selector is drawn from the server's own ladder. */
+  ladder?: Goal[]
+  /** What reaching this banner costs in tokens, or null when the colour row is
+   * unknown. */
+  rerolls?: RerollCost | null
   /** What the search actually did. On screen because an exhaustive comparison
    * and a screened one are different claims about the same list. */
-  search: {
-    inventory: number
-    slots: number
-    arrangements: number
-    subsets: number
-    rescored: number
-    screenSims: number
-    sims: number
-    /** Matches where every member of the unit played. */
-    nGames: number
-  }
+  search: BannerSearchDetail
   tournamentContext: {
     expectedSeries: number
     advanceProb: number

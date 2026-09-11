@@ -1,8 +1,8 @@
 import { Badge } from "@/components/ui/badge"
 import { Caveats } from "@/components/caveats"
-import { TieNote } from "@/components/tie-note"
 import { TournamentContext } from "@/components/tournament-context"
 import { points } from "@/lib/format"
+import { unitName } from "@/lib/labels"
 import { verdictFor } from "@/lib/ranking"
 import type { AnswerResponse, RankedUnit } from "@/types/run"
 
@@ -22,7 +22,6 @@ export function ResultPanel({ answer }: { answer: AnswerResponse }) {
 
   return (
     <div className="space-y-4">
-      <TieNote tied={answer.tied.length} />
 
       <ul className="space-y-2">
         {units.map((unit, i) => (
@@ -50,14 +49,14 @@ function UnitRow({ unit, rank, tied }: { unit: RankedUnit; rank: number; tied: b
   return (
     <li className="flex items-center gap-3 rounded-lg border p-3">
       <span className="text-muted-foreground w-6 shrink-0 text-center text-xs tabular-nums">
-        {tied ? "—" : rank}
+        {tied ? " - " : rank}
       </span>
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium">
-          {unit.players.map((p) => p.nick).join(" + ")}
+          {unitName(unit.players)}
         </p>
         <p className="text-muted-foreground text-xs">
-          {points(unit.ci.lo)} – {points(unit.ci.hi)} at 90%
+          {points(unit.ci.lo)} - {points(unit.ci.hi)} at 90%
         </p>
       </div>
       {tied && <Badge variant="secondary">tied</Badge>}

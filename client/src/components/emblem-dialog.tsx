@@ -43,6 +43,7 @@ export function EmblemDialog({
   catalog,
   scoring,
   usedStats,
+  lockedColor = null,
   onSave,
   onRemove,
   onClose,
@@ -53,14 +54,29 @@ export function EmblemDialog({
   initial: Axes
   catalog: EmblemCatalog
   scoring: Scoring | undefined
-  /** Stats standing in the OTHER slots. A banner may repeat a colour but never a
-   * stat, so these are unselectable rather than merely discouraged. */
+  /** Stats standing in the OTHER slots. No stat may appear twice on a banner,
+   * so these are unselectable rather than merely discouraged. */
   usedStats: Set<string>
+  /**
+   * The colour this slot must carry, when the slot has one.
+   *
+   * A banner slot always does: the colour of each slot is fixed by role -- Core
+   * is red-green-red-green-red, Support has no red slot at all -- so offering
+   * three colour buttons here would offer two choices that cannot be saved. The
+   * colour is shown instead of asked for, and only its six stats are listed.
+   *
+   * Null for an inventory, where an emblem is not yet committed to a position.
+   */
+  lockedColor?: string | null
   onSave: (emblem: Emblem) => void
   onRemove: () => void
   onClose: () => void
 }) {
-  const [axes, setAxes] = useState<Axes>(initial)
+  // A locked slot opens on its own colour rather than on nothing: there is no
+  // choice to present, so presenting an empty one would be a dead end.
+  const [axes, setAxes] = useState<Axes>(
+    lockedColor ? { ...initial, color: lockedColor } : initial,
+  )
   const resolved = catalog.resolve(axes)
   const stats = (axes.color && catalog.statsByColor.get(axes.color)) || []
 
@@ -91,14 +107,24 @@ export function EmblemDialog({
         <DialogHeader>
           <DialogTitle>Emblem {slot + 1}</DialogTitle>
           <DialogDescription>
-            Colour picks which stats are on offer. All three of stat, quality and trait
-            are needed before this emblem scores anything.
+            {lockedColor ? (
+              <>
+                This slot is <strong>{lockedColor}</strong>, fixed by the role - that is
+                what decides which stats can sit here. Stat, quality and trait are all
+                needed before the emblem scores anything.
+              </>
+            ) : (
+              <>
+                Colour picks which stats are on offer. All three of stat, quality and
+                trait are needed before this emblem scores anything.
+              </>
+            )}
           </DialogDescription>
         </DialogHeader>
 
         <Field label="Colour">
           <div className="grid grid-cols-3 gap-2">
-            {catalog.colors.map((color) => {
+            {(lockedColor ? [lockedColor] : catalog.colors).map((color) => {
               const style = colorStyle(color)
               const on = axes.color === color
               return (
@@ -106,6 +132,10 @@ export function EmblemDialog({
                   key={color}
                   name={`emblem-${slot}-color`}
                   checked={on}
+                  // A locked colour is the slot's, not a selection: it cannot be
+                  // chosen because it is already true, and it cannot be cleared
+                  // because there is nothing to clear it to.
+                  disabled={lockedColor !== null}
                   onSelect={() => change({ color })}
                   onClear={() => change({ color: null })}
                   // The hue lives on the element, the recipe in the class names.
@@ -139,11 +169,13 @@ export function EmblemDialog({
                 key={option.stat}
                 name={`emblem-${slot}-stat`}
                 checked={axes.stat === option.stat}
-                /* Two different reasons to be unpickable, and the label below says
-                   which. A stat already on the banner is unavailable *here*; a
-                   "no data" stat is unavailable everywhere, because the client
-                   marks it the same way in its own picker and an emblem carrying
-                   one scores nothing for anyone. */
+                /* Two different reasons to be unpickable, and the label below
+                   says which. A stat already on the banner is unavailable
+                   *here*. A "no data" stat is unavailable because THIS TOOL
+                   cannot value it -- not because it is worthless: the client's
+                   own scoring list pays Lotuses Grabbed 176 per lotus. Blocking
+                   it keeps the model from recommending something it is scoring
+                   as 0, which is the honest reason and a narrower one. */
                 disabled={usedStats.has(option.stat) || !option.measurable}
                 onSelect={() => change({ stat: option.stat })}
                 onClear={() => change({ stat: null })}
@@ -152,7 +184,7 @@ export function EmblemDialog({
                   <span>{option.label}</span>
                   {!option.measurable && (
                     <span className="text-muted-foreground text-xs">
-                      no data — scores nothing
+                      no data - this tool can't value it
                     </span>
                   )}
                 </span>

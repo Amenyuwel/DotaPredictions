@@ -1,4 +1,4 @@
-# Build Prompt — DotaPredictions Web Tool (final)
+# Build Prompt - DotaPredictions Web Tool (final)
 
 ## What we're building
 
@@ -9,16 +9,16 @@ A free, no-login web tool for the Dota 2 compendium fantasy game. It answers two
 
 Both answers must account for tournament context (how deep the team is expected to go), not just raw stats.
 
-**It is not a TI 2026 tool.** TI 2026 is the first tournament it serves. Every tournament-specific fact — the team list, the rosters, the format, the scoring table, the rolled banners, the patch prior — is data scoped to a `tournamentId`, never a constant in code. A new event is onboarded by running a bootstrap script and publishing a run, not by editing source.
+**It is not a TI 2026 tool.** TI 2026 is the first tournament it serves. Every tournament-specific fact - the team list, the rosters, the format, the scoring table, the rolled banners, the patch prior - is data scoped to a `tournamentId`, never a constant in code. A new event is onboarded by running a bootstrap script and publishing a run, not by editing source.
 
 There is an existing Python engine (~13,100 lines) that already does the modeling: Bradley-Terry ratings, Swiss and bracket Monte Carlo, fitted corrections, banner scoring, fantasy projection, roster optimization. **Do not rewrite it in JavaScript.** It stays as-is and gains a small number of additive changes, enumerated at the end.
 
 ## Stack
 
 - **MongoDB** (Atlas free tier is fine)
-- **Express 5 + TypeScript** — compute server
-- **React + Vite + TypeScript** — client
-- **Python** — existing engine, batch only, never in the request path
+- **Express 5 + TypeScript** - compute server
+- **React + Vite + TypeScript** - client
+- **Python** - existing engine, batch only, never in the request path
 
 No authentication. No user accounts. No sessions.
 
@@ -37,19 +37,19 @@ Python engine  ──writes──>  MongoDB  <──reads──  Express  <─�
 
 Never spawn Python from Express. Never put pipeline execution in the request path.
 
-## Repo layout — one monorepo
+## Repo layout - one monorepo
 
 ```
 dotapredictions/
   engine/     # existing Python. Add scripts/publish.py, scripts/new_tournament.py
   server/     # Express + TypeScript
   client/     # React + Vite + TypeScript
-  shared/     # run-schema.json — the contract
+  shared/     # run-schema.json - the contract
   docs/       # engine documentation, build plan
   docker-compose.yml
 ```
 
-One repo, not three. `shared/run-schema.json` is written by Python, read by Express, and generates the client's types, so **a schema change must be one commit touching all three sides** — across separate repos that is three PRs and a window where writer and reader disagree, which is the exact failure this spec demands must crash rather than silently render wrong numbers. The parity checkpoint below is likewise a cross-language test, and the server ships the client as a single deploy artifact.
+One repo, not three. `shared/run-schema.json` is written by Python, read by Express, and generates the client's types, so **a schema change must be one commit touching all three sides** - across separate repos that is three PRs and a window where writer and reader disagree, which is the exact failure this spec demands must crash rather than silently render wrong numbers. The parity checkpoint below is likewise a cross-language test, and the server ships the client as a single deploy artifact.
 
 Moving the existing Python tree under `engine/` costs zero code changes: `dota/config.py` derives `ROOT` from `__file__` and every path hangs off it, and no module contains a literal relative path.
 
@@ -57,9 +57,9 @@ Moving the existing Python tree under `engine/` costs zero code changes: `dota/c
 
 ---
 
-## Tournament lifecycle — the anti-staleness requirement
+## Tournament lifecycle - the anti-staleness requirement
 
-The most expensive bug this project has already produced was a stale roster, and it produced no error. A team was configured under a dead org id, all sixteen of its games at the event landed on a name the model had never heard of, and it was rated off **no evidence at all** — while still printing a confident projection. It moved from "weakest team in the field" to "third strongest" once fixed.
+The most expensive bug this project has already produced was a stale roster, and it produced no error. A team was configured under a dead org id, all sixteen of its games at the event landed on a name the model had never heard of, and it was rated off **no evidence at all** - while still printing a confident projection. It moved from "weakest team in the field" to "third strongest" once fixed.
 
 So freshness is not a maintenance chore here. It is a correctness gate.
 
@@ -77,7 +77,7 @@ engine/config/
     patch.yaml                  # gameplay patch prior
 ```
 
-Only `hero_adjectives.yaml` is global — it is extracted from the game client, not from a tournament. Everything else is versioned per event, because Valve changes scoring values, emblem traits and formats between years.
+Only `hero_adjectives.yaml` is global - it is extracted from the game client, not from a tournament. Everything else is versioned per event, because Valve changes scoring values, emblem traits and formats between years.
 
 ### Onboarding a new tournament
 
@@ -89,17 +89,17 @@ python -m scripts.new_tournament --tournament ti2027 --league <mainEventLeagueId
 The script scaffolds `engine/config/ti2027/` by **deriving rosters from match data**, not from a wiki table:
 
 1. Pull the named leagues, collect every `team_id` that played.
-2. For each team, take the five accounts that actually played its most recent games — this is what `scripts/discover_rosters.py` already does, and it cannot drift the way a scraped page does.
+2. For each team, take the five accounts that actually played its most recent games - this is what `scripts/discover_rosters.py` already does, and it cannot drift the way a scraped page does.
 3. Resolve nicknames roster-scoped (team → `team_id` → that team's current members → match the nick inside those five). Never search a nickname globally: OpenDota's `personaname` is whatever a player last set on Steam, so a global lookup for `Suma1L` returns a different player's account.
 4. Write `teams.yaml` and `overrides.yaml` with every id pinned, and copy the previous tournament's `scoring.yaml` as a starting point marked `verified_against_client: false`.
 
-Then a human verifies roles (soft vs hard support is editorial — replay parsing cannot tell them apart) and re-checks the scoring table against the client's HOW TO PLAY.
+Then a human verifies roles (soft vs hard support is editorial - replay parsing cannot tell them apart) and re-checks the scoring table against the client's HOW TO PLAY.
 
-`scripts/discover_rosters.py` currently hardcodes the TI 2026 qualifier league ids in a module constant (`QUALIFIER_LEAGUES`, lines 29–35). That constant moves into each tournament's `tournament.yaml` under `qualifier_leagues:`.
+`scripts/discover_rosters.py` currently hardcodes the TI 2026 qualifier league ids in a module constant (`QUALIFIER_LEAGUES`, lines 29-35). That constant moves into each tournament's `tournament.yaml` under `qualifier_leagues:`.
 
 ### Publish-time freshness gates
 
-`publish.py` must **refuse to publish** — non-zero exit, nothing written, no partial run — when any of these fail. Each one is a bug that would otherwise ship as a confident wrong number:
+`publish.py` must **refuse to publish** - non-zero exit, nothing written, no partial run - when any of these fail. Each one is a bug that would otherwise ship as a confident wrong number:
 
 | Gate | Catches |
 |---|---|
@@ -121,7 +121,7 @@ Failures print what to pin and where. `--force` exists for the operator who has 
 
 ### Deprecation is by scoping, never by deletion
 
-Runs are immutable and scoped to `{tournamentId, stage}`. A new event never mutates an old one; it publishes alongside. `isCurrent` is scoped per tournament, not global. Old tournaments stay queryable and renderable — they are the archive, and they are also the only way to check whether last year's answer was any good.
+Runs are immutable and scoped to `{tournamentId, stage}`. A new event never mutates an old one; it publishes alongside. `isCurrent` is scoped per tournament, not global. Old tournaments stay queryable and renderable - they are the archive, and they are also the only way to check whether last year's answer was any good.
 
 The client picks a tournament; it defaults to the newest one with a current run.
 
@@ -135,10 +135,10 @@ Nothing in the tool may assume an emblem count, a team count, or a bracket shape
 
 `stage` is part of the run key and part of every request:
 
-- **Group stage** projections come from `dota/swiss.py:simulate` — Swiss with drop-out at 4, every series Bo3.
-- **Main event** projections come from `dota/bracket.py:simulate` — the drawn bracket, Bo3 with a Bo5 Grand Final.
+- **Group stage** projections come from `dota/swiss.py:simulate` - Swiss with drop-out at 4, every series Bo3.
+- **Main event** projections come from `dota/bracket.py:simulate` - the drawn bracket, Bo3 with a Bo5 Grand Final.
 
-The two behave nothing alike and the difference is the interesting part. In the Swiss every team is guaranteed 4–6 series, so survival compresses to about **0.3%** of the projection and is nearly irrelevant. In the bracket a team plays 2 to 6 series and the Grand Final is a Bo5 — worth more than a Bo3 under a top-two-games rule — so bracket position genuinely moves the answer. The UI should not present these as the same question with different numbers.
+The two behave nothing alike and the difference is the interesting part. In the Swiss every team is guaranteed 4-6 series, so survival compresses to about **0.3%** of the projection and is nearly irrelevant. In the bracket a team plays 2 to 6 series and the Grand Final is a Bo5 - worth more than a Bo3 under a top-two-games rule - so bracket position genuinely moves the answer. The UI should not present these as the same question with different numbers.
 
 A tournament may define any number of stages. `tournament.yaml` lists them in order; the publisher emits one set of projections per stage that has enough information to simulate.
 
@@ -146,7 +146,7 @@ A tournament may define any number of stages. `tournament.yaml` lists them in or
 
 ## Data model
 
-All model output is scoped to a `runId` and is immutable. Never update a projection — publish a new run.
+All model output is scoped to a `runId` and is immutable. Never update a projection - publish a new run.
 
 ### `runs`
 ```js
@@ -167,7 +167,7 @@ All model output is scoped to a `runId` and is immutable. Never update a project
 
 **There are two half-lives and they differ.** Stat means and the bootstrap decay at
 60 days (`dota/fantasy.py`); ratings decay at 90 (`dota/ratings.py`). Both, plus the
-`asOf` they are measured against, must be published — the server cannot reproduce
+`asOf` they are measured against, must be published - the server cannot reproduce
 `recency_weights` from one of them, and getting it wrong fails parity silently
 rather than loudly.
 
@@ -175,7 +175,7 @@ rather than loudly.
 ```js
 { teamId, alsoTeamIds: [], name, tag, region, logoUrl, tournamentId }
 ```
-`teamId` unique per tournament. Always resolve by ID, never by name — rebrands, recycled ids and name reuse are all known, observed failure modes. `alsoTeamIds` is load-bearing: one org can carry two ids in one season, and folding them is the difference between sixteen games of evidence and none.
+`teamId` unique per tournament. Always resolve by ID, never by name - rebrands, recycled ids and name reuse are all known, observed failure modes. `alsoTeamIds` is load-bearing: one org can carry two ids in one season, and folding them is the difference between sixteen games of evidence and none.
 
 ### `players`
 ```js
@@ -187,7 +187,7 @@ rather than loudly.
 The **full generatable catalog**, not one rolled banner. Users own their own emblems,
 so the catalog is every combination the client can produce: each scorable stat ×
 5 quality tiers × 5 traits, roughly 450 rows. Generate it from that tournament's
-`scoring.yaml`. Do **not** generate it from `banners.yaml` — that file holds one
+`scoring.yaml`. Do **not** generate it from `banners.yaml` - that file holds one
 operator's rolled banner and is a fixture, not a catalog.
 
 ```js
@@ -196,12 +196,12 @@ operator's rolled banner and is a fixture, not a catalog.
 
 `measurable: false` for stats with no field in the data at any depth, so the client
 can mark them at build time instead of after computing a score of zero. No
-`slotIndex` — position is a property of a request, not of an emblem.
+`slotIndex` - position is a property of a request, not of an emblem.
 
 **The multiplier is derived, never stored.** Vampiric pays itself +50% and charges each *adjacent* emblem −10%; Benevolent pays each adjacent emblem +20% and itself nothing; Fractal, Friendly and Unique are whole-banner conditions. So an emblem's displayed percentage is a function of tier + trait + **neighbours**, and storing it as a scalar would make all 120 orderings score identically and silently disable the ordering feature. Derive it exactly as `dota/emblems.py:multipliers` does, and port `check_against_client` as a publish assertion.
 
 ### `playerSamples`
-The important one. Per-player, per-game stat samples, **after** the engine's factor stack (duration, opponent, league, hero) — publishing raw lines would make the server disagree with the engine.
+The important one. Per-player, per-game stat samples, **after** the engine's factor stack (duration, opponent, league, hero) - publishing raw lines would make the server disagree with the engine.
 
 ```js
 {
@@ -209,7 +209,7 @@ The important one. Per-player, per-game stat samples, **after** the engine's fac
   stats: ["kills","deaths", ...],   // column order
   games: <BSON Binary>,             // Float32, nGames x nStats, row-major
   nGames,
-  matchId:          <Int32 array>,  // REQUIRED — see below
+  matchId:          <Int32 array>,  // REQUIRED - see below
   heroId:           <Int32 array>,
   won:              <Uint8 array>,
   durationSeconds:  <Int32 array>,
@@ -224,18 +224,18 @@ Two things about `sampleWarnings`. Count **joint** games for a duo, not per-play
 games: role scores use only matches where both members appear, so a 90-game player
 beside a 40-game partner gives the slot about 40, and a per-player `n` overstates
 confidence on exactly the duos where it is weakest. And state the *direction* of the
-thin-tail bias — the bootstrap can never draw above a player's observed maximum, so
+thin-tail bias - the bootstrap can never draw above a player's observed maximum, so
 under an `E[max]` objective a small sample has its ceiling truncated. It is biased
 low, not merely uncertain, and "thin tail" alone does not say so.
 
 `matchId` is not optional and there is no `seriesIndex`. Two reasons, both fatal if ignored:
 
-- **Duo scores join on the match.** A role score is the average of the duo's members **in the same game**, using only matches where both appear — that keeps teammate correlation, since a stomp inflates everyone. Averaging two independently-drawn per-player distributions understates the spread of the pair. Without `matchId` the join is impossible and core and support scores come out wrong in a way that still looks plausible.
+- **Duo scores join on the match.** A role score is the average of the duo's members **in the same game**, using only matches where both appear - that keeps teammate correlation, since a stomp inflates everyone. Averaging two independently-drawn per-player distributions understates the spread of the pair. Without `matchId` the join is impossible and core and support scores come out wrong in a way that still looks plausible.
 - **Series structure is simulated, not observed.** Historical games are a bootstrap *pool* with no series grouping. The schedule is drawn from the stage simulation, below.
 
 The per-game scalars exist because coach Titles are **per-game conditions**, not season rates: the prefix keys on the hero played, `the Underdog` on a loss, `the Decisive` and `the Lucky` on match duration, `the Patient` and `the Flayed Twins Acolyte` on first-blood timing.
 
-Index `{runId, playerId}` unique. Rough size: ~80 players × ~40–120 joint games × ~20 stats × 4 bytes — a few MB. Fits in memory trivially.
+Index `{runId, playerId}` unique. Rough size: ~80 players × ~40-120 joint games × ~20 stats × 4 bytes - a few MB. Fits in memory trivially.
 
 ### `stageProjections`
 Tournament context. This is what makes answers tournament-aware.
@@ -273,7 +273,7 @@ The raw OpenDota cache (~308 MB on disk) stays on disk. It does not go in Mongo.
 
 ---
 
-## Scoring rules — read carefully
+## Scoring rules - read carefully
 
 These are non-negotiable and are the reason a naive implementation will be wrong.
 
@@ -284,7 +284,7 @@ These are non-negotiable and are the reason a naive implementation will be wrong
 - **Core and support are duos sharing one banner.** The banner is fitted to the pair's combined line, and the slot score is the pair's average, so a duo whose strengths do not overlap is worth less than either player looks alone.
 - **A banner may repeat a colour but never a stat.** This is the rule that breaks
   the obvious implementation. `dota/banner.py:best_banner` picks the best stat in
-  *each colour* — one red, one blue, one green — which is right for choosing three
+  *each colour* - one red, one blue, one green - which is right for choosing three
   emblems and wrong for everything else here. The TI 2026 Core banner is 3 red,
   2 green and **no blue**, and `best_banner` can never produce it. Score a
   user-supplied banner through the fixed path instead, which slots emblems by index
@@ -297,8 +297,8 @@ These are non-negotiable and are the reason a naive implementation will be wrong
   only on the server guarantees the two directions eventually disagree and gives the
   parity test nothing to check it against.
 - Emblem ordering matters, and it is free. Evaluate orderings exhaustively (5! = 120).
-- Coach Titles apply per game and stack multiplicatively (assumed — record it as an assumption).
-- **Unmeasurable stats are excluded, not discounted.** Some emblems carry stats with no field in the data at any depth. They are worth real points in the client and zero in the model. Never quietly substitute a placeholder multiplier — surface it as a caveat that says the emblem scores 0 for every player and the ranking is therefore softer than it looks.
+- Coach Titles apply per game and stack multiplicatively (assumed - record it as an assumption).
+- **Unmeasurable stats are excluded, not discounted.** Some emblems carry stats with no field in the data at any depth. They are worth real points in the client and zero in the model. Never quietly substitute a placeholder multiplier - surface it as a caveat that says the emblem scores 0 for every player and the ranking is therefore softer than it looks.
 
 Always report a confidence interval alongside every score, and always return the top ~10 alternatives, not just the winner. If alternative #2 falls inside #1's interval, the UI must present them as tied rather than crowning a winner. **This is the common case, not an edge case:** on the TI 2026 Main Event banners no slot's first place is separated from its second.
 
@@ -328,7 +328,7 @@ POST /api/roster/score
      -> expected roster score + interval
 ```
 
-`slots` comes from the request, not a constant — three emblems in a group stage, five in a main event.
+`slots` comes from the request, not a constant - three emblems in a group stage, five in a main event.
 
 The ranking unit for `core` and `support` is a **team's duo**, not a single player; only `mid` is one player. Return `{ teamId, role, players: [...] }` so the client can render both nicks.
 
@@ -338,10 +338,10 @@ Every response includes:
   runId, tournamentId, stage, computedAt,
   best: { ..., score, ci: { lo, hi } },
   alternatives: [ ...next 9 ],
-  tied: [ ... ],            // ids whose interval overlaps best's — render as a tie
+  tied: [ ... ],            // ids whose interval overlaps best's - render as a tie
   breakdown: { perStat: {...}, titleContribution, emblemOrder },
   tournamentContext: { expectedSeries, advanceProb, eliminationRisk },
-  caveats: ["lotuses_grabbed has no data — scores 0 for every player", "n=54, thin tail"]
+  caveats: ["lotuses_grabbed has no data - scores 0 for every player", "n=54, thin tail"]
 }
 ```
 
@@ -358,7 +358,7 @@ Single page, two mirrored entry paths, one shared result panel:
 - **"I have a player"** → player picker + owned-emblem picker → ranked banner orderings
 - **"I have a banner"** → banner builder → ranked players/duos, filterable by role
 
-Result panel shows: the top pick, the next nine with intervals, per-stat breakdown, tournament context, caveats. Overlapping intervals render as a tie — same visual weight, no crown.
+Result panel shows: the top pick, the next nine with intervals, per-stat breakdown, tournament context, caveats. Overlapping intervals render as a tie - same visual weight, no crown.
 
 Header always displays the tournament, the stage, the run timestamp and the data window. Users must be able to see what event they are looking at and how fresh it is without digging. A tournament/stage switcher lives there; past tournaments stay browsable.
 
@@ -366,7 +366,7 @@ Libraries: TanStack Query for data, TanStack Table for tables, Recharts for inte
 
 The confidence interval needs a gamma sampler on whichever side computes it. The
 engine's interval is a Bayesian bootstrap over `rng.dirichlet`, which Node has no
-equivalent of — Marsaglia–Tsang is about thirty lines, but budget it as real work
+equivalent of - Marsaglia-Tsang is about thirty lines, but budget it as real work
 rather than meeting it mid-phase.
 
 **Assets and attribution.** Hero portraits and emblem art belong to Valve. Pull
@@ -377,8 +377,8 @@ avoid any framing that implies Valve endorsement.
 
 Ship in this order:
 
-1. **Shareable URL** — encode input state in the querystring (`?t=ti2026&s=main&p=1234&e=a,b,c,d,e`). No storage, no DB. Include tournament and stage or the link rots the moment a new event is published.
-2. **Print stylesheet + `window.print()`** — uses the browser's own Save-as-PDF. Real vector text, zero dependencies.
+1. **Shareable URL** - encode input state in the querystring (`?t=ti2026&s=main&p=1234&e=a,b,c,d,e`). No storage, no DB. Include tournament and stage or the link rots the moment a new event is published.
+2. **Print stylesheet + `window.print()`** - uses the browser's own Save-as-PDF. Real vector text, zero dependencies.
 3. `@react-pdf/renderer` only if a custom layout is genuinely needed.
 
 Do not use html2canvas. It produces raster output with poor text quality and large files.
@@ -400,7 +400,7 @@ Build vertical slices. Get one real number end to end before adding breadth.
    - **Exact, to 1e-9:** per-game banner score, emblem multipliers under every
      ordering, the duo's role average, and the coach-title multipliers. All are
      deterministic given the published sample matrix. **A mismatch here is a real
-     serialization bug — stop and fix it.**
+     serialization bug - stop and fix it.**
    - **Within tolerance, ≤0.25%:** the projection and its interval, with a fixed
      TypeScript seed and `n ≥ 20,000`. Widen the tolerance only with a measured
      reason, never to make a failing test pass.
@@ -411,7 +411,7 @@ Build vertical slices. Get one real number end to end before adding breadth.
 8. Add `/api/banner/optimize` and the player → banner direction.
 9. Share URLs and print stylesheet.
 10. Roster scorer, alternatives table, caveats panel.
-11. `scripts/new_tournament.py` and the tournament switcher — validated by scaffolding a *past* event from its league ids and checking the derived roster against the config already in the repo.
+11. `scripts/new_tournament.py` and the tournament switcher - validated by scaffolding a *past* event from its league ids and checking the derived roster against the config already in the repo.
 
 ---
 

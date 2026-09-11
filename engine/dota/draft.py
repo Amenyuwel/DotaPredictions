@@ -7,7 +7,7 @@ that filter is severe and *opponent-specific*. Two things depend on it:
 
 * **Coach Title prefixes.** They key on hero appearance, so a prefix's value is the
   share of games on a tagged hero. If those heroes are contested out of the draft, the
-  prefix quietly pays nothing — the one place a fantasy recommendation here rests on
+  prefix quietly pays nothing - the one place a fantasy recommendation here rests on
   predicting what gets picked.
 * **Stat lines.** Heroes drive stats. A projection that bootstraps a player's past
   games weights his Naga games and his Juggernaut games by how often he played them
@@ -30,7 +30,7 @@ Two honest limits. This models *availability*, not the draft as a game: no first
 advantage, no counter-picking, no positional flexibility, and no modelling of what a
 team does when its preferred hero is gone. And it overlaps with the patch layer's
 hand-entered hero viability, which is a different channel (how good a hero is) than
-this one (whether you get it) — but a hero nerfed into irrelevance is also one nobody
+this one (whether you get it) - but a hero nerfed into irrelevance is also one nobody
 bothers to ban, so the two are not fully independent.
 """
 from __future__ import annotations

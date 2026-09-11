@@ -26,6 +26,12 @@ group_stage:
   # number. It travels on the run so the web tool reads it rather than guessing
   # from the stage name.
   banner_slots: 3
+  # Reroll tokens for THIS period. Deliberately absent: the Main Event's 40 is
+  # transcribed from the client and this one never was. A number invented here
+  # would price whether a goal is reachable against a budget nobody checked --
+  # and the check would pass. `reroll_tokens:` (unset) means the tool says the
+  # budget is unknown instead of answering.
+  # reroll_tokens:
   # Teams at 4-0/4-1 (top 3) advance straight to the Main Event.
   # Teams at 3-2/2-3 (ranks 4-13) play a single elimination-round series.
   # Teams at 1-4 / 0-4 are out.
@@ -44,6 +50,12 @@ main_event:
   series_format: bo3
   grand_final_format: bo5
   banner_slots: 5
+  # Rerolls are per period like everything else in fantasy, and a token buys one
+  # stat OR one trait reroll. Neither is a choice: the client rolls a NEW stat
+  # (never the current one, never one already on the banner) or a DIFFERENT
+  # trait, so reaching a named banner costs several tokens per emblem rather
+  # than one. Quality is not rerollable at all.
+  reroll_tokens: 40
   lock_utc: "2026-08-19T02:00:00Z"    # roster locked in 2 days as of Aug 17
   upper_bracket_round_1:
     - ["Iron Wing", "Team Spirit"]      # A  (client tags: IW vs TSpirit)

@@ -17,6 +17,9 @@
  *      with lightness -- blue near white, green further down -- so it is
  *      checked per role rather than argued about once.
  *   4. A text role drops below WCAG AA 4.5:1 against the card behind it.
+ *   5. The label on a selected chip drops below AA against the CHIP, which is
+ *      a different surface from the card and was the gap that let a chip be
+ *      lightened until its own word stopped being readable on it.
  *
  * Nobody can see clipping by reading the CSS, which is why this is a script and
  * not a code review note.
@@ -101,10 +104,20 @@ if (roles.length === 0) {
   problems.push("no --emblem-* roles found; has the recipe been renamed or removed?")
 }
 
-// (1) Hue, sat and the weave are the only per-colour overrides. The weave is on
-// this list because the client draws each colour a different pattern and
-// copying that is the point; a lightness or a chroma never can be.
-const ALLOWED = new Set(["emblem-hue", "emblem-sat", "emblem-pattern", "emblem-pattern-size"])
+// (1) Hue, sat and the weaves are the only per-colour overrides -- the weave
+// for a control and the one framed for a 24px swatch, each with its own image,
+// scale and phase. They are on this list because the client draws each colour a
+// different pattern and copying that is the point; a lightness or a chroma
+// never can be.
+const ALLOWED = new Set([
+  "emblem-hue",
+  "emblem-sat",
+  "emblem-pattern",
+  "emblem-pattern-size",
+  "emblem-swatch-pattern",
+  "emblem-swatch-pattern-size",
+  "emblem-swatch-pattern-position",
+])
 for (const { colour, declared } of perColour) {
   const extra = declared.filter((d) => !ALLOWED.has(d))
   if (extra.length) {
@@ -160,6 +173,34 @@ for (const { name, L, C, theme } of roles) {
         `--emblem-${name} in ${colour} is ${ratio.toFixed(2)}:1 against the ${theme} ` +
           `card, below WCAG AA 4.5:1.`,
       )
+    }
+  }
+}
+
+// (5) The word ON a selected chip, graded against the chip rather than the
+// card. A weave is two tones and the type crosses both, so the darker of the
+// pair is what has to pass -- checking the average would let a label be legible
+// on half of a checkerboard.
+//
+// This is the check that was missing when the chips were lightened: nothing on
+// screen says "this label just stopped clearing AA", and the palette file gives
+// no hint either, because the two values live in different blocks.
+for (const theme of ["light", "dark"]) {
+  const of = (name) => roles.find((r) => r.theme === theme && r.name === name)
+  const ink = of("ink-on")
+  const pair = [of("ground-on"), of("pat-on")].filter(Boolean)
+  if (!ink || pair.length !== 2) continue
+  for (const [colour, hue] of Object.entries(HUES)) {
+    for (const tone of pair) {
+      const ratio = contrast(toLinear(ink.L, ink.C, hue), toLinear(tone.L, tone.C, hue))
+      checked += 1
+      if (ratio < 4.5) {
+        problems.push(
+          `--emblem-ink-on in ${colour} is ${ratio.toFixed(2)}:1 against ` +
+            `--emblem-${tone.name} in the ${theme} theme, below WCAG AA 4.5:1. The label ` +
+            `on a selected chip is read on the chip, not on the card.`,
+        )
+      }
     }
   }
 }

@@ -152,3 +152,94 @@ export async function deleteBanner(id: string): Promise<void> {
   const { error } = await supabase.from("saved_banners").delete().eq("id", id)
   if (error) throw new Error(error.message)
 }
+
+/**
+ * One saved roster: the three units a reader picked, together.
+ *
+ * A whole roster per row rather than three rows with a role each. The three are
+ * chosen together, the tab adds their targets into one total, and half a roster
+ * restored later would read as a finished one with a slot gone missing.
+ *
+ * Player ids, not team ids. A roster follows people: a stand-in or a transfer
+ * should come back as the player who was picked rather than as whoever wears
+ * that jersey now. The ids are resolved against the run on screen when loading,
+ * so one this run does not carry comes back as an empty slot, never a wrong one.
+ */
+export interface SavedRoster {
+  id: string
+  tournamentId: string
+  stage: string
+  players: { core: number; mid: number; support: number }
+  label: string
+  createdAt: string
+}
+
+interface SavedRosterRow {
+  id: string
+  tournament_id: string
+  stage: string
+  core_player_id: number
+  mid_player_id: number
+  support_player_id: number
+  label: string
+  created_at: string
+}
+
+const ROSTER_COLUMNS =
+  "id, tournament_id, stage, core_player_id, mid_player_id, support_player_id, label, created_at"
+
+const rosterFromRow = (row: SavedRosterRow): SavedRoster => ({
+  id: row.id,
+  tournamentId: row.tournament_id,
+  stage: row.stage,
+  players: {
+    core: row.core_player_id,
+    mid: row.mid_player_id,
+    support: row.support_player_id,
+  },
+  label: row.label,
+  createdAt: row.created_at,
+})
+
+export async function listSavedRosters(tournamentId: string, stage: string) {
+  if (!supabase) return []
+  const { data, error } = await supabase
+    .from("saved_rosters")
+    .select(ROSTER_COLUMNS)
+    .eq("tournament_id", tournamentId)
+    .eq("stage", stage)
+    .order("created_at", { ascending: false })
+  if (error) throw new Error(error.message)
+  return (data as SavedRosterRow[]).map(rosterFromRow)
+}
+
+export async function saveRoster(input: {
+  tournamentId: string
+  stage: string
+  players: { core: number; mid: number; support: number }
+  label: string
+}): Promise<SavedRoster> {
+  if (!supabase) throw new Error("Supabase is not configured")
+  // user_id is not sent, for the same reason as a banner: it defaults from the
+  // JWT in Postgres and the insert policy checks it again.
+  const { data, error } = await supabase
+    .from("saved_rosters")
+    .insert({
+      tournament_id: input.tournamentId,
+      stage: input.stage,
+      core_player_id: input.players.core,
+      mid_player_id: input.players.mid,
+      support_player_id: input.players.support,
+      label: input.label,
+    })
+    .select(ROSTER_COLUMNS)
+    .single()
+  if (error) throw new Error(error.message)
+  return rosterFromRow(data as SavedRosterRow)
+}
+
+export async function deleteRoster(id: string): Promise<void> {
+  if (!supabase) throw new Error("Supabase is not configured")
+  const { error } = await supabase.from("saved_rosters").delete().eq("id", id)
+  if (error) throw new Error(error.message)
+}

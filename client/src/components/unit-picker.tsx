@@ -1,5 +1,5 @@
 import { useId, useState } from "react"
-import { UserRound } from "lucide-react"
+import { Plus, UserRound } from "lucide-react"
 
 import {
   Dialog,
@@ -9,7 +9,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { LANE_LABEL, LANE_ORDER, ROLE_LABEL } from "@/lib/labels"
+import { LANE_LABEL, LANE_ORDER, ROLE_LABEL, unitName } from "@/lib/labels"
 import { cn } from "@/lib/utils"
 import type { FantasyRole, Player, Team } from "@/types/run"
 
@@ -116,7 +116,14 @@ export function UnitPicker({
       <Button
         type="button"
         variant="outline"
-        className="h-auto w-full justify-start py-2"
+        className={cn(
+          "h-auto min-h-11 w-full justify-start py-2",
+          // Empty reads as a space waiting to be filled rather than as a filled
+          // one reporting nothing -- the same rule, and the same dashed edge,
+          // as the banner trigger on the other tab.
+          !selected &&
+            "border-input/70 text-muted-foreground hover:border-input border-dashed",
+        )}
         onClick={() => setOpen(true)}
       >
         {selected ? (
@@ -132,22 +139,27 @@ export function UnitPicker({
             </span>
           </span>
         ) : (
-          placeholder
+          <>
+            <Plus aria-hidden />
+            {placeholder}
+          </>
         )}
       </Button>
-
-      {hidden > 0 && (
-        <p className="text-muted-foreground text-xs">
-          {hidden} {hidden === 1 ? "team is" : "teams are"} not in this stage and cannot be
-          scored against it.
-        </p>
-      )}
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>{placeholder}</DialogTitle>
-            <DialogDescription>One team, one card, in stage order.</DialogDescription>
+            {/* The shortened field is said here, beside the list it describes,
+                rather than under the closed trigger. Three of these mount at
+                once in the roster tab, so outside it was the same sentence
+                three times over -- and it is not about the player you picked,
+                it is about the ones this list cannot offer. */}
+            <DialogDescription>
+              One team, one card, in stage order.
+              {hidden > 0 &&
+                ` ${hidden} ${hidden === 1 ? "team is" : "teams are"} not in this stage and cannot be scored against it.`}
+            </DialogDescription>
           </DialogHeader>
 
           {/* One radio group, one fieldset -- the per-team headers that used
@@ -190,7 +202,7 @@ export function UnitPicker({
                     <span className="text-muted-foreground truncate text-2xs font-semibold tracking-[0.1em] uppercase">
                       {team.name}
                     </span>
-                    <span className="w-full truncate">{unit.map((p) => p.nick).join(" + ")}</span>
+                    <span className="w-full truncate">{unitName(unit)}</span>
                     <span className="text-muted-foreground w-full truncate text-xs">
                       {unit.map((p) => LANE_LABEL[p.lane]).join(" · ")}
                       {roleFilter === undefined && ` · ${ROLE_LABEL[first.fantasyRole]}`}

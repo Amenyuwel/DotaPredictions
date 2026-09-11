@@ -9,6 +9,7 @@ import { healthRouter } from "./routes/health.js"
 import { optimizeRouter } from "./routes/optimize.js"
 import { rankRouter } from "./routes/rank.js"
 import { runRouter } from "./routes/run.js"
+import { targetRouter } from "./routes/target.js"
 
 /**
  * Wiring only. Every module below answers one question; this file is the only
@@ -37,6 +38,7 @@ export function createApp(): Express {
   app.use("/api", runRouter)
   app.use("/api", rankRouter)
   app.use("/api", optimizeRouter)
+  app.use("/api", targetRouter)
 
   app.use("/api", (_req, res) => {
     res.status(404).json({ error: "not_found" })

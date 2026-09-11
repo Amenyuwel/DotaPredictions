@@ -4,8 +4,8 @@ import { Info } from "lucide-react"
  * The model's own limits, next to the number they qualify.
  *
  * Required output, not decoration. Users cannot audit the engine, so anything
- * it knows it cannot see — an emblem carrying a stat with no data, a duo with
- * forty joint games and a truncated ceiling — has to travel with the answer.
+ * it knows it cannot see -- an emblem carrying a stat with no data, a duo with
+ * forty joint games and a truncated ceiling -- has to travel with the answer.
  * In the panel, never in a footnote.
  */
 export function Caveats({ items }: { items: string[] }) {

@@ -1,7 +1,7 @@
 # Python Quality Reference
 
 ## Tooling
-Dev tools below are fine to add — they don't ship. Runtime dependencies follow the package policy in SKILL.md: stdlib first.
+Dev tools below are fine to add - they don't ship. Runtime dependencies follow the package policy in SKILL.md: stdlib first.
 
 - Format + lint with **ruff** (`ruff format`, `ruff check`). Replaces black, isort, flake8 for most projects.
 - Type check with **mypy** or **pyright** on public code at minimum.
@@ -16,7 +16,7 @@ Dev tools below are fine to add — they don't ship. Runtime dependencies follow
 
 ## Idioms
 - Use `dataclass` (often `frozen=True`) instead of loose dicts for structured data. Reach for `pydantic` only if the project already uses it or needs heavy runtime validation of external data.
-- Context managers (`with`) for files, locks, connections — guarantees cleanup.
+- Context managers (`with`) for files, locks, connections - guarantees cleanup.
 - Comprehensions for simple transforms; switch to a loop once it needs more than one condition or nested logic.
 - `enumerate()` instead of `range(len(x))`; `zip()` for parallel iteration.
 - `dict.get(key, default)` and `collections.defaultdict` / `Counter` over manual existence checks.

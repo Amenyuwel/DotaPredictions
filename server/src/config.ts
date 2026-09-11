@@ -77,8 +77,18 @@ export const config = {
    * arrangements, 47,520 once mirror images are folded together, and that is
    * the point where an exhaustive screen still fits inside a request. Raising
    * it costs roughly a factor per extra emblem.
+   *
+   * `targetShortlist` is the one narrowing left in `/api/banner/target`. Since
+   * slot colours went in, that search is exhaustive over stats -- each slot has
+   * six candidates, not eighteen -- but the candidate count still runs to
+   * 303,750 for mid, whose row carries all three colours. Every one of them is
+   * priced on its recency-weighted mean, which is exact and costs a dot
+   * product; only this many go on to the Monte Carlo screen. The mean ranks
+   * badly against E[best series], which is the whole reason the screen exists,
+   * so the bound is set far above `keep`: it is there to drop candidates that
+   * are not in the running, not to pick the winner.
    */
-  search: { screenSims: 240, keep: 10, maxInventory: 12 },
+  search: { screenSims: 240, keep: 10, maxInventory: 12, targetShortlist: 3000 },
 
   /** Runs are immutable, so the current run can be cached hard. */
   runCacheSeconds: 3600,

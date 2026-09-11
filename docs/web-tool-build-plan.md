@@ -1,4 +1,4 @@
-# DotaPredictions Web Tool — Build Plan
+# DotaPredictions Web Tool - Build Plan
 
 Plan for `.claude/dotapredictions-build-prompt.md`: a free, no-login web tool
 answering **player → banner** and **banner → player**, tournament-aware, backed by
@@ -13,7 +13,7 @@ the existing Python engine running batch-only behind immutable Supabase snapshot
 1. **The schema is the product.** `shared/run-schema.json` is written by Python,
    read by Express, and generates the client's types. The spec's own words: "A
    schema change is one commit touching all three sides." Across three repos that
-   is three PRs, a version matrix, and a window where writer and reader disagree —
+   is three PRs, a version matrix, and a window where writer and reader disagree -
    exactly the failure the spec demands must crash rather than silently render
    wrong numbers. A monorepo makes that commit atomic and the crash unreachable.
 2. **Checkpoint 4 is a cross-language test.** Comparing a TypeScript score against
@@ -26,7 +26,7 @@ the existing Python engine running batch-only behind immutable Supabase snapshot
    issue trackers and per-repo access control. None applies here.
 
 **The honest counterargument**, and why it loses: Python is batch/cron and the web
-app is a long-running service, so they deploy differently. True — but that is a
+app is a long-running service, so they deploy differently. True - but that is a
 *deploy* boundary, solved by one Dockerfile per service inside one repo. Splitting
 the repo to express a deploy difference costs the atomic schema commit and buys
 nothing back.
@@ -40,7 +40,7 @@ the invocation directory changes.
 
 ---
 
-## Phase 0 — Restructure
+## Phase 0 - Restructure
 
 ```bash
 git mv dota scripts config data tests requirements.txt engine/
@@ -52,18 +52,18 @@ Stays at root: `README.md`, `CLAUDE.md`, `docs/`, `public/`, `.gitignore`,
 
 Follow-ups in the same commit:
 
-- `.gitignore` — repoint `data/cache/` and `out/` to `engine/data/cache/` and
+- `.gitignore` - repoint `data/cache/` and `out/` to `engine/data/cache/` and
   `engine/out/`; add `node_modules/`, `client/dist/`, `server/dist/`.
 - Add `jsonschema` to `engine/requirements.txt` (not currently installed).
 - Update run commands in `README.md` and file paths in `CLAUDE.md`.
 
 **Done when:** `cd engine && python -m pytest tests -q` passes and
 `python -m scripts.bracket_outcomes` still runs offline off the existing cache.
-Do not touch a `.py` file in this commit — if one needs editing, the move is wrong.
+Do not touch a `.py` file in this commit - if one needs editing, the move is wrong.
 
 ---
 
-## Phase 1 — `shared/run-schema.json`
+## Phase 1 - `shared/run-schema.json`
 
 The contract. Version it `schemaVersion: 1` and treat every later change as
 breaking until the tool has users.
@@ -74,7 +74,7 @@ Four corrections to the spec's draft data model, each traced to engine behaviour
 
 The spec keys rows by `seriesIndex`. That cannot reproduce a slot score:
 `engine/dota/fantasy.py:role_game_scores` averages the duo **within the same
-match**, keeping only matches where both members appear — deliberately, to
+match**, keeping only matches where both members appear - deliberately, to
 preserve teammate correlation. And `project_slot` fits **one shared banner** to the
 duo's combined means. Per-player rows with no join key silently produce wrong core
 and support numbers.
@@ -91,7 +91,7 @@ on `engine/dota/sources/base.py:PlayerGame`:
 | `firstBloodTime` | `the Patient`, `the Flayed Twins Acolyte` (negative = pre-horn) |
 | `startTime` | recency weights in the bootstrap |
 
-Keep them in a parallel block — one scalar per row, not part of the stat matrix.
+Keep them in a parallel block - one scalar per row, not part of the stat matrix.
 
 Publish both half-lives with the samples: stat means and the bootstrap decay at
 **60 days** (`fantasy.py:87`), ratings at **90** (`ratings.py:66`), plus the `asOf`
@@ -100,14 +100,14 @@ from one of them, and the failure is silent.
 
 `sampleWarnings` counts **joint** duo games, not per-player games, and names the
 direction of the bias: the bootstrap cannot draw above an observed maximum, so a
-thin sample has its ceiling truncated under `E[max]` — biased low, not just noisy.
+thin sample has its ceiling truncated under `E[max]` - biased low, not just noisy.
 
 ### 2. Series structure is simulated, not observed
 
 `seriesIndex` does not exist in history. Observed games are only a **bootstrap
 pool**; the schedule is drawn by `engine/dota/bracket.py:simulate`, which emits
 `series_samples` (games-per-series shapes such as `(3,2,3)`) and `decider_samples`
-(did the series go the full distance — needed by `the Clutch`, and not recoverable
+(did the series go the full distance - needed by `the Clutch`, and not recoverable
 from a game count, since a 3-game Bo5 is not a decider).
 
 So `stageProjections` carries, per team:
@@ -139,7 +139,7 @@ identically and the ordering feature is inert.
 { emblemId, stat, tier, trait, displayName, measurable }  // multiplier derived, never stored
 ```
 
-Scope it as the **full generatable catalog** — every stat × 5 tiers × 5 traits,
+Scope it as the **full generatable catalog** - every stat × 5 tiers × 5 traits,
 ~450 rows, generated from `scoring.yaml`. `banners.yaml` is one operator's rolled
 banner, a fixture rather than a catalog; users of a public tool own their own
 emblems.
@@ -149,11 +149,11 @@ error fails the run.
 
 ### 4. Unmeasurable stats are absent, not discounted
 
-The spec's example caveat reads "lotuses_grabbed unmeasurable — treated as flat
+The spec's example caveat reads "lotuses_grabbed unmeasurable - treated as flat
 1.20". The engine does the opposite on purpose: unmeasurable stats are excluded
 from valuation, never scored (`banner.stat_points` returns `None`;
 `config/scoring.yaml` lists `watchers_taken` and `lotuses_grabbed`). Correct caveat
-text: *"scores 0 for every player — real points the model cannot see."* This matters
+text: *"scores 0 for every player - real points the model cannot see."* This matters
 because the Main Event support banner carries Lotuses at ×1.20 with no rerolls
 left, which is exactly why support ordering deserves less confidence than its
 numbers suggest.
@@ -163,25 +163,25 @@ numbers suggest.
 
 ---
 
-## Phase 2 — `engine/scripts/publish.py`
+## Phase 2 - `engine/scripts/publish.py`
 
-One new script. It must not reimplement anything — it calls `pipeline.analyse`,
+One new script. It must not reimplement anything - it calls `pipeline.analyse`,
 then serialises.
 
 Emits, all scoped to one `runId`:
 
-- `runs` — `engineVersion` from the git SHA, `configHash` over `config/*.yaml`,
+- `runs` - `engineVersion` from the git SHA, `configHash` over `config/*.yaml`,
   `params` from CLI flags, `dataWindow` from `corpus.matches`.
-- `teams` / `players` — from `cfg.roster`, by ID only. Fold `also_team_ids` into
+- `teams` / `players` - from `cfg.roster`, by ID only. Fold `also_team_ids` into
   `alsoTeamIds`: this is the Iron Wing failure mode, one org with two ids and
   sixteen TI games nearly lost.
-- `emblems` — `config/banners.yaml` plus the tier/trait tables in
+- `emblems` - `config/banners.yaml` plus the tier/trait tables in
   `config/scoring.yaml`.
-- `playerSamples` — `analysis.adjusted_games`, i.e. lines **after** the factor
+- `playerSamples` - `analysis.adjusted_games`, i.e. lines **after** the factor
   stack, plus `analysis.game_weight`. Publishing raw lines would make the server
   disagree with `report.py`.
-- `stageProjections` — the `SwissOutcome` and `BracketOutcome` fields above.
-- `factorAudit` — `analysis.factor_reports`, including `kind: "absent"` rows, so a
+- `stageProjections` - the `SwissOutcome` and `BracketOutcome` fields above.
+- `factorAudit` - `analysis.factor_reports`, including `kind: "absent"` rows, so a
   known hole shows up as a hole.
 
 Publish-time assertions, all fail-loud:
@@ -190,19 +190,19 @@ Publish-time assertions, all fail-loud:
 - schema validation via `jsonschema`;
 - `emblems.check_against_client` returns empty;
 - `nGames` matches the matrix row count for every player;
-- flip `isCurrent` in a transaction — the old run stays queryable, never mutated.
+- flip `isCurrent` in a transaction - the old run stays queryable, never mutated.
 
 **Done when:** one real run lands in Supabase and the row's payload
 matches the roster size.
 
 ---
 
-## Phase 3 — Express, `/api/player/rank` only
+## Phase 3 - Express, `/api/player/rank` only
 
 Boot: load the current run into memory once, validate against the schema on read,
 crash on mismatch. Binary reads become `Float32Array` views with no parsing.
 
-Port exactly these, in order — they are the scoring chain, and nothing else matters
+Port exactly these, in order - they are the scoring chain, and nothing else matters
 until they agree:
 
 | Python | TypeScript |
@@ -213,7 +213,7 @@ until they agree:
 | `titles.game_multiplier` | prefix per hero, suffix per game |
 | `fantasy.role_game_scores` | **duo join on `matchId`** |
 | `fantasy.plan_series` / `score_plan` | top-2-in-series, best-series |
-| `fantasy.best_series_interval` | Dirichlet bootstrap CI — needs a Marsaglia–Tsang gamma sampler, Node has none |
+| `fantasy.best_series_interval` | Dirichlet bootstrap CI - needs a Marsaglia-Tsang gamma sampler, Node has none |
 
 Not `banner.best_banner`. It picks one stat per colour, which is right for *choosing*
 three emblems and wrong for scoring a real one: the Main Event core banner is 3 red,
@@ -225,16 +225,16 @@ Vectorise over typed arrays the way `score_plan` already does (grouped by series
 length), and make the replicate count server config so it is tuned against measured
 latency rather than guessed.
 
-Ranking unit: for `core` and `support` the unit is a team's **duo**, not a player —
+Ranking unit: for `core` and `support` the unit is a team's **duo**, not a player -
 return `{teamId, slot, nicks[]}`. Only `mid` is a single player.
 
 **Done when:** `/api/player/rank` returns a score for one banner.
 
 ---
 
-## Phase 4 — The checkpoint that matters
+## Phase 4 - The checkpoint that matters
 
-Before any more breadth. Take one locked slot — `support / Team Spirit` under the
+Before any more breadth. Take one locked slot - `support / Team Spirit` under the
 Main Event banner is the best candidate, since `docs/ti2026-main-event-picks.md`
 records it at **15,379**.
 
@@ -248,7 +248,7 @@ bug burns days looking for something that is not there.
 | Stochastic | `≤0.25%` | the projection and its interval, fixed TS seed, `n ≥ 20,000` |
 
 **A mismatch in the deterministic half is a real serialization bug. Stop and fix it
-— do not build past this.** Widen the stochastic tolerance only with a measured
+ - do not build past this.** Widen the stochastic tolerance only with a measured
 reason, never to turn a red test green.
 
 Sources of truth, in order: `engine/out/analysis.json` (full precision), then
@@ -257,7 +257,7 @@ with a golden fixture so a later refactor cannot quietly break them.
 
 ---
 
-## Phase 5 — Client, banner → player only
+## Phase 5 - Client, banner → player only
 
 Vite SPA, one screen: banner builder → ranked duos/players, filterable by role.
 TanStack Query, TanStack Table, Recharts for intervals. Debounce 250 ms, POST on
@@ -266,7 +266,7 @@ change. Header shows run timestamp and data window.
 **Ship here.** One direction is already a usable tool.
 
 The interval rule is a requirement, not a nicety: on the current banners no slot's
-#1 is separated from its #2 — core leads by 45 against a 737-point joint sampling
+#1 is separated from its #2 - core leads by 45 against a 737-point joint sampling
 error, mid by 146 against 580, support by 280 against 565. When #2 falls inside
 #1's interval the UI must render them **tied**. Crowning a winner there is the
 specific error this tool exists to avoid.
@@ -275,7 +275,7 @@ Caveats render in the result panel, never in a footnote.
 
 ---
 
-## Phases 6-10 — Breadth
+## Phases 6-10 - Breadth
 
 6. **Group stage run + stage switcher.** **DONE.** Both stages publish and both
    are served. Two findings against what this line predicted:
@@ -293,7 +293,7 @@ Caveats render in the result panel, never in a footnote.
    stage; an unmatched request 404s with what IS available instead of falling
    back to another stage.
 7. `/api/banner/optimize` and the player → banner direction. **Blocked on a new
-   engine function**: a constrained search over the user's inventory — no repeated
+   engine function**: a constrained search over the user's inventory - no repeated
    stat, colours unconstrained, `slots` from the request, 120 orderings inside each
    candidate set. Nothing in `dota/banner.py` does this today. Write it in Python
    first so the parity test has something to check the TypeScript against.
@@ -310,7 +310,7 @@ Caveats render in the result panel, never in a footnote.
     event's `tournament.yaml`. `scripts/new_tournament.py` scaffolds a new event
     from an existing one, copying shapes and refusing to copy data.
 
-    Still open: the validation this line asks for — scaffold a *past* event from
+    Still open: the validation this line asks for - scaffold a *past* event from
     its league ids and diff the derived roster against the committed config. That
     is the one test that proves onboarding works without waiting a year.
 
@@ -319,14 +319,14 @@ Caveats render in the result panel, never in a footnote.
 ## Multi-tournament: what makes a stale roster fail loudly
 
 The costliest bug this project has produced was a stale org id that raised no
-error — sixteen TI games landed on a team the model had never heard of, and it
+error - sixteen TI games landed on a team the model had never heard of, and it
 was rated on no evidence while still printing a projection. `publish.py` turns
 that class of bug into a refusal to publish:
 
 - every player resolves; no fuzzy matches, no duplicate `account_id`s
   (`resolve.problems` already returns this as a blocking list);
 - every team's rating fit saw at least `--min-team-games` result rows
-  (`ratings.evidence`) — this is the gate that would have caught Iron Wing;
+  (`ratings.evidence`) - this is the gate that would have caught Iron Wing;
 - roster drift: the five configured accounts match the five most-played accounts
   in that team's recent games;
 - orphan-id sweep: a pinned `team_id` whose recent matches carry an unknown name
@@ -340,7 +340,7 @@ the only way past any of them.
 Config becomes per-tournament (`engine/config/<tournamentId>/`), with only
 `hero_adjectives.yaml` global since it comes from the game client rather than an
 event. `scripts/discover_rosters.py:29` hardcodes the TI 2026 qualifier league
-ids in a module constant — that moves into each tournament's `tournament.yaml`.
+ids in a module constant - that moves into each tournament's `tournament.yaml`.
 
 ---
 
@@ -354,18 +354,18 @@ ids in a module constant — that moves into each tournament's `tournament.yaml`
 - **Why one column, not six tables:** nothing queries inside a payload. The
   server reads the whole run once at boot, and every field worth filtering on is
   a column beside it. Splitting it would buy nothing and cost a second
-  representation of the same bytes — which is exactly what the Mongo writer had,
+  representation of the same bytes - which is exactly what the Mongo writer had,
   with base64 on the file path and BSON Binary in the database.
 - **Indexes:** `(tournament_id, stage, is_current, created_at desc)` on `runs`;
   `(user_id, created_at desc)` on `saved_banners`.
 - **Auth:** Google and GitHub via Supabase, plus an explicit guest path that
-  saves nothing. The scoring API stays unauthenticated — a guest and a signed-in
+  saves nothing. The scoring API stays unauthenticated - a guest and a signed-in
   user get identical projections, because the model does not know who is asking.
   Identity buys persistence and nothing else, which is why no Express route
   verifies a token: saves go from the browser to Postgres under RLS.
 - **Rate limit** 60 req/min by IP; `Cache-Control: public, max-age=3600` on
   `/api/run/current`; LRU memo on POST bodies keyed by hash.
-- **Numbers:** doubles end to end. Format in React only — never in the API or DB
+- **Numbers:** doubles end to end. Format in React only - never in the API or DB
   layer.
 - **Dev:** Vite proxy for `/api`. **Prod:** Express serves `client/dist`, one
   origin, no CORS.
@@ -378,12 +378,12 @@ ids in a module constant — that moves into each tournament's `tournament.yaml`
 and part of every request. Main Event goes first because its banners are the ones
 currently in `config/banners.yaml`; the group stage follows in Phase 6 and doubles
 as the test that no emblem count is hardcoded. *Multi-tournament is a requirement*,
-not a later nicety — see the phase 10 and freshness sections above.
+not a later nicety - see the phase 10 and freshness sections above.
 
 **Still open.**
 
 1. **Whose emblem inventory?** `banner/optimize` takes an inventory the user owns.
-   Nothing in the engine models an inventory today — it is a pure client concept,
+   Nothing in the engine models an inventory today - it is a pure client concept,
    so it lives in the querystring and never in the database.
 2. **Run cadence.** Cron during an event, or manual publish? Decides only whether
    `publish.py` needs a scheduler.

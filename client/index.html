@@ -4,7 +4,41 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>client</title>
+    <meta name="color-scheme" content="light dark" />
+    <title>DotaPredictions - TI fantasy banner projections</title>
+    <meta
+      name="description"
+      content="Which units score best through a War Banner, and which banner to roll for, projected from public match history with an interval on every number."
+    />
+    <!--
+      The palette, before anything renders.
+
+      This is the one job React cannot do. The stylesheet ships as a <link> in
+      the head, so the browser can paint `:root` -- the light palette -- while
+      the module graph is still loading, and a reader on dark gets a full white
+      page for a frame. Applying the class from a blocking inline script here
+      means the first paint is already correct.
+
+      It is a deliberate second copy of what `src/lib/theme.ts` does -- read
+      the choice, resolve it against the OS, put it on the root -- including
+      the storage key, because a module import would defeat the point. Kept to
+      those four lines for that reason: every other decision about the theme
+      lives in the module, and this reads the same key, writes the same class
+      and the same `color-scheme`. Change one and change the other.
+    -->
+    <script>
+      try {
+        var choice = localStorage.getItem("dotapredictions:theme") || "system"
+        var dark =
+          choice === "dark" ||
+          (choice === "system" && matchMedia("(prefers-color-scheme: dark)").matches)
+        document.documentElement.classList.toggle("dark", dark)
+        document.documentElement.style.colorScheme = dark ? "dark" : "light"
+      } catch (e) {
+        /* Storage or matchMedia unavailable: the page stays light, which is
+           what the stylesheet paints by default. Degrade, never fail. */
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

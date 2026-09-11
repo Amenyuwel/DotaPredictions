@@ -199,6 +199,26 @@
     --emblem-pattern: none;
     --emblem-pattern-size: auto;
 
+    /* The same three weaves again, drawn for a 24px square instead of for a
+       control.
+       
+       A separate set rather than a phase applied to the one above, because the
+       two are not the same drawing at two sizes. A chip is wide enough that
+       where the pattern begins never reads as a decision -- it is a surface,
+       and the eye takes the texture. A swatch shows about one repeat, so the
+       phase IS the composition: at the chip's phase, blue came out as a band
+       hard against the left edge with a 2px slice of the next at the right, and
+       green put its one crossing in the top quarter, clipped into an arrowhead.
+       Shifting the shared weave to fix that moved the chips too, and a lattice
+       slid 9px off its own grid is a plaid.
+       
+       So: the motif is the client's, the framing is this box's. Every offset
+       below is in pixels against a 24px swatch -- re-derive them if `swatch` in
+       emblem-catalog.ts ever changes size. */
+    --emblem-swatch-pattern: none;
+    --emblem-swatch-pattern-size: auto;
+    --emblem-swatch-pattern-position: 0 0;
+
     /* The weave: ground, and the pattern drawn over it. */
     --emblem-ground: oklch(0.94 calc(0.027 * var(--emblem-sat)) var(--emblem-hue));
     --emblem-pat: oklch(0.88 calc(0.056 * var(--emblem-sat)) var(--emblem-hue));
@@ -206,9 +226,27 @@
     --emblem-ground-on: oklch(0.91 calc(0.041 * var(--emblem-sat)) var(--emblem-hue));
     --emblem-pat-on: oklch(0.84 calc(0.075 * var(--emblem-sat)) var(--emblem-hue));
 
+    /* The weave again, pitched to be read as a 24px sample on a card rather
+       than as a surface under text.
+
+       The chip tones above are nearly the page: they are a control's skin, and
+       a control that shouts at rest is the thing they were written to avoid. A
+       swatch is the opposite case -- it is 24 pixels, it sits beside a word
+       that already says "red", and at the chip's lightness it reads as a
+       smudge. So it gets its own pair, further from the background and further
+       apart from each other, because a two-tone weave at 24px needs the two
+       tones to separate.
+
+       Same rule as everything else here: one recipe, hue the only variable, and
+       the chroma is about 95% of what the tightest of the three hues can reach
+       at that lightness -- blue at 0.82, green at 0.58. `check-tone.mjs` reads
+       these two lines and fails if either goes out of gamut. */
+    --emblem-sample: oklch(0.82 calc(0.085 * var(--emblem-sat)) var(--emblem-hue));
+    --emblem-sample-pat: oklch(0.74 calc(0.127 * var(--emblem-sat)) var(--emblem-hue));
+
     /* The colour stated plainly, for the two places that have no room to weave:
-       the border of a selected chip and the bar down a builder row. One token,
-       because those two are answering the same question and a row's bar
+       the border of a selected chip and the ring around a swatch. One token,
+       because those two are answering the same question and a swatch's ring
        disagreeing with its chip's border would be a bug you could see. */
     --emblem-mark: oklch(0.68 calc(0.11 * var(--emblem-sat)) var(--emblem-hue));
     --emblem-ring: color-mix(in oklab, var(--emblem-mark) 35%, transparent);
@@ -217,6 +255,14 @@
        Darker and more saturated than anything above, because it is type on the
        card background and has to clear contrast on its own. */
     --emblem-ink: oklch(0.48 calc(0.1 * var(--emblem-sat)) var(--emblem-hue));
+
+    /* The word printed ON a selected chip, which is a different surface and so
+       a different token. `--emblem-ink` is graded against the card; a label
+       standing on the weave has to clear the weave, and the two cannot be the
+       same value in both themes -- the chip is the lighter surface in the dark
+       theme and the lighter surface in the light one too, so this is dark in
+       both. `check-tone.mjs` grades it against the pair it actually sits on. */
+    --emblem-ink-on: oklch(0.36 calc(0.09 * var(--emblem-sat)) var(--emblem-hue));
   }
 
   /* Hue and weave, both measured off the client's own banners. The gaps are
@@ -229,6 +275,13 @@
     /* Checkerboard. Each conic quadrant is one 12px cell of the 24px tile. */
     --emblem-pattern: repeating-conic-gradient(var(--emblem-pat) 0% 25%, transparent 0% 50%);
     --emblem-pattern-size: 24px 24px;
+    /* One whole tile, four cells, already centred: a 24px tile in a 24px box
+       needs no framing of its own. */
+    --emblem-swatch-pattern: repeating-conic-gradient(
+      var(--emblem-pat) 0% 25%,
+      transparent 0% 50%
+    );
+    --emblem-swatch-pattern-size: 24px 24px;
   }
 
   [data-emblem="blue"] {
@@ -237,6 +290,16 @@
       90deg,
       var(--emblem-pat) 0 11px,
       transparent 11px 22px
+    );
+    /* The client's 11px stripe, placed once in the middle: (24 - 11) / 2 of
+       ground on each side. Not repeating, because the 22px period would put
+       the next stripe's leading 2px against the right edge and the swatch
+       would read as a band with a nick out of it rather than as a line. */
+    --emblem-swatch-pattern: linear-gradient(
+      90deg,
+      transparent 0 6.5px,
+      var(--emblem-pat) 6.5px 17.5px,
+      transparent 17.5px
     );
   }
 
@@ -248,26 +311,111 @@
     --emblem-pattern:
       repeating-linear-gradient(45deg, var(--emblem-pat) 0 7px, transparent 7px 20px),
       repeating-linear-gradient(-45deg, var(--emblem-pat) 0 7px, transparent 7px 20px);
+    /* One crossing of the lattice, not a window onto a tiling of it.
+       
+       Tiling was the mistake: at 20px period in a 24px box the swatch catches
+       roughly one repeat, so the result depended entirely on phase and never
+       landed square -- shifted one way the diamond was clipped by the top edge
+       into an arrowhead, shifted the other the corners filled in and the
+       wedges closed up. There is no offset that makes an arbitrary slice of a
+       tiling read as the motif, because the motif is the crossing and the
+       slice is not centred on it by construction.
+       
+       So the crossing is drawn directly: two 8px bands, each centred on its own
+       gradient line, so they meet in the middle of the box and run corner to
+       corner. What that leaves is the shape the lattice is actually made of --
+       a triangle of ground against each of the four edges, top, bottom, left
+       and right, with the X between them. `calc(50% ± 4px)` rather than pixel
+       stops so the two bands stay centred if the swatch is ever resized; only
+       the 8px thickness is tied to this size. */
+    --emblem-swatch-pattern:
+      linear-gradient(
+        45deg,
+        transparent calc(50% - 4px),
+        var(--emblem-pat) calc(50% - 4px) calc(50% + 4px),
+        transparent calc(50% + 4px)
+      ),
+      linear-gradient(
+        -45deg,
+        transparent calc(50% - 4px),
+        var(--emblem-pat) calc(50% - 4px) calc(50% + 4px),
+        transparent calc(50% + 4px)
+      );
   }
 
   /* A stat the scoring table does not classify. The same control in grey, and
      with no weave, because it is not one of the client's colours. */
   [data-emblem="unclassified"] { --emblem-sat: 0; }
 
-  /* Dark theme. The weave inverts -- ground below the pattern instead of above
-     it -- so a hovered chip deepens into the page rather than flashing pale on
-     it, and selection still means more colour. The gamut is far wider down
-     here, so these are nowhere near their limits. */
+  /* Dark theme, pitched pastel.
+     
+     The weave still inverts -- ground below the pattern instead of above it --
+     so selection means more colour, and the pattern still reads lighter than
+     the ground it lies on. What changed is where the pair sits: these were
+     barely above the page (0.28 / 0.34) and a red chip came out as a dark slab
+     you had to be told was red. Everything below is lifted into the mid tones
+     and the chroma held down, which is what makes a colour read as pastel
+     rather than as dim: lightness does the talking, hue only tints it.
+     
+     Lightness and chroma move TOGETHER here, which is the correction the first
+     pastel pass got wrong: it lifted the lightness and left the chroma where it
+     was, and a colour lifted without chroma does not become pastel, it becomes
+     grey. These sit between the near-black originals and that washed pass --
+     light enough to read as the colour at a glance, saturated enough that red,
+     blue and green are three colours rather than three greys.
+     
+     One recipe, hue the only variable, exactly as in the light theme. Green is
+     the hue that binds: sRGB is far narrower there than at red or blue, so the
+     chroma on every line is what the TIGHTEST hue can reach, not the roomiest.
+     `check-tone.mjs` verifies that per hue rather than by eye, because clipping
+     is invisible in the stylesheet. */
   .dark [data-emblem] {
-    --emblem-ground: oklch(0.28 calc(0.04 * var(--emblem-sat)) var(--emblem-hue));
-    --emblem-pat: oklch(0.34 calc(0.055 * var(--emblem-sat)) var(--emblem-hue));
-    --emblem-ground-on: oklch(0.34 calc(0.06 * var(--emblem-sat)) var(--emblem-hue));
-    --emblem-pat-on: oklch(0.41 calc(0.08 * var(--emblem-sat)) var(--emblem-hue));
-    --emblem-ink: oklch(0.78 calc(0.106 * var(--emblem-sat)) var(--emblem-hue));
+    /* The resting pair stays where the page's own near-white type can be read
+       over it: this weave appears under a hovered chip whose label is still the
+       ordinary foreground colour, and lifting it would quietly drop that text
+       below AA with nothing on screen to say so. */
+    --emblem-ground: oklch(0.4 calc(0.058 * var(--emblem-sat)) var(--emblem-hue));
+    --emblem-pat: oklch(0.47 calc(0.082 * var(--emblem-sat)) var(--emblem-hue));
+    /* The selected pair is the bright one, and can be, because a selected chip
+       carries its own dark label (`--emblem-ink-on`) rather than the page's. */
+    --emblem-ground-on: oklch(0.6 calc(0.095 * var(--emblem-sat)) var(--emblem-hue));
+    --emblem-pat-on: oklch(0.68 calc(0.125 * var(--emblem-sat)) var(--emblem-hue));
+    /* The 24px sample, further apart than the chip pair because two tones in a
+       small square need the separation to read as a weave at all. */
+    --emblem-sample: oklch(0.56 calc(0.13 * var(--emblem-sat)) var(--emblem-hue));
+    --emblem-sample-pat: oklch(0.68 calc(0.145 * var(--emblem-sat)) var(--emblem-hue));
+    /* Type on the card, so it is the one role that has to clear contrast on its
+       own rather than just look right. */
+    --emblem-ink: oklch(0.79 calc(0.1 * var(--emblem-sat)) var(--emblem-hue));
+    /* Dark type, in the dark theme, because the surface under it is the bright
+       selected chip rather than the page. */
+    --emblem-ink-on: oklch(0.18 calc(0.05 * var(--emblem-sat)) var(--emblem-hue));
   }
 }
 
 @layer base {
+  /* Motion here is always confirmation, never information: a dialog zooming in,
+     a team watermark fading up, a colour chip warming on hover -- each restates
+     something the layout has already said. So all of it can be taken away
+     without a fact going with it, and for a reader who gets sick from it, that
+     is the whole trade.
+
+     Near-zero rather than `none`, because `animation: none` never fires
+     `animationend` and Base UI waits on that to unmount a closing dialog: the
+     box would stay on screen, the page under it inert. The two `!important`s
+     are the documented exception to the no-!important rule -- this has to beat
+     every utility that sets a duration, including ones not written yet. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
   * {
     @apply border-border outline-ring/50;
     }

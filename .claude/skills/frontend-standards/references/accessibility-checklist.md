@@ -69,5 +69,5 @@ Use when reviewing or auditing an interface. Report failures with element, crite
 
 ## Quick tools
 - Browser DevTools accessibility tree and contrast checker
-- axe DevTools or Lighthouse accessibility audit (catches ~30–40% of issues; manual checks still required)
+- axe DevTools or Lighthouse accessibility audit (catches ~30-40% of issues; manual checks still required)
 - Keyboard-only walkthrough and a screen reader pass (VoiceOver, NVDA) for key flows

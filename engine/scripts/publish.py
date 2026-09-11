@@ -162,6 +162,14 @@ def build_run_meta(
             if stage == "main" and cfg.tournament.main_event is not None
             else cfg.tournament.banner_slots
         ),
+        # The period's reroll budget, or null where the client's number was
+        # never transcribed. Null is not zero: it is the difference between "you
+        # cannot afford this banner" and "nobody wrote down what you can spend".
+        "rerollTokens": (
+            cfg.tournament.main_event.reroll_tokens
+            if stage == "main" and cfg.tournament.main_event is not None
+            else cfg.tournament.reroll_tokens
+        ),
         "schemaVersion": 1,
         "createdAt": iso(datetime.now(timezone.utc)),
         "engineVersion": engine_version(),
@@ -256,6 +264,12 @@ def build_scoring(cfg: Config) -> dict[str, Any]:
         "version": cfg.scoring.version,
         "verifiedAgainstClient": cfg.scoring.verified,
         "colors": list(cfg.scoring.colors),
+        # The rule that decides which stats a slot can even hold. Published
+        # rather than re-derived in the web tool, so there is one place it is
+        # written down and a period with a different shape needs no release.
+        "bannerColors": {
+            role: list(seq) for role, seq in sorted(cfg.scoring.slot_colors.items())
+        },
         "stats": {
             key: {
                 "perUnit": stat.per_unit,

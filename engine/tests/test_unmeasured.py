@@ -24,18 +24,46 @@ def match(**player_fields):
 
 
 def test_it_fires_when_the_field_appears_under_valves_own_name():
-    """`lotuses` and `watchers` are what Valve calls them.
+    """`lotuses` is what Valve calls it.
 
-    CMsgDOTAFantasyPlayerStats numbers them 25 and 24. If OpenDota ever surfaces
-    the parsed values it most likely keeps that spelling, so those are the names
-    this has to catch first.
+    CMsgDOTAFantasyPlayerStats numbers it 25. If OpenDota ever surfaces the
+    parsed value it most likely keeps that spelling, so that is one of the names
+    this has to catch.
+
+    `watchers_taken` used to be checked here too and is gone on purpose: it is
+    measured now, read from `ability_uses.ability_lamp_use`. It is also the
+    reason this list is no longer trusted to be complete -- it guessed
+    "watchers", the data said "lamp", and the stat sat excluded for a
+    tournament. See tests/test_watchers.py.
     """
     found = rediscover(["lotuses_grabbed"], [match(lotuses=4)])
     assert found == {"lotuses_grabbed": ["lotuses"]}, found
-
-    found = rediscover(["watchers_taken"], [match(watchers=2)])
-    assert found == {"watchers_taken": ["watchers"]}, found
     print("ok  a newly published field is detected under Valve's own name")
+
+
+def test_it_looks_for_the_pluck_ability_by_its_real_name():
+    """The name the stat would actually arrive under.
+
+    `ability_pluck_lotus` is not a guess: it exists in odota/dotaconstants with
+    a `lotus_rate` attribute, and OpenDota simply never populates it. So it is
+    the first thing to look for, and it arrives nested inside `ability_uses`
+    exactly as `ability_lamp_use` does.
+    """
+    found = rediscover(
+        ["lotuses_grabbed"], [match(ability_uses={"ability_pluck_lotus": 5})]
+    )
+    assert found == {"lotuses_grabbed": ["ability_pluck_lotus"]}, found
+
+
+def test_lotus_consumption_does_not_fire_the_notice():
+    """`famango` is already populated and is not the stat.
+
+    It counts lotuses CONSUMED, not plucked -- a lotus can be handed to a
+    teammate. Listing it as a candidate would fire this notice on every publish
+    forever while naming a field that cannot answer the question.
+    """
+    consumed = match(item_uses={"famango": 3, "great_famango": 1})
+    assert rediscover(["lotuses_grabbed"], [consumed]) == {}
 
 
 def test_it_looks_one_level_into_nested_stat_dicts():

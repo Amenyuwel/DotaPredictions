@@ -257,6 +257,25 @@ class OpenDota:
             # this emblem is scored optimistically-low rather than as zero.
             if p.get("item_uses") is not None:
                 stats["madstone_collected"] = float(uses.get("madstone_bundle", 0))
+            # Watchers. `ability_uses.ability_lamp_use` is the capture: a Watcher
+            # is a "lamp" in Valve's own naming, which is the whole reason an
+            # earlier search of these payloads for "watcher" came back empty and
+            # the stat spent a tournament marked unmeasurable.
+            #
+            # NOT `ability_capture`, which sits beside it in the same dict and
+            # looks like the obvious choice. That one is the OUTPOST: dotaconstants
+            # gives it `target_team: Enemy` and `base_capture_time: 6`, and it
+            # fires once or twice a match against this field's 27 to 44. Taking it
+            # would have understated the stat by an order of magnitude and still
+            # produced a plausible number.
+            #
+            # Same sparse-dict rule as the Tormentor above, and it matters more
+            # here because most players take none: an absent KEY on a parsed
+            # replay is a measured zero, while an absent MAP is an unparsed replay
+            # and no measurement at all.
+            abilities = p.get("ability_uses")
+            if abilities is not None:
+                stats["watchers_taken"] = float(abilities.get("ability_lamp_use", 0))
             if p.get("neutral_kills") is not None:
                 stats["neutral_kills"] = float(p["neutral_kills"])
             if p.get("observer_kills") is not None:

@@ -27,10 +27,15 @@ export function TournamentContext({
       <CardHeader>
         <CardTitle className="text-sm">Tournament context</CardTitle>
       </CardHeader>
-      <CardContent className="grid grid-cols-3 gap-4 text-sm">
-        <Stat label="Expected series" value={expectedSeries.toFixed(2)} />
-        <Stat label="Advances" value={percent(advanceProb)} />
-        <Stat label="Out early" value={percent(eliminationRisk)} />
+      <CardContent>
+        {/* A real `dl`: these are three term/value pairs, and `dt`/`dd` outside
+            one are not a description list, they are two elements with no
+            defined meaning. The grid moves here with them. */}
+        <dl className="grid grid-cols-3 gap-4 text-sm">
+          <Stat label="Expected series" value={expectedSeries.toFixed(2)} />
+          <Stat label="Advances" value={percent(advanceProb)} />
+          <Stat label="Out early" value={percent(eliminationRisk)} />
+        </dl>
       </CardContent>
     </Card>
   )

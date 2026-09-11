@@ -7,6 +7,7 @@ import { overlapping, unmeasurableCaveats } from "../scoring/answer.js"
 import { slotStatValues } from "../scoring/banner.js"
 import { searchBanner, type ScoredArrangement } from "../scoring/optimize.js"
 import { recencyWeights } from "../scoring/project.js"
+import { slotColors } from "../scoring/slots.js"
 import { indexFor, unitOf, type Unit } from "../scoring/units.js"
 import type { Emblem, FantasyRole, RunPayload } from "../validate.js"
 
@@ -148,8 +149,10 @@ function optimize(
     Date.parse(payload.run.params.asOf) / 1000,
   )
 
+  const colors = slotColors(payload.scoring, unit.role, slots)
   const found = searchBanner(inventory, slot, unit.projection, payload.scoring, weights, {
     slots,
+    slotColors: colors,
     screenSims: config.search.screenSims,
     keep: config.search.keep,
     sims: config.scoring.sims,
@@ -175,6 +178,9 @@ function optimize(
       players: unit.players,
     },
     search: {
+      // Named, because the client draws this answer and the target answer with
+      // one panel and the two searched different things.
+      kind: "inventory" as const,
       inventory: inventory.length,
       slots,
       arrangements: found.arrangements,
@@ -200,11 +206,15 @@ function optimize(
       worstOrder: null,
       reason:
         slot.nGames === 0
-          ? `${unit.players.map((p) => p.nick).join(" + ")} have no match in this run where ` +
+          ? `${unit.players.map((p) => p.nick).join(" & ")} have no match in this run where ` +
             `all of them played, so there is nothing to score a banner against.`
-          : `These ${inventory.length} emblems carry fewer than ${slots} different stats. ` +
-            `A banner may repeat a colour but never a stat, so no legal banner can be ` +
-            `built from them.`,
+          : colors
+            ? `No legal banner can be built from these ${inventory.length} emblems. A ` +
+              `${unit.role} banner is ${colors.join(" ")}, top to bottom, and no stat may ` +
+              `appear twice - so the inventory has to carry the right colours in the ` +
+              `right numbers, not just enough emblems.`
+            : `These ${inventory.length} emblems carry fewer than ${slots} different ` +
+              `stats, and no stat may appear twice on a banner.`,
       caveats: [],
     }
   }

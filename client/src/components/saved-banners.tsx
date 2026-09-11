@@ -5,46 +5,62 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Loading, Spinner } from "@/components/ui/spinner"
 import {
   useDeleteBanner,
   useSaveBanner,
   useSavedBanners,
 } from "@/hooks/use-saved-banners"
 import type { AuthState } from "@/hooks/use-session"
-import { ROLE_LABEL } from "@/lib/labels"
+import { ROLE_LABEL, STAGE_LABEL } from "@/lib/labels"
 import type { Emblem, FantasyRole, RunMeta } from "@/types/run"
 
+const ROLES = ["core", "mid", "support"] as const
+
 /**
- * Save the banner on screen, and load one back.
+ * Save a banner on screen, and load one back.
  *
  * Only complete banners can be saved. A partial banner is not a cheaper version
  * of the same question -- it is a different banner -- and a half-filled row
  * loaded back a week later would look like a finished answer.
+ *
+ * The tab holds three banners now, so saving needs to say which. It offers only
+ * the slots whose banner is finished, and when exactly one is it does not ask
+ * at all -- a control with a single option is a question with no answer to
+ * give. Which slot a banner belongs to is not cosmetic: the role is what
+ * `onLoad` puts it back into, and a support banner restored into the core card
+ * would be scored against the wrong unit and look like a finding.
  */
 export function SavedBanners({
   run,
   auth,
-  role,
-  banner,
+  banners,
   slots,
   onLoad,
 }: {
   run: RunMeta
   auth: AuthState
-  role: FantasyRole
-  banner: (Emblem | null)[]
+  /** One banner per fantasy slot, each ordered and null-padded. */
+  banners: Record<FantasyRole, (Emblem | null)[]>
   slots: number
   onLoad: (role: FantasyRole, emblemIds: string[]) => void
 }) {
   const [label, setLabel] = useState("")
+  const [picked, setPicked] = useState<FantasyRole | null>(null)
   const signedIn = auth.status === "user"
 
   const saved = useSavedBanners(run.tournamentId, run.stage, signedIn)
   const save = useSaveBanner(run.tournamentId, run.stage)
   const remove = useDeleteBanner(run.tournamentId, run.stage)
 
-  const chosen = banner.filter((e): e is Emblem => e !== null)
-  const complete = chosen.length === slots
+  const emblemsOf = (r: FantasyRole) =>
+    banners[r].filter((e): e is Emblem => e !== null)
+  const ready = ROLES.filter((r) => emblemsOf(r).length === slots)
+  // The picked slot only counts while its banner is still complete: editing one
+  // back down to four emblems must not leave the form pointed at it.
+  const role = ready.find((r) => r === picked) ?? ready[0] ?? null
+  const chosen = role ? emblemsOf(role) : []
+  const complete = role !== null
 
   if (!signedIn) {
     return (
@@ -72,7 +88,7 @@ export function SavedBanners({
           className="space-y-2"
           onSubmit={(event) => {
             event.preventDefault()
-            if (!complete) return
+            if (!complete || !role) return
             save.mutate(
               {
                 tournamentId: run.tournamentId,
@@ -85,6 +101,25 @@ export function SavedBanners({
             )
           }}
         >
+          {/* Only shown when there is a choice to make. */}
+          {ready.length > 1 && (
+            <fieldset className="flex flex-wrap gap-1">
+              <legend className="mb-1 text-xs font-medium">Which banner</legend>
+              {ready.map((r) => (
+                <Button
+                  key={r}
+                  type="button"
+                  size="sm"
+                  variant={r === role ? "secondary" : "ghost"}
+                  aria-pressed={r === role}
+                  onClick={() => setPicked(r)}
+                >
+                  {ROLE_LABEL[r]}
+                </Button>
+              ))}
+            </fieldset>
+          )}
+
           <label htmlFor="banner-label" className="text-xs font-medium">
             Name this banner
           </label>
@@ -92,17 +127,21 @@ export function SavedBanners({
             id="banner-label"
             value={label}
             onChange={(event) => setLabel(event.target.value)}
-            placeholder={`${ROLE_LABEL[role]} banner`}
+            placeholder={role ? `${ROLE_LABEL[role]} banner` : "Core banner"}
             maxLength={80}
             autoComplete="off"
           />
           <Button type="submit" size="sm" disabled={!complete || save.isPending}>
-            <Bookmark aria-hidden />
-            {save.isPending ? "Saving…" : "Save current banner"}
+            {save.isPending ? <Spinner className="size-4" /> : <Bookmark aria-hidden />}
+            {save.isPending
+              ? "Saving…"
+              : role
+                ? `Save the ${ROLE_LABEL[role]} banner`
+                : "Save a banner"}
           </Button>
           <p className="text-muted-foreground text-xs" aria-live="polite">
             {!complete
-              ? `Choose ${slots - chosen.length} more emblem${slots - chosen.length === 1 ? "" : "s"} before saving.`
+              ? `Finish a banner - ${slots} emblems on any one slot - before saving.`
               : save.error
                 ? `Could not save: ${save.error.message}`
                 : ""}
@@ -111,6 +150,7 @@ export function SavedBanners({
 
         {saved.isPending ? (
           <div className="space-y-2" aria-busy>
+            <Loading>Loading your saved banners…</Loading>
             <Skeleton className="h-10 w-full" />
             <Skeleton className="h-10 w-full" />
           </div>
@@ -149,7 +189,7 @@ export function SavedBanners({
           </ul>
         ) : (
           <p className="text-muted-foreground text-xs">
-            Nothing saved yet for the {run.stage === "main" ? "Main Event" : "Group Stage"}.
+            Nothing saved yet for the {STAGE_LABEL[run.stage]}.
           </p>
         )}
       </CardContent>

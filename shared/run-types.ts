@@ -98,6 +98,10 @@ export interface RunMeta {
    * Scoped per {tournamentId, stage}, never global.
    */
   isCurrent: boolean
+  /**
+   * Reroll tokens for this period, or null where the client's number was never transcribed. A token buys one stat reroll or one trait reroll, and neither is a choice -- the client rolls a stat that is new and not already on the banner, or a trait that is different -- so a named banner costs several tokens per emblem in expectation rather than one. Quality is not rerollable at all, which is why the budget prices the stats and traits of a goal and never its tiers. Null is not zero and not 'enough': it means the budget half of a goal's feasibility cannot be answered, and the tool says so rather than passing a check against a number nobody wrote down. Optional: runs published before the field existed carry none.
+   */
+  rerollTokens?: number | null
 }
 /**
  * The client's scoring table, published so the server can score a banner without a second copy of scoring.yaml. Stat values are wildly unequal (Creep Score 3 per unit, Roshan 1172), so a raw rate means nothing until it is multiplied through this.
@@ -106,6 +110,12 @@ export interface Scoring {
   version: string
   verifiedAgainstClient: boolean
   colors: string[]
+  /**
+   * Fantasy role -> the colour of each banner slot, at the longest period's length. A shorter period takes the first bannerSlots of the row, because the emblems carry over. This is the rule that decides which stats a slot can hold at all: Core is red-green-red-green-red and Support has no red slot, so it is not a preference and not one-of-each. Optional: a run published before this field existed carries no row, and the tool degrades rather than refusing to start -- rank and optimize keep working under the stat rule alone, and the target search declines to answer instead of guessing a sequence. Republish with publish.py to get the rule back.
+   */
+  bannerColors?: {
+    [k: string]: string[]
+  }
   /**
    * Scoring-stat key -> what it pays. `source` is the column name in playerSamples.stats; `measurable` false means the source data has no field for it at any depth.
    */

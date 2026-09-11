@@ -51,6 +51,13 @@ function validPayload() {
       version: "ti2026-client",
       verifiedAgainstClient: true,
       colors: ["red", "blue", "green"],
+      // Required: it is the rule that decides which stats a slot can hold,
+      // and a payload without it cannot be scored for a target banner.
+      bannerColors: {
+        core: ["red", "green", "red", "green", "red"],
+        mid: ["red", "blue", "green", "red", "green"],
+        support: ["blue", "green", "blue", "green", "blue"],
+      },
       stats: {
         smokes_used: { perUnit: 293, base: 0, color: "blue", measurable: true, source: "smokes_used" },
         lotuses_grabbed: { perUnit: 176, base: 0, color: "blue", measurable: false, source: null },

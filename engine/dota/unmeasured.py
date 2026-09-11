@@ -11,9 +11,13 @@ payloads it already fetched for field names that would carry the stat, and says
 so if one appears. That turns "remember to check at the next International" into
 something that happens whether anyone remembers or not.
 
-Verified absent on 2026-09-10 across OpenDota, STRATZ, and the public Valve Web
-API; see `config/ti2026/scoring.yaml` for the full evidence and for why the
-client's own "no data" label is the decisive part.
+This list got `watchers_taken` wrong for a tournament, and the way it did is the
+reason the candidate names below are chosen the way they are. The 2026-09-10
+check searched these payloads for the string "watcher", found nothing, and
+concluded nobody published it. OpenDota publishes it as
+`ability_uses.ability_lamp_use` -- a Watcher is a "lamp" in Valve's naming -- so
+the search was looking for a word that does not appear in the data and never
+could have found it. A candidate list is only as good as its worst guess.
 """
 from __future__ import annotations
 
@@ -22,16 +26,32 @@ from typing import Any, Iterable
 
 from .config import CACHE_DIR
 
-# What the field would most likely be called if it appeared.
+# What the field would be called if it appeared.
 #
-# The first name in each tuple is Valve's own, taken from
-# CMsgDOTAFantasyPlayerStats in the Dota protobufs (`watchers` = 24,
-# `lotuses` = 25). OpenDota names parsed fields after the source where it can,
-# so Valve's spelling is the best single guess; the rest are the shapes the
-# existing parser already uses elsewhere (`camps_stacked`, `rune_pickups`).
+# `ability_pluck_lotus` is the one that matters and it is not a guess: the
+# ability EXISTS in odota/dotaconstants, with a `lotus_rate` attribute, and
+# OpenDota simply never populates it -- 0 of 8 parsed pro matches sampled on
+# 2026-09-11 carried the key, against `ability_lamp_use` appearing in 8 of 8.
+# So the day Valve starts emitting it, this is the name it will arrive under.
+#
+# The rest are fallbacks: Valve's own spelling from CMsgDOTAFantasyPlayerStats
+# (`lotuses` = 25), and the shapes the existing parser uses elsewhere.
+#
+# `item_uses.famango` is deliberately NOT here. It is lotus CONSUMPTION, it is
+# already populated, and listing it would fire this notice on every publish
+# forever while naming a field that cannot answer the question -- a lotus can
+# be plucked and handed to a teammate.
+#
+# `watchers_taken` is no longer on this list: it is measured, via
+# `ability_uses.ability_lamp_use`. See `sources/opendota.py`.
 CANDIDATE_FIELDS: dict[str, tuple[str, ...]] = {
-    "lotuses_grabbed": ("lotuses", "lotuses_grabbed", "lotus_pickups", "lotus_grabbed"),
-    "watchers_taken": ("watchers", "watchers_taken", "watcher_captures", "outposts_taken"),
+    "lotuses_grabbed": (
+        "ability_pluck_lotus",
+        "lotuses",
+        "lotuses_grabbed",
+        "lotus_pickups",
+        "lotus_grabbed",
+    ),
 }
 
 

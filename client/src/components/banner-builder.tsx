@@ -2,6 +2,7 @@ import { useMemo, useState } from "react"
 import { Plus } from "lucide-react"
 
 import { EmblemDialog } from "@/components/emblem-dialog"
+import { EmblemMeta } from "@/components/emblem-meta"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
@@ -11,7 +12,6 @@ import {
   colorStyle,
   tierLabel,
   tierNumeral,
-  traitLabel,
   type Axes,
 } from "@/lib/emblem-catalog"
 import { cn } from "@/lib/utils"
@@ -33,6 +33,7 @@ export function BannerBuilder({
   emblems,
   scoring,
   slots,
+  slotColors,
   value,
   onChange,
 }: {
@@ -41,6 +42,16 @@ export function BannerBuilder({
    * from a server that predates the field. See `buildCatalog`. */
   scoring: Scoring | undefined
   slots: number
+  /**
+   * The colour of each slot, in banner order.
+   *
+   * Not a hint: it is the rule. A Core banner is red-green-red-green-red and a
+   * Support banner has no red slot at all, so slot 2 offers six stats rather
+   * than eighteen. Empty only for a run published before the rule was on the
+   * wire, and then every colour is offered -- the old behaviour, which is how
+   * a red stat reached a Support banner in the first place.
+   */
+  slotColors: string[]
   value: (Emblem | null)[]
   onChange: (next: (Emblem | null)[]) => void
 }) {
@@ -66,7 +77,9 @@ export function BannerBuilder({
   const openingAxes = (index: number): Axes => {
     const current = value[index] ?? null
     if (current) return axesOf(current, catalog.colorOf)
-    return { color: null, stat: null, tier: null, trait: null }
+    // The slot's own colour, which is not a default the user has to confirm --
+    // it is the only colour this slot can hold.
+    return { color: slotColors[index] ?? null, stat: null, tier: null, trait: null }
   }
 
   return (
@@ -74,7 +87,10 @@ export function BannerBuilder({
       <ol className="space-y-2">
         {Array.from({ length: slots }, (_, i) => {
           const current = value[i] ?? null
-          const color = current ? catalog.colorOf(current.stat) : null
+          // An EMPTY slot still has a colour, so it is painted with it. The row
+          // then says what belongs there before anything is chosen, rather than
+          // looking like a blank that could take anything.
+          const color = current ? catalog.colorOf(current.stat) : (slotColors[i] ?? null)
           const style = color ? colorStyle(color) : null
 
           return (
@@ -85,22 +101,32 @@ export function BannerBuilder({
               <button
                 type="button"
                 onClick={() => setEditing(i)}
-                // Declared once per row. The colour bar and the colour word are
-                // both inside, so both resolve the same hue and cannot disagree.
+                // Declared once per row. The colour swatch and the colour word
+                // are both inside, so both resolve the same hue and cannot
+                // disagree.
                 {...(style?.attrs ?? {})}
                 className={cn(
-                  "focus-visible:border-ring focus-visible:ring-ring/50 group relative flex min-h-14 flex-1 items-center gap-3 overflow-hidden rounded-xl border pr-3 text-left transition-colors focus-visible:ring-3",
+                  "focus-visible:border-ring focus-visible:ring-ring/50 group relative flex min-h-14 flex-1 items-center gap-3 overflow-hidden rounded-xl border px-3 text-left transition-colors focus-visible:ring-3",
                   current
                     ? "border-input bg-card hover:bg-accent/50"
                     : "border-input/70 text-muted-foreground hover:border-input hover:bg-accent/40 border-dashed",
                 )}
               >
-                {/* The colour, as a bar down the edge of the row rather than a
-                    swatch to be looked up. The word is right beside it, so the
-                    paint is confirmation and never the only signal. */}
+                {/* The colour as a sample of its weave -- checkered, striped or
+                    latticed -- so the three are told apart by pattern before
+                    hue. The word is right beside it either way, so the paint is
+                    confirmation and never the only signal. An empty slot keeps
+                    the box and drops the weave, rather than letting the row
+                    resize when an emblem arrives. */}
                 <span
                   aria-hidden
-                  className={cn("h-full w-1.5 self-stretch", style?.bar ?? "bg-transparent")}
+                  // See `SAMPLE`: the weave's tones are overridden on the
+                  // element that declares them, so the attribute rides here too.
+                  {...(style?.attrs ?? {})}
+                  className={cn(
+                    "size-6 shrink-0 rounded-md",
+                    style ? style.swatch : "border-input/70 border border-dashed",
+                  )}
                 />
 
                 {current ? (
@@ -109,15 +135,7 @@ export function BannerBuilder({
                       <span className="block truncate text-sm font-medium">
                         {catalog.statLabels.get(current.stat) ?? current.stat}
                       </span>
-                      <span className="mt-0.5 flex items-center gap-1.5 text-2xs tracking-wider uppercase">
-                        <span className={cn("font-semibold", style?.tag)}>{color}</span>
-                        <span className="text-muted-foreground/50" aria-hidden>
-                          /
-                        </span>
-                        <span className="text-muted-foreground">
-                          {traitLabel(current.trait)}
-                        </span>
-                      </span>
+                      <EmblemMeta color={color!} trait={current.trait} />
                     </span>
 
                     {/* The quality, stamped the way the client stamps it. */}
@@ -131,7 +149,7 @@ export function BannerBuilder({
                 ) : (
                   <span className="flex flex-1 items-center gap-2 py-3 pl-1 text-sm">
                     <Plus aria-hidden className="size-4 shrink-0" />
-                    Choose an emblem
+                    {color ? `Choose a ${color} emblem` : "Choose an emblem"}
                   </span>
                 )}
               </button>
@@ -141,9 +159,14 @@ export function BannerBuilder({
                   {/* Base UI composes through `render`, not `asChild`. */}
                   <TooltipTrigger render={<Badge variant="outline">no data</Badge>} />
                   <TooltipContent>
-                    The client marks this stat “no data” in its own emblem picker, and no
-                    match-data source publishes it either. An emblem carrying it scores
-                    nothing — not here, and not in the client. Reroll it.
+                    {/* This used to say the emblem scores nothing and to reroll it.
+                        That was false and it was advice: the client's own scoring
+                        list pays Lotuses Grabbed 176 per lotus. What is true is
+                        narrower and less useful, which is why it has to be said
+                        plainly rather than rounded up into a recommendation. */}
+                    No match-data source publishes {current.stat}, so this tool scores it
+                    as 0 and every banner carrying it is understated. It still pays in
+                    the client - the number here is a floor, not a verdict on the emblem.
                   </TooltipContent>
                 </Tooltip>
               )}
@@ -152,17 +175,20 @@ export function BannerBuilder({
         })}
       </ol>
 
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-muted-foreground text-xs">
-          1 to {slots} is top to bottom on your banner: Vampiric takes 10% from each
-          neighbour, Benevolent pays each 20%.
-        </p>
-        {value.some(Boolean) && (
+      {/* No note under the list. What it said -- 1 to N is top to bottom, and
+          what Vampiric and Benevolent do to their neighbours -- is the dialog's
+          own description, three inches above it in the same box; the rest, that
+          a slot's colour is fixed by the role, is said by the emblem dialog at
+          the moment it offers six stats instead of eighteen. Both were already
+          where a reader can act on them, and a second copy is the one they
+          compare against the first. */}
+      {value.some(Boolean) && (
+        <div className="flex justify-end">
           <Button variant="ghost" size="sm" onClick={() => onChange(Array(slots).fill(null))}>
             Clear
           </Button>
-        )}
-      </div>
+        </div>
+      )}
 
       {editing !== null && (
         <EmblemDialog
@@ -180,6 +206,9 @@ export function BannerBuilder({
                 .map((e) => e.stat),
             )
           }
+          // The slot decides the colour, so the dialog shows it rather than
+          // asking. Only its six stats are then on offer.
+          lockedColor={slotColors[editing] ?? null}
           onSave={(emblem) => setSlot(editing, emblem)}
           onRemove={() => setSlot(editing, null)}
           onClose={() => setEditing(null)}

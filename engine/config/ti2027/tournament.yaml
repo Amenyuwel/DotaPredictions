@@ -9,6 +9,9 @@ group_stage:
   rounds: 5
   series_format: bo3
   banner_slots: 3
+  # Reroll tokens for this period, from the client. Leave unset rather than
+  # guessing -- the tool reports an unknown budget, it does not invent one.
+  reroll_tokens: TODO
   direct_advance: 3
   elimination_round_slots: 10
 main_event:
@@ -16,6 +19,7 @@ main_event:
   series_format: bo3
   grand_final_format: bo5
   banner_slots: 5
+  reroll_tokens: TODO
   lock_utc: TODO
   league_id: null
 prediction_buckets:

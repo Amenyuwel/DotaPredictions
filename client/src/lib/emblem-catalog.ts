@@ -41,11 +41,16 @@ export const UNCLASSIFIED = "unclassified"
  * and a reader who cannot separate red from green loses nothing, because the
  * word was doing the work the whole time.
  *
- * `tag` and `bar` are the exception, and deliberately: they are not buttons.
- * The word under a builder row and the stripe down its edge are the standing
- * record of what a banner is, so they are painted always -- `tag` in ink on the
- * card, `bar` in the mark, which is the colour flat because six pixels of weave
- * is mush rather than a pattern.
+ * `bar` is the exception, and deliberately: it is not a button. The stripe
+ * down a decided row's edge is the standing record of what a banner is, so it
+ * is painted always, in the mark -- the colour flat, because six pixels of
+ * weave is mush rather than a pattern.
+ *
+ * There was a `tag` beside it, the ink for a colour's NAME under a builder row.
+ * The name is gone from that row: the weave, the paint and the empty slot's own
+ * sentence were already saying it, and a fourth copy is the one a reader checks
+ * the other three against. `--emblem-ink` is still live and still graded by
+ * `scripts/check-tone.mjs` -- `selected` wears it.
  */
 /**
  * One recipe, at whatever hue the element declares.
@@ -87,11 +92,63 @@ const SKIN_HOVER =
  * further apart than any state is drawn. */
 const DEEPER = "[--emblem-ground:var(--emblem-ground-on)] [--emblem-pat:var(--emblem-pat-on)]"
 
+/** The weave drawn for a 24px square rather than for a control.
+ *
+ * A second set of pattern properties, not the first set repositioned. The phase
+ * that makes a swatch legible is wrong on a chip -- the chips are wide enough
+ * that a shift slides the lattice off its own grid and reads as a plaid -- so
+ * the two are kept apart and `index.css` says why at each colour.
+ *
+ * Same literal-string rule as `SKIN_HOVER`: written out rather than built from
+ * a shared prefix, because Tailwind reads this file as text and never generates
+ * a class name that only exists once strings are joined. */
+const SWATCH_SKIN =
+  "bg-[var(--emblem-ground)] bg-[image:var(--emblem-swatch-pattern)] bg-[length:var(--emblem-swatch-pattern-size)] [background-position:var(--emblem-swatch-pattern-position)]"
+
+/** The sample pair, swapped in the same way `DEEPER` swaps the selected one.
+ *
+ * It has to be set on the element that carries `data-emblem`, not on an
+ * ancestor of it: `--emblem-pattern` substitutes `--emblem-pat` where the
+ * pattern is declared, and children inherit the value already substituted. An
+ * override one level down would change nothing and look like a broken token.
+ * That is why `swatch` is spread with `attrs` rather than relying on the card
+ * around it. */
+const SAMPLE = "[--emblem-ground:var(--emblem-sample)] [--emblem-pat:var(--emblem-sample-pat)]"
+
 const TONE = {
   idle: SKIN_HOVER,
-  selected: `${SKIN} ${DEEPER} border-[var(--emblem-mark)] text-[var(--emblem-ink)] ring-2 ring-[var(--emblem-ring)]`,
-  tag: "text-[var(--emblem-ink)]",
-  bar: "bg-[var(--emblem-mark)]",
+  /**
+   * Selected, and the edge stays neutral.
+   *
+   * The weave already says which colour this is, and so does the word inside
+   * it. A hue on the border as well drew the frame of the control in the
+   * colour of its content, which reads as the chip being made OF that colour
+   * rather than showing it -- three differently-edged boxes where the rest of
+   * the form has one edge. Selection is carried by the deeper ground and the
+   * focus-weight ring, both of them the same on all three.
+   */
+  selected: `${SKIN} ${DEEPER} text-[var(--emblem-ink-on)] ring-2 ring-ring/40`,
+  /**
+   * The colour as a sample of the material, for a row that has already been
+   * decided and only has to report what it is.
+   *
+   * Not a painted edge. A flat bar down the left of a card is the house style
+   * of every generated dashboard, it says nothing a reader can name, and at
+   * three hues it is the one part of this palette that carries no information
+   * the word beside it does not already carry.
+   *
+   * A swatch of the weave does carry some: red is checkered, blue is striped
+   * and green is a lattice, measured off the client's own banners, so the three
+   * are told apart by pattern before colour is involved at all -- which is what
+   * makes them survive a greyscale print, a dim phone, and the eight percent of
+   * men who would see two of these three as one.
+   *
+   * Drawn from `--emblem-swatch-pattern`, which is the same three motifs framed
+   * for a box this size rather than for a control -- see `SWATCH_SKIN`. The
+   * edge is `--emblem-ring` rather than a new border colour, because the ring
+   * at 35% of the mark is already the token for "this colour, stated quietly".
+   */
+  swatch: `${SWATCH_SKIN} ${SAMPLE} ring-1 ring-[var(--emblem-ring)]`,
 } as const
 
 /**
@@ -152,6 +209,12 @@ export const tierNumeral = (tier: string) => tier.replace(/^tier_/, "").toUpperC
 
 /** "tier_v" -> "Tier V", for anywhere the numeral needs saying out loud. */
 export const tierLabel = (tier: string) => `Tier ${tierNumeral(tier)}`
+
+/** The tier stamp: a square at the end of an emblem row, the same size as the
+ * colour swatch at the other end. Shared with the control that SETS a tier, so
+ * the thing a reader clicks is the thing they have been reading. */
+export const TIER_CHIP =
+  "bg-muted/60 text-foreground/80 grid size-6 shrink-0 place-items-center rounded-md border text-2xs font-semibold tabular-nums"
 
 export const traitLabel = (trait: string) =>
   trait.charAt(0).toUpperCase() + trait.slice(1)

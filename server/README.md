@@ -20,7 +20,7 @@ answers from whoever is looking:
 |---|---|---|
 | `unconfigured` | neither `RUN_FILE` nor `SUPABASE_URL` + `SUPABASE_SECRET_KEY` | set one |
 | `empty` | reachable, nothing published, or the database is unreachable | publish a run |
-| `ready` | serving | — |
+| `ready` | serving | - |
 
 A fourth outcome is deliberately not a state. **A payload that fails schema
 validation kills the process at boot.** Everywhere else in this project a
@@ -50,7 +50,7 @@ POST /api/banner/optimize { role, teamId, inventory:[{emblemId}], tournamentId?,
 not versions of each other: different field, different format, different banner
 size, different simulator. Both query parameters narrow and neither is required;
 with none, the newest run answers. A request naming a stage nobody published
-404s with `available` rather than falling back — a Group Stage question answered
+404s with `available` rather than falling back - a Group Stage question answered
 with Main Event numbers is a wrong answer wearing the right shape.
 
 `RUN_FILE` loads runs from `publish.py --out` payloads instead of Supabase
@@ -66,7 +66,7 @@ is immutable, so the same banner has the same answer for the life of the
 process. Cold ~115ms for eight units, warm ~2ms.
 
 `/api/run/current` returns 404 with a `reason` and a `hint` when nothing is
-published — that is a state for the client to render, not an error. Sample
+published - that is a state for the client to render, not an error. Sample
 matrices are not returned: they are megabytes of Float32 that only the scorer
 reads. Two fields on it are not properties of the run and travel with it anyway,
 because a client that has to guess either would offer a choice this server then
@@ -78,7 +78,7 @@ is the search bound below.
 
 `/api/banner/optimize` is `/api/player/rank` from the other end: the unit is
 fixed and the banner is the free choice. It searches the emblems you **own**
-rather than the catalog, because the catalog is not a choice anyone has — five
+rather than the catalog, because the catalog is not a choice anyone has - five
 slots drawn from 450 generatable emblems is around 10^13 ordered arrangements,
 and an exhaustive answer over an inventory beats a heuristic's guess over
 everything.
@@ -101,7 +101,7 @@ Three things make it exhaustive and still fit in a request:
 
 The leading ten emblem *sets* are then rescored at `scoring.sims` with a
 bootstrap interval, and the answer reports how many. Alternatives are one row
-per set and never reorderings of the winner — what the order is worth is said
+per set and never reorderings of the winner - what the order is worth is said
 once, by rescoring the winning set in its worst arrangement. Cold ~930ms for the
 full 47,520, warm ~3ms.
 
@@ -125,7 +125,7 @@ payload lives in a single `json` column, so the whole run arrives in that one
 response.
 
 `public.runs` has row-level security enabled and **no policy**. That is the
-intended end state, not an oversight — only the secret key (which carries
+intended end state, not an oversight - only the secret key (which carries
 BYPASSRLS) reads it, so a browser key pointed at that table returns an empty
 set rather than the corpus.
 
@@ -149,7 +149,7 @@ src/app.ts            wiring; the only file that knows the order
 
 `banner.ts` is split into a stat half and a multiplier half on purpose. What a
 stat pays in a game does not depend on the banner it lands on, so the search
-computes that once and rebuilds only the multipliers — and, more to the point, a
+computes that once and rebuilds only the multipliers - and, more to the point, a
 banner scored by the search and the same banner scored by `/api/player/rank`
 cannot come out differently, because there is one implementation of either half.
 

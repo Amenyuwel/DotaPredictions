@@ -183,6 +183,18 @@ class Bucket:
     points: float
 
 
+def _tokens(raw: Any) -> int | None:
+    """A period's reroll budget, or None when it is not known.
+
+    The template ships `reroll_tokens: TODO`, which YAML reads as the string
+    "TODO" -- so an event onboarded without filling it in must come out as
+    unknown rather than crashing a publish or, worse, parsing as some number.
+    """
+    if raw is None or isinstance(raw, str):
+        return None
+    return int(raw)
+
+
 @dataclass
 class MainEvent:
     """The drawn Main Event bracket. Absent until the group stage resolves."""
@@ -191,6 +203,10 @@ class MainEvent:
     series_format: str
     grand_final_format: str
     banner_slots: int
+    # Reroll tokens for this period, or None when the client's number was never
+    # transcribed. None is not zero and not "plenty": it means the budget half
+    # of a goal's feasibility cannot be answered, and the tool says so.
+    reroll_tokens: int | None
     pairings: list[tuple[str, str]]
     eliminated: list[str]
     lock_utc: datetime | None = None
@@ -225,6 +241,7 @@ class MainEvent:
             series_format=str(raw.get("series_format", "bo3")),
             grand_final_format=str(raw.get("grand_final_format", "bo5")),
             banner_slots=int(raw["banner_slots"]),
+            reroll_tokens=_tokens(raw.get("reroll_tokens")),
             pairings=pairs,  # type: ignore[arg-type]
             eliminated=list(raw.get("eliminated") or []),
             my_picks=dict(raw.get("my_picks") or {}),
@@ -244,6 +261,8 @@ class Tournament:
     direct_advance: int
     elimination_round_slots: int
     banner_slots: int
+    # The group stage's own token budget. See `MainEvent.reroll_tokens`.
+    reroll_tokens: int | None
     buckets: list[Bucket]
     fantasy_distinct_teams: bool
     # OpenDota league id -> region, for the qualifiers that fed this event.
@@ -268,6 +287,7 @@ class Tournament:
             direct_advance=gs["direct_advance"],
             elimination_round_slots=gs["elimination_round_slots"],
             banner_slots=gs["banner_slots"],
+            reroll_tokens=_tokens(gs.get("reroll_tokens")),
             buckets=buckets,
             fantasy_distinct_teams=raw["fantasy"].get("distinct_teams_required", False),
             qualifier_leagues={
@@ -304,6 +324,27 @@ class Scoring:
     # to change, so this is a choice to be re-checked, not a constant. Defaulted so
     # a hand-built Scoring (tests, ad-hoc scripts) needs no coach block.
     coach_equipped: dict[str, Any] = field(default_factory=dict)
+    # Role -> the colour of each banner slot, at Main Event length. A shorter
+    # period takes the first `slots` of the row: the emblems carry over. Empty
+    # only for a hand-built Scoring; `slot_colors_for` is the reader.
+    slot_colors: dict[str, list[str]] = field(default_factory=dict)
+
+    def slot_colors_for(self, role: str, slots: int) -> list[str]:
+        """The colour of each slot for one role, at this period's length.
+
+        Not a preference and not one-of-each: Core is red-green-red-green-red and
+        Support has no red slot at all. A role with no row raises rather than
+        falling back to a plausible sequence -- guessing here would put a stat on
+        a slot that cannot hold it and nothing downstream would notice.
+        """
+        row = self.slot_colors.get(role)
+        if not row:
+            raise KeyError(f"no banner_slot_colors row for role {role!r}")
+        if slots > len(row):
+            raise ValueError(
+                f"{role} has {len(row)} slot colours, asked for {slots}"
+            )
+        return row[:slots]
 
     @classmethod
     def load(cls, tournament_id: str | None = None) -> "Scoring":
@@ -324,6 +365,10 @@ class Scoring:
             quality={k: float(v) for k, v in (raw.get("emblem_quality") or {}).items()},
             traits=raw.get("emblem_traits") or {},
             colors=list(raw.get("banner_colors") or ["red", "blue", "green"]),
+            slot_colors={
+                role: list(seq)
+                for role, seq in (raw.get("banner_slot_colors") or {}).items()
+            },
             coach_titles=(raw.get("coach") or {}).get("titles") or {},
             coach_equipped=(raw.get("coach") or {}).get("equipped") or {},
             verified=bool(raw.get("verified_against_client", False)),

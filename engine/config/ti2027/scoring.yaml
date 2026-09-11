@@ -89,6 +89,28 @@ banner_colors:
 - red
 - blue
 - green
+# Carried forward from ti2026 and NOT re-verified against a 2027 client. If the
+# format changes these rows are the first thing to check: they decide which
+# stats are even legal on a slot.
+banner_slot_colors:
+  core:
+  - red
+  - green
+  - red
+  - green
+  - red
+  mid:
+  - red
+  - blue
+  - green
+  - red
+  - green
+  support:
+  - blue
+  - green
+  - blue
+  - green
+  - blue
 coach:
   equipped:
     prefix: Cerulean

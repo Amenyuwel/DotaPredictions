@@ -1,6 +1,8 @@
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Loading } from "@/components/ui/spinner"
 import { ApiError } from "@/lib/api"
+import { cn } from "@/lib/utils"
 
 /**
  * What the app shows when it has no answer.
@@ -13,6 +15,7 @@ import { ApiError } from "@/lib/api"
 export function LoadingRun() {
   return (
     <div className="space-y-3" aria-busy>
+      <Loading>Loading the published run…</Loading>
       <Skeleton className="h-8 w-52" />
       <Skeleton className="h-32 w-full" />
     </div>
@@ -20,8 +23,8 @@ export function LoadingRun() {
 }
 
 /** 502/503/504 come from the dev proxy or a load balancer when nothing is
- * listening upstream. That is the same problem as a failed fetch — the server
- * is not there — and a different one from a request it actually rejected. */
+ * listening upstream. That is the same problem as a failed fetch -- the server
+ * is not there -- and a different one from a request it actually rejected. */
 const GATEWAY = new Set([502, 503, 504])
 
 /** The two 404s that mean "publish something".
@@ -77,9 +80,30 @@ export function RunError({ error }: { error: unknown }) {
   )
 }
 
-export function AwaitingInput({ children }: { children: React.ReactNode }) {
+/**
+ * A box where an answer will go, saying what is still missing.
+ *
+ * Two sizes, and which one to use is a question about how many are on screen
+ * rather than about what the box says. One of these standing alone is the whole
+ * answer column and can afford the room; three stacked, one per roster slot,
+ * are a frame drawn three times around one short line, and at that point the
+ * frame is louder than the three headings telling them apart. `compact` is the
+ * three-up size, so the set stays one size decided by the group.
+ */
+export function AwaitingInput({
+  compact,
+  children,
+}: {
+  compact?: boolean
+  children: React.ReactNode
+}) {
   return (
-    <div className="text-muted-foreground rounded-lg border border-dashed p-8 text-center text-sm">
+    <div
+      className={cn(
+        "text-muted-foreground rounded-lg border border-dashed text-center",
+        compact ? "px-4 py-4 text-xs" : "p-6 text-sm",
+      )}
+    >
       {children}
     </div>
   )

@@ -7,6 +7,7 @@ import { overlapping, unmeasurableCaveats } from "../scoring/answer.js"
 import { slotGameScores } from "../scoring/banner.js"
 import type { DecodedProjection } from "../scoring/decode.js"
 import { project, recencyWeights } from "../scoring/project.js"
+import { bannerRejection } from "../scoring/slots.js"
 import { indexFor, unitsOf } from "../scoring/units.js"
 import type { Emblem, FantasyRole, Player, RunPayload } from "../validate.js"
 
@@ -71,14 +72,13 @@ rankRouter.post("/player/rank", (req, res) => {
     res.status(400).json({ error: "empty_banner", reason: "send at least one emblem" })
     return
   }
-  // The client forbids a repeated stat. Enforced here too: the two directions
-  // must agree about what a legal banner is.
-  const stats = new Set(banner.map((e) => e.stat))
-  if (stats.size !== banner.length) {
-    res.status(400).json({
-      error: "repeated_stat",
-      reason: "a banner may repeat a colour but never a stat",
-    })
+  // Both of the client's rules, enforced here too: the directions of the tool
+  // must agree about what a legal banner even is. The colour one is the
+  // load-bearing half -- a slot's colour is fixed by role, so it decides which
+  // six stats can sit there at all.
+  const rejection = bannerRejection(banner, payload.scoring, role, banner.length)
+  if (rejection) {
+    res.status(400).json({ error: "illegal_banner", reason: rejection })
     return
   }
 

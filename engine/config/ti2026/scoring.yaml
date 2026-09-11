@@ -41,8 +41,20 @@ stats:
 
 # Stats OpenDota does not expose. They are excluded from optimisation rather
 # than scored as zero, so the model never recommends an emblem it cannot value.
+#
+# `watchers_taken` was on this list until 2026-09-11 and should not have been.
+# OpenDota publishes it as `ability_uses.ability_lamp_use` -- a Watcher is a
+# "lamp" in Valve's naming -- and the searches that declared it missing looked
+# for the string "watcher", which appears nowhere. Present in 8 of 8 parsed pro
+# matches sampled, 27 to 44 uses per match.
+#
+# `lotuses_grabbed` stays, and now for a much better reason than "not found".
+# The ability that would carry it EXISTS in Valve's data -- `ability_pluck_lotus`
+# in odota/dotaconstants, with a `lotus_rate` attribute -- and OpenDota never
+# populates it: 0 of those same 8 matches carry the key at all. `item_uses.famango`
+# and its greater variants are lotus CONSUMPTION, not grabs, and cannot stand in:
+# a lotus can be plucked and handed to a teammate.
 unmeasurable:
-  - watchers_taken
   - lotuses_grabbed
 # Recovered 2026-08-17, both needed by the Main Event banners:
 #   tormentor_kills    <- players[].killed["npc_dota_miniboss"]
@@ -50,36 +62,61 @@ unmeasurable:
 #                         BUNDLES consumed. If a bundle carries more than one
 #                         madstone this understates the stat, so treat any
 #                         madstone emblem's contribution as a floor.
-# watchers_taken and lotuses_grabbed: nobody has this data, including Valve.
+# lotuses_grabbed: nobody publishes this, and the field name is now known.
 #
-# Investigated 2026-09-10, because "we cannot see it" and "it does not exist"
-# lead to opposite advice about an emblem. Four checks:
+# Investigated 2026-09-10 and CORRECTED 2026-09-11. The first pass concluded
+# both this and watchers_taken were unavailable; it was half wrong, and the way
+# it was wrong is worth keeping. It searched OpenDota payloads for the strings
+# "lotus" and "watcher". Both are absent -- and watchers were there all along
+# under `ability_uses.ability_lamp_use`, because Valve calls a Watcher a lamp.
+# A search is only as good as the vocabulary it assumes.
 #
-#   OpenDota   absent. Not one of the 145 fields on a parsed player, not in
-#              objectives (only aegis/courier/firstblood/miniboss/roshan/
-#              building_kill), not anywhere in the payload at any depth. Every
-#              "lotus" string in a match is the ITEM lotus_orb; "watcher"
-#              appears zero times.
-#   STRATZ     absent. Zero hits for lotus or watcher across all 981 types in
-#              the published schema, checked against known-good controls
+# What that leaves for lotuses, re-checked with the right vocabulary:
+#
+#   OpenDota   the plucking ability EXISTS in dotaconstants as
+#              `ability_pluck_lotus` (it carries a `lotus_rate` attribute) and
+#              is never populated: 0 of 8 parsed pro matches sampled carried
+#              the key, while `ability_lamp_use` appeared in all 8 at 27-44
+#              uses. `item_uses.famango` / `great_famango` / `greater_famango`
+#              are lotus CONSUMPTION and cannot stand in -- a lotus can be
+#              plucked and given away. Every "lotus" string elsewhere in a
+#              match is the ITEM lotus_orb.
+#   STRATZ     absent. Zero hits for lotus across all 981 types in the
+#              published schema, checked against known-good controls
 #              (campStack, stun, roshan all hit). A STRATZ token does NOT close
-#              this, which this file previously implied.
+#              this, which this file previously implied. NOTE: the same sweep
+#              searched for "watcher" and that half of it proved worthless, so
+#              treat this as "not found under this name", not as proof.
 #   Valve API  no public fantasy interface at all.
-#   Valve GC   the fields EXIST but are not reachable over HTTP:
-#              CMsgDOTAFantasyPlayerStats.watchers = 24, .lotuses = 25,
-#              delivered by k_EMsgGCFantasyFinalPlayerStats (7309). Reaching it
-#              needs a Steam account attached to the Game Coordinator, and the
-#              message looks event-scoped rather than queryable per match.
+#   Valve GC   the field EXISTS but is not reachable over HTTP:
+#              CMsgDOTAFantasyPlayerStats.lotuses = 25 (.watchers = 24 too,
+#              though that one is now moot), delivered by
+#              k_EMsgGCFantasyFinalPlayerStats (7309). Reaching it needs a Steam
+#              account attached to the Game Coordinator, and the message looks
+#              event-scoped rather than queryable per match.
 #
-# The decisive evidence is the client itself: its emblem picker prints "no data"
-# under exactly these two stats and no others. So an emblem carrying one scores
-# nothing FOR ANYONE -- it is a dead emblem to reroll, not points this model is
-# blind to. Both readings are consistent with an unpopulated protobuf field.
+# SETTLED 2026-09-12, from the client's own scoring list. It prints all
+# eighteen stats with their values and marks NONE of them "no data":
+# Watchers Taken +147.00 per captured watcher, Lotuses Grabbed +176.00 per lotus
+# taken. So the claim this file and the README both carried -- that the client
+# labels these two "no data", and therefore an emblem carrying one "scores
+# nothing FOR ANYONE" and should be rerolled -- was false, and it was advice.
+# Anyone who followed it rerolled an emblem paying 176 a lotus.
 #
-# Handling is unchanged and correct under either reading: excluded from emblem
-# choice, and scored as absent rather than as zero, so the model never
-# recommends an emblem it cannot value. See scripts/main_event.py, which reports
-# what the Support banner's Lotuses emblem is worth blind.
+# The distinction that survives, and the only one that was ever real:
+#
+#   UNSCORED       the game pays nothing for it. No stat here is in this
+#                  category. There is no such thing on the list.
+#   UNMEASURABLE   the game pays for it and WE cannot see it. Only
+#                  lotuses_grabbed, and it is a fact about our sources.
+#
+# Handling is unchanged and was already right for the right reason: excluded
+# from emblem CHOICE, because the model must never recommend something it is
+# scoring as 0, and reported as absent rather than as zero. What changes is
+# everything the tool SAYS about it -- a banner carrying a Lotuses emblem is
+# understated, not doomed, and the number beside it is a floor. See
+# scripts/main_event.py, which reports what the Support banner's Lotuses emblem
+# is worth blind.
 
 # Displayed emblem % = 100 + quality% + trait%.
 emblem_quality:
@@ -96,8 +133,24 @@ emblem_traits:
   unique:     {bonus: 0.30, condition: "only Unique emblem on the banner"}
   friendly:   {bonus: 0.50, condition: "at least 3 Friendly emblems on the banner"}
 
-# A banner carries one emblem of each colour.
+# The palette. Every stat carries one of these.
 banner_colors: [red, blue, green]
+
+# The colour of each SLOT, fixed by role. This is not a choice the player makes
+# and it is not "one of each": a Core banner is three reds and two greens, a
+# Support banner has no red on it at all.
+#
+# Listed at Main Event length. A Group Stage banner is the FIRST THREE of the
+# same row, because the three carry over and two are added -- so one row per
+# role covers both periods and they cannot drift apart.
+#
+# Verified against every banner in banners.yaml, both periods, all three roles:
+# six transcriptions from the client, six exact matches. Do not "fix" a row
+# without re-checking it there.
+banner_slot_colors:
+  core:    [red,  green, red,   green, red]
+  mid:     [red,  blue,  green, red,   green]
+  support: [blue, green, blue,  green, blue]
 
 # Coach Titles: a prefix and a suffix, each a conditional % on the final score.
 # Free to change, no roll tokens.

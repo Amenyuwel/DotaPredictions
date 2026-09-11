@@ -9,7 +9,7 @@ has to be answered on matches the model never saw.
 
 Method: walk forward through the corpus in time slices. For each slice, fit the ratings
 and the pairwise records on everything *before* it, predict the games *inside* it, and
-score the predictions with log-loss and Brier — proper scoring rules, so a model cannot
+score the predictions with log-loss and Brier - proper scoring rules, so a model cannot
 win by being confidently wrong. Repeat across a range of prior strengths, from "ignore
 head-to-head entirely" to "trust it almost completely".
 

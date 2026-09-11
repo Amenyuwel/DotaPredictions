@@ -13,7 +13,7 @@ property, which quietly assumes that filter away. Two places it matters:
    heroes this bracket will not allow should count for less.
 
 This prices both against each player's expected opponents in the drawn bracket, then
-reports what the correction was actually worth — which is the only way to find out
+reports what the correction was actually worth - which is the only way to find out
 whether modelling the draft was necessary or merely satisfying.
 """
 from __future__ import annotations

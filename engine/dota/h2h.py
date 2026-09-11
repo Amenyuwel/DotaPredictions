@@ -2,7 +2,7 @@
 
 The intuition is strong: if Liquid have gone 7-8 with Falcons over fifteen games, that
 feels like better evidence about *this* match than two ratings fitted on everyone. The
-Bradley-Terry model in `ratings.py` deliberately throws it away — it pools every result
+Bradley-Terry model in `ratings.py` deliberately throws it away - it pools every result
 into one number per team, so a matchup is predicted transitively, through common
 opponents. That is a real assumption, and it is what lets the model price a pair that has
 never met at all (4 of the 28 pairs in this bracket).
@@ -18,8 +18,8 @@ because a result from February is weaker evidence than one from last week.
 
 `scripts/validate_h2h.py` fits this on past data and scores it on later matches the fit
 never saw, across a range of `k`. That is the only honest way to answer the question,
-because a head-to-head term will always improve the *fit* — it adds a free parameter per
-pair — while usually degrading the *prediction*.
+because a head-to-head term will always improve the *fit* - it adds a free parameter per
+pair - while usually degrading the *prediction*.
 """
 from __future__ import annotations
 

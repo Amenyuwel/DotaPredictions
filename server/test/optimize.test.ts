@@ -30,10 +30,15 @@ import type { Emblem, Scoring } from "../src/validate.js"
 
 const STATS = ["kills", "gpm", "stuns", "roshan", "wards", "smokes"]
 
+/** Two colours is enough to make the point, and the row is NOT a palindrome --
+ * so the mirror fold has to notice it cannot fold. */
+const SLOT_COLORS = ["red", "blue", "red", "red", "blue"]
+
 const scoring: Scoring = {
   version: "test",
   verifiedAgainstClient: false,
   colors: ["red", "blue"],
+  bannerColors: { core: SLOT_COLORS, mid: SLOT_COLORS, support: SLOT_COLORS },
   stats: Object.fromEntries(
     STATS.map((stat, i) => [
       stat,
@@ -189,6 +194,10 @@ test("both directions of the tool score one banner identically", () => {
 test("the alternatives are other emblem sets, never reorderings of the winner", () => {
   const found = searchBanner(inventory, slot, proj, scoring, weights, {
     slots: 5,
+    // Deliberately unconstrained: this test pins the subset and arrangement
+    // arithmetic, and every slot has to be interchangeable for those counts to
+    // be what they are. The colour row gets its own test below.
+    slotColors: null,
     screenSims: 120,
     keep: 6,
     sims: 400,
@@ -210,8 +219,8 @@ test("the alternatives are other emblem sets, never reorderings of the winner", 
 
   // The counts are exact, not a lower bound. Seven emblems in five slots is
   // C(7,5) = 21 sets, ten of which use both `kills` emblems and are illegal
-  // because a banner may repeat a colour but never a stat, leaving 11. Each is
-  // 5! = 120 orders, halved to 60 by the mirror fold.
+  // because no stat may appear twice, leaving 11. Each is 5! = 120 orders,
+  // halved to 60 by the mirror fold.
   assert.equal(found.subsets, 11)
   assert.equal(found.arrangements, 11 * 60)
   assert.ok(
@@ -224,3 +233,90 @@ test("the alternatives are other emblem sets, never reorderings of the winner", 
     "the order gap must be quoted against the banner on screen",
   )
 })
+
+/**
+ * The colour row, which is the rule that was missing.
+ *
+ * A slot's colour is fixed by role, so an emblem can only be placed where its
+ * stat's colour matches. Two things follow and both are easy to get wrong in
+ * the direction that still returns an answer:
+ *
+ *  - No arrangement may put a stat on a slot of another colour. The old search
+ *    walked every permutation and would happily do it.
+ *  - The mirror fold must switch itself off unless the row reads the same
+ *    backwards. It discards half the orderings on the claim that the reverse of
+ *    every banner is also searched -- and under a non-palindromic row the
+ *    reverse is a DIFFERENT colour row, so it is not searched at all, and the
+ *    discarded half could hold the answer.
+ */
+test("every arrangement it scores is legal for the colour row", () => {
+  const found = searchBanner(inventory, slot, proj, scoring, weights, {
+    slots: 5,
+    slotColors: SLOT_COLORS,
+    screenSims: 120,
+    keep: 6,
+    sims: 400,
+    boot: 12,
+    seed: 5,
+  })
+
+  for (const banner of [found.best, found.worstOrder, ...found.alternatives]) {
+    if (!banner) continue
+    banner.emblems.forEach((e, i) => {
+      assert.equal(
+        scoring.stats[e.stat]?.color,
+        SLOT_COLORS[i],
+        `slot ${i + 1} must be ${SLOT_COLORS[i]}, got ${e.stat}`,
+      )
+    })
+  }
+})
+
+test("the mirror fold stands down when the colour row is not a palindrome", () => {
+  const reversed = [...SLOT_COLORS].reverse()
+  assert.notDeepEqual(SLOT_COLORS, reversed, "this test needs a non-palindromic row")
+
+  const opts = {
+    slots: 5,
+    screenSims: 120,
+    keep: 3,
+    sims: 200,
+    boot: 0,
+    seed: 5,
+  }
+  const constrained = searchBanner(inventory, slot, proj, scoring, weights, {
+    ...opts,
+    slotColors: SLOT_COLORS,
+  })
+
+  // Every legal arrangement is kept, not half of them: with the row fixed, no
+  // two of them are mirror images of each other.
+  const legal = countLegal(inventory, SLOT_COLORS)
+  assert.equal(constrained.arrangements, legal)
+})
+
+/** Arrangements of `inventory` that satisfy the row, counted the slow, obvious
+ * way so the search cannot be wrong in the same direction as its own check. */
+function countLegal(pool: Emblem[], colors: string[]): number {
+  let found = 0
+  const used = new Set<number>()
+  const stats = new Set<string>()
+  const walk = (depth: number) => {
+    if (depth === colors.length) {
+      found += 1
+      return
+    }
+    for (let i = 0; i < pool.length; i++) {
+      const e = pool[i]!
+      if (used.has(i) || stats.has(e.stat)) continue
+      if (scoring.stats[e.stat]?.color !== colors[depth]) continue
+      used.add(i)
+      stats.add(e.stat)
+      walk(depth + 1)
+      stats.delete(e.stat)
+      used.delete(i)
+    }
+  }
+  walk(0)
+  return found
+}

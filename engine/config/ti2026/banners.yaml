@@ -15,9 +15,12 @@
 # catches both a mis-transcription and a wrong model of the trait rules. All
 # fifteen currently agree.
 #
-# Note the client permits repeated colours (Core carries four reds) but never a
-# repeated stat. dota/banner.py's one-per-colour rule applies only to *choosing*
-# emblems and is bypassed here.
+# The colour of each slot is FIXED by role -- see `banner_slot_colors` in
+# scoring.yaml. Core is red-green-red-green-red, mid red-blue-green-red-green,
+# support blue-green-blue-green-blue, and all six banners below match those rows
+# exactly. So a repeated colour is not a permission the client grants, it is the
+# shape of the banner: Core carries three reds because slots 1, 3 and 5 ARE red,
+# and Support can never carry one at all. What may not repeat is the stat.
 
 # ---------------------------------------------------------------------------
 # MAIN EVENT (period 2), transcribed 2026-08-17. Five emblems per banner.

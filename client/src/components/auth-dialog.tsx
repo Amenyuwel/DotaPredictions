@@ -53,7 +53,7 @@ export function AuthDialog({
         <DialogHeader>
           <DialogTitle>Save your banners</DialogTitle>
           <DialogDescription>
-            Sign in to keep the banners you build. Rankings are the same either way — an
+            Sign in to keep the banners you build. Rankings are the same either way - an
             account only decides whether they are still here tomorrow.
           </DialogDescription>
         </DialogHeader>
