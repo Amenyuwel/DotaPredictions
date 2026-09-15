@@ -250,6 +250,7 @@ export default function App() {
 
       <RunHeader
         run={data.run}
+        overlay={data.overlay}
         account={<AccountMenu state={auth} />}
         help={<FaqButton onClick={() => setFaqOpen(true)} />}
         stages={

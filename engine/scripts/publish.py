@@ -242,6 +242,53 @@ def build_players(cfg: Config, tournament_id: str) -> list[dict[str, Any]]:
     ]
 
 
+# The rules the scorer actually implements, as opposed to the prose beside them.
+# A trait names one of these; it does not describe one. See `_condition_rule`.
+CONDITION_RULES = frozenset(
+    {
+        "always",
+        "never",
+        "allQualitiesDiffer",
+        "countAtLeast3",
+        "onlyOne",
+        "neighboursOnly",
+    }
+)
+
+
+def _condition_rule(name: str, spec: dict[str, Any]) -> str:
+    """Which implemented rule gates this trait's own bonus.
+
+    Required, and deliberately not defaulted. A trait with no rule pays its
+    bonus unconditionally -- correct for Vampiric, and silently wrong for a
+    trait whose rule was simply left blank, which is the shape of mistake this
+    whole project is built to make loud. Nor is it inferred from the trait's
+    NAME: that is exactly what stops working the year a client renames Fractal
+    or ships a sixth trait, and the failure would be a banner scored too high
+    with nothing anywhere to notice.
+
+    `condition` beside it stays prose. It is displayed and never evaluated, so
+    the two cannot drift into disagreeing about what fires -- only one of them
+    is read by the scorer at all.
+    """
+    rule = spec.get("condition_rule")
+    if rule is None:
+        raise ValueError(
+            f"emblem trait {name!r} has no `condition_rule`. Every trait needs one, "
+            f"because a trait without a rule pays its bonus on every banner: add "
+            f"`condition_rule: always` if that is what it does, or name the rule that "
+            f"gates it. Implemented: {', '.join(sorted(CONDITION_RULES))}."
+        )
+    if rule not in CONDITION_RULES:
+        raise ValueError(
+            f"emblem trait {name!r} names condition_rule {rule!r}, which the scorer "
+            f"does not implement. A rule nobody wrote is a condition that never "
+            f"fires, and the trait would quietly pay nothing. "
+            f"Implemented: {', '.join(sorted(CONDITION_RULES))}."
+        )
+    return str(rule)
+
+
 def build_scoring(cfg: Config) -> dict[str, Any]:
     """The scoring table itself, published rather than reimplemented.
 
@@ -259,6 +306,7 @@ def build_scoring(cfg: Config) -> dict[str, Any]:
             "bonus": float(spec.get("bonus") or 0.0),
             "adjacentBonus": float(spec.get("adjacent_bonus") or 0.0),
             "condition": spec.get("condition"),
+            "conditionRule": _condition_rule(name, spec),
         }
     return {
         "version": cfg.scoring.version,

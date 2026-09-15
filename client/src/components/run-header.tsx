@@ -1,9 +1,11 @@
 import type { ReactNode } from "react"
-import { AlertTriangle } from "lucide-react"
+import { AlertTriangle, SlidersHorizontal } from "lucide-react"
 
 import { ThemeMenu } from "@/components/theme-menu"
 import { Badge } from "@/components/ui/badge"
 import { tournamentLabel } from "@/lib/labels"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import type { OverlayStatus } from "@/types/admin"
 import type { RunMeta } from "@/types/run"
 
 /**
@@ -24,11 +26,23 @@ import type { RunMeta } from "@/types/run"
  */
 export function RunHeader({
   run,
+  overlay,
   account,
   stages,
   help,
 }: {
   run: RunMeta
+  /**
+   * What was changed by hand after this run was published, or null/undefined
+   * when nothing was.
+   *
+   * Beside the forced-gate badge because it is the same kind of statement: not
+   * a date a reader might want, but the answer telling them something about how
+   * it came to be. An override is not a fault -- it is usually a correction
+   * that is MORE current than the crawl -- so it is stated, not warned about.
+   * What would be a fault is it being invisible.
+   */
+  overlay?: OverlayStatus | null
   account?: ReactNode
   stages?: ReactNode
   /** The way into the FAQ. In the header rather than at the foot of the page
@@ -59,6 +73,32 @@ export function RunHeader({
 
           {account}
         </div>
+
+        {overlay && overlay.changeCount > 0 && (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Badge variant="outline" className="gap-1">
+                  <SlidersHorizontal className="size-3.5" aria-hidden />
+                  {overlay.changeCount} configuration override
+                  {overlay.changeCount === 1 ? "" : "s"} (v{overlay.version})
+                </Badge>
+              }
+            />
+            <TooltipContent className="max-w-80">
+              {overlay.note || "No reason was recorded."} Published{" "}
+              {new Date(overlay.publishedAt).toLocaleString()}. These values were set by hand
+              after the run was crawled, so they are newer than it rather than part of it.
+            </TooltipContent>
+          </Tooltip>
+        )}
+
+        {overlay?.failed && (
+          <Badge variant="destructive" className="gap-1">
+            <AlertTriangle className="size-3.5" aria-hidden />
+            configuration override not applied
+          </Badge>
+        )}
 
         {run.gatesForced.length > 0 && (
           <Badge variant="destructive" className="gap-1">

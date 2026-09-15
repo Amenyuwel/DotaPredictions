@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { LogOut, UserRound } from "lucide-react"
+import { LogOut, SlidersHorizontal, UserRound } from "lucide-react"
 
 import { AuthDialog } from "@/components/auth-dialog"
 import { Button } from "@/components/ui/button"
@@ -11,6 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { useAdmin } from "@/hooks/use-admin"
 import { displayName, type AuthState } from "@/hooks/use-session"
 import { signOut } from "@/lib/supabase"
 
@@ -24,6 +25,11 @@ import { signOut } from "@/lib/supabase"
  */
 export function AccountMenu({ state }: { state: AuthState }) {
   const [dialogOpen, setDialogOpen] = useState(false)
+  // Whether to draw one menu item, and nothing else. The answer is not sent
+  // anywhere and is never trusted: every admin request re-asks both halves of
+  // the question on the server, with the only key that can read the admin list.
+  // So a forged answer here buys a link and a 403 behind it.
+  const admin = useAdmin(state)
 
   if (state.status === "loading") {
     return (
@@ -74,6 +80,12 @@ export function AccountMenu({ state }: { state: AuthState }) {
           {state.session.user.email ?? name}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
+        {admin.status === "admin" ? (
+          <DropdownMenuItem render={<a href="/admin" />}>
+            <SlidersHorizontal aria-hidden />
+            Configuration
+          </DropdownMenuItem>
+        ) : null}
         <DropdownMenuItem onClick={() => void signOut()}>
           <LogOut aria-hidden />
           Sign out
