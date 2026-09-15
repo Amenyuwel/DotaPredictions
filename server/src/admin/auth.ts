@@ -1,7 +1,6 @@
 import type { NextFunction, Request, Response } from "express"
 
 import { config } from "../config.js"
-import { devLoginEnabled, verifyToken } from "./dev-login.js"
 import { postgrest } from "./rest.js"
 
 /**
@@ -66,33 +65,6 @@ export async function requireAdmin(
   res: Response,
   next: NextFunction,
 ): Promise<void> {
-  // The local shortcut, checked first and only when it is switched on. It is a
-  // whole door rather than a bypass hung off the side of the real one: the
-  // token is verified, it expires, and what comes out is the same
-  // `AdminIdentity` the Supabase path produces -- so everything downstream,
-  // the audit trail included, cannot tell which door was used and does not
-  // need to. `devLoginEnabled()` is false unless ADMIN_DEV_LOGIN is set with a
-  // full set of credentials, and the process refuses to boot with it set in
-  // production.
-  if (devLoginEnabled()) {
-    const token = bearerOf(req.header("authorization"))
-    const identity = token ? verifyToken(token) : null
-    if (identity) {
-      req.admin = identity
-      next()
-      return
-    }
-    // No fallthrough to Supabase when the local login is the configured door.
-    // Falling through would mean a failed dev token gets a second opinion from
-    // a service that may not be configured, and the 503 that produced would
-    // read as "the server is broken" rather than "sign in again".
-    res.status(401).json({
-      error: "unauthenticated",
-      reason: "Sign in at /admin/login.",
-    })
-    return
-  }
-
   if (!adminAvailable()) {
     res.status(503).json({
       error: "admin_unavailable",

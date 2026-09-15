@@ -13,7 +13,6 @@
  * it has what it needs to answer.
  */
 import { ApiError } from "@/lib/api"
-import { clearDevSession, devToken, setDevSession } from "@/lib/dev-session"
 import { supabase } from "@/lib/supabase"
 import type {
   AdminConfig,
@@ -40,20 +39,15 @@ export class AdminError extends ApiError {
 /**
  * The bearer for an admin request.
  *
- * Two sources, and the local one wins when it is present. That ordering is what
- * makes the development door usable on a machine that ALSO has Supabase
- * credentials configured -- which is the normal case here, since the same
- * `.env` holds both. Without it, a stale Supabase session would be preferred
- * over the password the developer just typed.
+ * One source: the signed-in Supabase session. There was a second -- a local
+ * password door that minted its own token -- and it is gone, so there is one
+ * kind of admin session and one place it comes from.
  *
  * Read at call time rather than captured once: the Supabase library refreshes
  * its session in the background, and a token copied at mount starts failing an
  * hour later with no visible cause.
  */
 async function bearer(): Promise<string> {
-  const local = devToken()
-  if (local) return local
-
   if (!supabase) {
     throw new AdminError(
       "No sign-in is configured in this deployment",
@@ -175,60 +169,4 @@ export async function exportYaml(tournamentId: string, stage: string): Promise<s
     throw new AdminError(`GET export -> ${res.status}`, res.status, null, null, [])
   }
   return res.text()
-}
-
-// ---------------------------------------------------------------------------
-// the local development door
-// ---------------------------------------------------------------------------
-
-/**
- * Whether this deployment offers a username-and-password sign-in at all.
- *
- * Asked before drawing the form, so a build pointed at a Supabase deployment
- * sends people to the OAuth dialog instead of a login nobody can use. A network
- * failure answers "no": the honest rendering of "cannot tell" is the path that
- * definitely exists.
- */
-export async function devLoginAvailable(): Promise<boolean> {
-  try {
-    const res = await fetch("/api/admin/login/available")
-    if (!res.ok) return false
-    return ((await res.json()) as { devLogin?: boolean }).devLogin === true
-  } catch {
-    return false
-  }
-}
-
-/** Exchange the pair for a signed, expiring token. The password is never stored
- * -- only what the server hands back for it. */
-export async function devLogin(username: string, password: string): Promise<void> {
-  const res = await fetch("/api/admin/login", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ username, password }),
-  })
-
-  if (!res.ok) {
-    let reason: string | null = null
-    try {
-      reason = ((await res.json()) as { reason?: string }).reason ?? null
-    } catch {
-      // no JSON body; the status carries the message
-    }
-    throw new AdminError(reason ?? `Sign-in failed (${res.status})`, res.status, null, reason, [])
-  }
-
-  const body = (await res.json()) as {
-    token: string
-    expiresAt: string
-    admin: { email: string }
-  }
-  setDevSession({ token: body.token, expiresAt: body.expiresAt, email: body.admin.email })
-}
-
-/** Forget the local session. There is nothing to revoke server-side: the token
- * is stateless and expiring by design, which is what keeps this shortcut from
- * needing a session table of its own. */
-export function devLogout(): void {
-  clearDevSession()
 }

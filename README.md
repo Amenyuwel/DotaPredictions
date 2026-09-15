@@ -332,8 +332,8 @@ locally too, so everything can sit on **one** port.
 cd server && npm run dev:solo    # builds client/dist, then serves it on :3000
 ```
 
-Then `http://localhost:3000` is the tool, `/admin` is the editor and
-`/admin/login` the sign-in, all same-origin with the API. The trade is hot
+Then `http://localhost:3000` is the tool and `/admin` is the editor, both
+same-origin with the API. The trade is hot
 reload: `client/dist` is a static build, so a change to client source needs a
 rebuild. Leave one running beside it if you are editing the front end, and
 reload the page rather than waiting for HMR:

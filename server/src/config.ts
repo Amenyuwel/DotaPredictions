@@ -52,26 +52,6 @@ export const config = {
   tournamentId: process.env.TOURNAMENT_ID ?? "",
   stage: process.env.STAGE ?? "",
 
-  /**
-   * A local username and password that stand in for a Supabase session.
-   *
-   * For working on the configuration editor without a completed OAuth round
-   * trip. It replaces BOTH halves of the real gate -- the verified token and
-   * the `public.admins` row -- so it is off unless `ADMIN_DEV_LOGIN` is set
-   * deliberately, has no default credentials to fall back on, and takes the
-   * process down at boot if it is ever set alongside NODE_ENV=production. See
-   * `admin/dev-login.ts`.
-   */
-  adminDevLogin: {
-    enabled: (process.env.ADMIN_DEV_LOGIN ?? "").trim() === "1",
-    username: process.env.ADMIN_DEV_USERNAME ?? "",
-    password: process.env.ADMIN_DEV_PASSWORD ?? "",
-    /** Signs the session token. No default: an HMAC key that ships in the
-     * repository is not a key, and a missing one leaves the feature off rather
-     * than quietly signing with something guessable. */
-    secret: process.env.ADMIN_DEV_SECRET ?? "",
-  },
-
   /** Spec: 60 requests per minute per IP, since there is no auth. */
   rateLimit: { windowMs: 60_000, max: 60 },
 

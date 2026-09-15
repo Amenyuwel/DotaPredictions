@@ -12,13 +12,12 @@ import { ThemeMenu } from "@/components/theme-menu"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Loading } from "@/components/ui/spinner"
+import { Skeleton, SkeletonPanel } from "@/components/ui/skeleton"
 import { useAdmin } from "@/hooks/use-admin"
 import { useDraft } from "@/hooks/use-draft"
 import { useSession } from "@/hooks/use-session"
 import { exportYaml } from "@/lib/admin-api"
 import { SECTIONS } from "@/lib/admin-ui"
-import { devSession } from "@/lib/dev-session"
 import type { Stage } from "@/types/run"
 
 /**
@@ -56,15 +55,17 @@ export function AdminPage() {
   const [publishOpen, setPublishOpen] = useState(false)
   const [pending, setPending] = useState<ConfirmRequest | null>(null)
   const draft = useDraft(selected?.tournamentId, selected?.stage)
-  // Present only when the local password door was used. A `sessionStorage` read
-  // per render rather than state, so it cannot disagree with what the API
-  // client sends.
-  const local = devSession()
 
   if (session.status === "loading" || admin.status === "loading") {
     return (
       <Shell>
-        <Loading>Checking whether you can edit the configuration…</Loading>
+        {/* Deliberately NOT the editor's shape. This check resolves to the
+            editor or to a refusal, and holding open two columns of forms for
+            somebody who is about to be told they cannot edit anything is a
+            promise the page may not keep. */}
+        <SkeletonPanel label="Checking whether you can edit the configuration…">
+          <Skeleton className="h-24 w-full rounded-xl" />
+        </SkeletonPanel>
       </Shell>
     )
   }
@@ -85,12 +86,10 @@ export function AdminPage() {
               : "Sign in with an account that can change the configuration."}
           </AlertDescription>
         </Alert>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button size="sm" variant="outline" render={<a href="/admin/login" />}>
-            Sign in with a username
-          </Button>
-          <BackLink />
-        </div>
+        {/* One way out, and it is the only one that can help: signing in
+            happens on the tool, through the account menu, and this page has no
+            sign-in of its own to offer. */}
+        <BackLink />
       </Shell>
     )
   }
@@ -98,7 +97,7 @@ export function AdminPage() {
   if (draft.isLoading) {
     return (
       <Shell>
-        <Loading>Loading the published run and the current draft…</Loading>
+        <EditorSkeleton />
       </Shell>
     )
   }
@@ -142,11 +141,9 @@ export function AdminPage() {
         />
       }
       subtitle={
-        local
-          ? `Signed in as ${local.email}`
-          : session.status === "user"
-            ? `Signed in as ${session.session.user.email}`
-            : undefined
+        session.status === "user"
+          ? `Signed in as ${session.session.user.email}`
+          : undefined
       }
     >
       {/* A plain two-column layout, not a vertical tablist. The sections are
@@ -186,8 +183,17 @@ export function AdminPage() {
         </div>
 
         {/* `min-w-0`, or a wide table inside a flex child refuses to shrink and
-            pushes the whole page into a horizontal scroll. */}
-        <main id="editor" className="grid min-w-0 flex-1 gap-4">
+            pushes the whole page into a horizontal scroll.
+
+            `w-full` for the other direction, and it is not redundant with
+            `flex-1`: below `md` this row is a COLUMN, where width is the cross
+            axis and `items-start` sizes every child to its own content. A
+            section whose content happened to be wide -- a scoring table -- filled
+            the page and hid that; one whose content is four short buttons came
+            out the width of the word "Colours". In the row direction `flex-1`
+            still decides the width, because a `flex-basis` of 0 outranks a
+            declared one. */}
+        <main id="editor" className="grid w-full min-w-0 flex-1 gap-4">
           {blocked ? (
             <Alert variant="destructive">
               <ShieldAlert aria-hidden />
@@ -304,12 +310,48 @@ export function AdminPage() {
  * The frame every state of this page shares.
  *
  * No account menu. On the public page that control is the only way in or out of
- * an account; here it was a "Sign in" button sitting a few inches from the words
- * "Signed in as amenyuwel" -- two facts about one thing, disagreeing, because
- * the local password door is not a Supabase session and that menu only knows
- * about Supabase. Signing out belongs to whichever door was actually used, so
- * it is rendered by the page that knows which.
+ * an account; this page is reached FROM that menu, already signed in, and it
+ * says so in the subtitle. A second control offering to sign in, inches from
+ * the words "Signed in as", is one fact stated twice and disagreeing with
+ * itself. The way out is the link back to the tool.
  */
+/**
+ * The editor's own shape, held open while the draft loads.
+ *
+ * Here the outcome IS this layout -- admin is already established by the time
+ * this renders, so the rail and the form are what arrive -- which is what makes
+ * reserving them honest rather than a guess. A single line of text in this
+ * space left the configuration page empty under its own header and then dropped
+ * a two-column editor into it, which reads as the page having been broken and
+ * then suddenly fixed.
+ */
+function EditorSkeleton() {
+  return (
+    <SkeletonPanel
+      label="Loading the published run and the current draft…"
+      className="flex flex-col items-start gap-6 space-y-0 md:flex-row"
+    >
+      {/* The rail, at the width it actually takes. */}
+      <div className="w-full shrink-0 space-y-2 md:w-64 xl:w-72">
+        <Skeleton className="h-9 w-full" />
+        {Array.from({ length: 4 }, (_, i) => (
+          <Skeleton key={i} className="h-8 w-full" />
+        ))}
+        <Skeleton className="h-px w-full" />
+        <Skeleton className="h-9 w-full" />
+      </div>
+
+      {/* The section being edited: a heading, a paragraph, then a table. */}
+      <div className="w-full min-w-0 space-y-3">
+        <Skeleton className="h-7 w-64" />
+        <Skeleton className="h-4 w-full max-w-prose" />
+        <Skeleton className="h-4 w-3/4 max-w-prose" />
+        <Skeleton className="h-72 w-full" />
+      </div>
+    </SkeletonPanel>
+  )
+}
+
 function Shell({
   children,
   toolbar,
@@ -334,7 +376,11 @@ function Shell({
       </a>
 
       <header className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b pb-4">
-        <div className="mr-auto grid gap-0.5">
+        <div className="mr-auto grid justify-items-start gap-0.5">
+          {/* Pulled left by the button's own padding so its label starts on the
+              same vertical as the heading under it, rather than indented from
+              it by an amount that reads as a mistake. */}
+          <BackLink className="-ml-2.5" />
           <h1 className="font-heading text-xl font-semibold tracking-tight">Configuration</h1>
           {subtitle ? <p className="text-muted-foreground text-xs">{subtitle}</p> : null}
         </div>
@@ -356,14 +402,18 @@ function Shell({
 /**
  * The way back to the public tool.
  *
- * Only on the two states that are dead ends -- refused, and failed to load --
- * where there is nothing on screen to do and no other exit. The working page
- * dropped it: /admin is a URL somebody reached deliberately, and the browser's
- * own back button is the control for undoing that.
+ * On every state of this page, including the working one. It was once only on
+ * the dead ends -- refused, failed to load -- on the reasoning that /admin is a
+ * URL somebody reached deliberately and the browser's back button undoes that.
+ * Back does not, reliably: the two ways in are a link from the account menu and
+ * a redirect after the dev sign-in, and after a publish or a reload the entry
+ * that button goes to is somewhere in the middle of an editing session rather
+ * than the tool. An exit a reader has to guess at is not an exit, and the
+ * account page has carried the same link all along.
  */
-function BackLink() {
+function BackLink({ className }: { className?: string }) {
   return (
-    <Button size="sm" variant="ghost" render={<a href="/" />}>
+    <Button size="sm" variant="ghost" className={className} render={<a href="/" />}>
       <ArrowLeft aria-hidden />
       Back to the tool
     </Button>

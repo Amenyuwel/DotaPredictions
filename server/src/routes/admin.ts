@@ -11,7 +11,6 @@ import {
   type ConfigOverlay,
 } from "../admin/overlay.js"
 import { requireAdmin } from "../admin/auth.js"
-import { checkPassword, devLoginEnabled, mintToken } from "../admin/dev-login.js"
 import {
   del,
   insert,
@@ -32,8 +31,6 @@ import { runStore } from "../run-store.js"
  * publishing again. Nothing here edits anything in place except the single
  * draft row, which is by definition the thing nobody is being served.
  *
- *   POST   /api/admin/login           the local development door, off by default
- *   GET    /api/admin/login/available  whether that door exists here
  *   GET    /api/admin/session          who am I, and can I do this
  *   GET    /api/admin/config           the published run, the draft, and what
  *                                      the draft would do if published
@@ -47,61 +44,10 @@ import { runStore } from "../run-store.js"
  * `requireAdmin` is applied to the router rather than to each route. A route
  * added later without it would be a route anyone can call, and the failure would
  * be invisible until somebody found it -- so the gate is on the door, not on
- * each of eight things behind it. The two login routes sit ABOVE that line and
- * are the only unauthenticated ones here; anything added below it is covered
- * whether its author remembered or not.
+ * each of eight things behind it. Nothing sits above that line: every route in
+ * this file is authenticated, whether its author remembered or not.
  */
 export const adminRouter: Router = Router()
-
-/**
- * POST /api/admin/login -- the local development door.
- *
- * Registered BEFORE the gate below, because it is how a caller gets past it.
- * This is the one route in the file that is reachable unauthenticated, and it
- * is deliberately inert unless `ADMIN_DEV_LOGIN` is set with a full set of
- * credentials: with the flag off it 404s exactly as it would if it did not
- * exist, so a deployment using Supabase auth does not expose a second way in.
- *
- * Rate limiting is the app-wide 60/minute per IP from `app.ts`. That is a low
- * enough ceiling to make guessing a password over the network pointless, and
- * this route is not meant to be on a network.
- */
-adminRouter.post("/login", (req, res) => {
-  if (!devLoginEnabled()) {
-    res.status(404).json({
-      error: "not_found",
-      reason: "This deployment signs administrators in through Supabase.",
-    })
-    return
-  }
-
-  const body = (req.body ?? {}) as { username?: unknown; password?: unknown }
-  const identity = checkPassword(body.username, body.password)
-  if (!identity) {
-    // One message for a wrong username and a wrong password. The difference is
-    // only ever useful to somebody working through a list.
-    res.status(401).json({ error: "bad_credentials", reason: "Wrong username or password." })
-    return
-  }
-
-  const { token, expiresAt } = mintToken(identity)
-  console.log(`[server] local admin login: ${identity.email}`)
-  res.set("Cache-Control", "no-store")
-  res.json({ token, expiresAt, admin: identity })
-})
-
-/**
- * Whether this deployment even offers the local door.
- *
- * The client asks before drawing a password form, so that a build pointed at a
- * Supabase deployment shows the OAuth dialog instead of a login nobody can use.
- * Unauthenticated on purpose: it reveals which sign-in method is configured,
- * which is visible from the dialog the page would draw anyway.
- */
-adminRouter.get("/login/available", (_req, res) => {
-  res.set("Cache-Control", "no-store")
-  res.json({ devLogin: devLoginEnabled() })
-})
 
 adminRouter.use(requireAdmin)
 
