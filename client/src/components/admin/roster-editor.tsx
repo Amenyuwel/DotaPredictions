@@ -24,10 +24,10 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { validateId } from "@/lib/admin-ui"
-import { ROLE_LABEL } from "@/lib/labels"
+import { LANE_LABEL, LANE_ORDER, ROLE_LABEL, ROLE_ORDER } from "@/lib/labels"
 import { cn } from "@/lib/utils"
 import type { AdminConfig, ConfigOverlay, PlayerPatch } from "@/types/admin"
-import type { FantasyRole, Lane, Player, Team } from "@/types/run"
+import type { Player, Team } from "@/types/run"
 
 /**
  * Teams and players.
@@ -50,14 +50,11 @@ import type { FantasyRole, Lane, Player, Team } from "@/types/run"
  * roster edit is one team, because that is the unit that changes.
  */
 
-const LANES: Lane[] = ["carry", "mid", "offlane", "soft_support", "hard_support"]
-const FANTASY_ROLES: FantasyRole[] = ["core", "mid", "support"]
-
-const LANE_OPTIONS = LANES.map((lane) => ({ value: lane, label: lane.replace(/_/g, " ") }))
-const ROLE_OPTIONS = FANTASY_ROLES.map((role) => ({
-  value: role,
-  label: ROLE_LABEL[role] ?? role,
-}))
+/** Built from `lib/labels`, not re-listed here. The lane order is board order
+ * -- position 1 through 5 -- and the labels are the ones every other screen
+ * shows; a second copy of either is a second spelling waiting to drift. */
+const LANE_OPTIONS = LANE_ORDER.map((lane) => ({ value: lane, label: LANE_LABEL[lane] }))
+const ROLE_OPTIONS = ROLE_ORDER.map((role) => ({ value: role, label: ROLE_LABEL[role] }))
 
 export function RosterEditor({
   config,

@@ -24,8 +24,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { validateKey } from "@/lib/admin-ui"
 import { tierLabel, traitLabel } from "@/lib/emblem-catalog"
+import { capitalize, statLabel } from "@/lib/labels"
 import type { AdminConfig, ConfigOverlay, StatPatch, TraitPatch } from "@/types/admin"
 import type { Scoring } from "@/types/run"
 
@@ -42,8 +44,11 @@ import type { Scoring } from "@/types/run"
  * cannot be compared at all -- so the shape of the page follows from the job:
  * one row per stat, every attribute a column, nothing folded away.
  *
- * Quality and colours sit side by side beneath, because both are short and
- * neither earns a full row of its own.
+ * Four tables, one at a time, behind a tab strip. Stacked, they were four
+ * screens of scrolling to reach the one being edited, and nothing was gained
+ * by the other three being below the fold rather than behind a tab -- they were
+ * not comparable with each other, only with the client. Comparison happens
+ * WITHIN a table, which is why the rows are dense and the tables are not.
  */
 
 /** The rules the scorer implements. A closed list because they are code: a
@@ -111,19 +116,45 @@ export function ScoringEditor({
 
   const shared = { scoring, published, patch, setScoring }
 
+  // Which table is open. Local, and deliberately not lifted: it is a view
+  // preference with no bearing on the draft, and threading it through the page
+  // would put something in the page's state that cannot change an answer.
+  const [pane, setPane] = useState<string>(PANES[0].value)
+
   return (
-    <div className="grid gap-4">
-      <StatsCard {...shared} sourceColumns={config.sourceColumns} />
-      <TraitsCard {...shared} />
-      {/* Both are short. Side by side on a wide screen rather than stacked,
-          which is most of what the vertical scrolling was. */}
-      <div className="grid gap-4 xl:grid-cols-2">
+    <Tabs value={pane} onValueChange={(next) => setPane(next as string)} className="gap-3">
+      <TabsList variant="line" className="w-full justify-start overflow-x-auto">
+        {PANES.map((entry) => (
+          <TabsTrigger key={entry.value} value={entry.value} className="flex-none px-3">
+            {entry.label}
+          </TabsTrigger>
+        ))}
+      </TabsList>
+
+      <TabsContent value="stats">
+        <StatsCard {...shared} sourceColumns={config.sourceColumns} />
+      </TabsContent>
+      <TabsContent value="traits">
+        <TraitsCard {...shared} />
+      </TabsContent>
+      <TabsContent value="quality">
         <QualityCard {...shared} />
+      </TabsContent>
+      <TabsContent value="colours">
         <ColorsCard {...shared} />
-      </div>
-    </div>
+      </TabsContent>
+    </Tabs>
   )
 }
+
+/** The four tables, in the order they are read: what a stat pays, what a trait
+ * does to it, what a tier adds, and which slots can hold the result. */
+const PANES = [
+  { value: "stats", label: "Stats" },
+  { value: "traits", label: "Emblem traits" },
+  { value: "quality", label: "Emblem quality" },
+  { value: "colours", label: "Colours and slots" },
+] as const
 
 // ---------------------------------------------------------------------------
 // stats
@@ -148,11 +179,13 @@ function StatsCard({
   const removed = patch.statsRemoved ?? []
 
   const colorOptions = useMemo(
-    () => scoring.colors.map((c) => ({ value: c, label: c })),
+    () => scoring.colors.map((c) => ({ value: c, label: capitalize(c) })),
     [scoring.colors],
   )
   const sourceOptions = useMemo(
-    () => [{ value: NO_SOURCE, label: "none" }, ...sourceColumns.map((c) => ({ value: c, label: c }))],
+    // Column names stay verbatim: they must match the run's own, and a
+    // prettified one would not be the thing being named.
+    () => [{ value: NO_SOURCE, label: "None" }, ...sourceColumns.map((c) => ({ value: c, label: c }))],
     [sourceColumns],
   )
 
@@ -258,7 +291,7 @@ function StatsCard({
           <RemovedChips
             label="Removed stats"
             hint="Every emblem carrying one of these disappears with it — a stat that pays nothing and an emblem that cannot be built are the same statement."
-            entries={removed.map((key) => ({ key, label: key }))}
+            entries={removed.map((key) => ({ key, label: statLabel(key) }))}
             onRestore={(key) =>
               setScoring({ ...patch, statsRemoved: removed.filter((k) => k !== key) })
             }
@@ -335,7 +368,12 @@ function StatRow({
     <TableRow className={entry ? "bg-primary/5" : undefined}>
       <TableCell className="pl-6">
         <div className="flex items-center gap-1.5">
-          <code className="text-xs">{statKey}</code>
+          {/* The words, then the key. The key is what an emblem id is built
+              from and what the YAML export names, so it cannot simply go --
+              but it is the identifier, not the label, and reading eighteen of
+              them in lower snake case was the complaint. */}
+          <span className="text-sm font-medium">{statLabel(statKey)}</span>
+          <code className="text-muted-foreground text-2xs">{statKey}</code>
           {!was ? <Badge variant="secondary">new</Badge> : null}
           {!spec.measurable ? (
             <Badge variant="outline" title="Excluded from emblem choice, never scored as zero">
@@ -366,7 +404,7 @@ function StatRow({
       </TableCell>
 
       <TableCell>
-        <Cell changed={entry?.color !== undefined} was={was?.color}>
+        <Cell changed={entry?.color !== undefined} was={was && capitalize(was.color)}>
           <SelectCell
             label={`${statKey} colour`}
             value={spec.color}
@@ -379,14 +417,14 @@ function StatRow({
       </TableCell>
 
       <TableCell>
-        <Cell changed={entry?.source !== undefined} was={was ? (was.source ?? "none") : undefined}>
+        <Cell changed={entry?.source !== undefined} was={was ? (was.source ?? "None") : undefined}>
           <SelectCell
             label={`${statKey} source column`}
             value={spec.source ?? NO_SOURCE}
             options={sourceOptions}
             changed={entry?.source !== undefined}
             width="w-44"
-            format={(v) => (v === NO_SOURCE ? "none" : v)}
+            format={(v) => (v === NO_SOURCE ? "None" : v)}
             onChange={(v) => onSetSource(v === NO_SOURCE ? null : v)}
           />
         </Cell>
