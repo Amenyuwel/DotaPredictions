@@ -74,6 +74,9 @@ export function ConfirmDialog({
   const matches =
     request !== null && typed.trim().toLowerCase() === request.confirmText.trim().toLowerCase()
 
+  // The words in the box and the words a screen reader hears, from one place.
+  const hint = request ? `Type ${request.confirmText} to delete` : ""
+
   return (
     <Dialog open={request !== null} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-md">
@@ -98,33 +101,30 @@ export function ConfirmDialog({
                 : "This cannot be undone."}
             </p>
 
-            <div className="grid gap-1.5">
-              {/* The hint is the placeholder, and the label is kept for anyone
-                  who cannot see one. A placeholder is normally the wrong place
-                  for it -- it vanishes at the first keystroke, taking the
-                  instruction with it -- which is survivable only because the
-                  title above says the same name and does not vanish. */}
+            <div>
+              {/* The instruction is the placeholder. It vanishes at the first
+                  keystroke, which is normally the reason not to put one there,
+                  and is survivable here only because the title carries the same
+                  name and does not vanish. The label says the same words for
+                  anyone who cannot see either. */}
               <label htmlFor={inputId} className="sr-only">
-                To confirm, type {request.confirmText}
+                {hint}
               </label>
               <Input
                 id={inputId}
                 value={typed}
                 onChange={(event) => setTyped(event.currentTarget.value)}
-                placeholder={request.confirmText}
+                placeholder={hint}
                 aria-describedby={hintId}
                 autoComplete="off"
                 autoFocus
               />
-              {/* Announced, because the only other sign that the name matches is
-                  a button changing from disabled to enabled, which is silent. */}
-              <p id={hintId} className="text-muted-foreground min-h-4 text-xs" aria-live="polite">
-                {typed.length === 0
-                  ? "Type the name shown to enable the button."
-                  : matches
-                    ? "Matches."
-                    : "Does not match yet."}
-              </p>
+              {/* Nothing is drawn here. The button going from disabled to
+                  enabled is the whole feedback, and that is silent -- so the
+                  state is announced without being shown. */}
+              <span id={hintId} className="sr-only" aria-live="polite">
+                {typed.length > 0 && (matches ? "Name matches." : "Name does not match yet.")}
+              </span>
             </div>
 
             <DialogFooter>
