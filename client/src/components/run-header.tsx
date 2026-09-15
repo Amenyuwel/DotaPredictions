@@ -30,6 +30,7 @@ export function RunHeader({
   account,
   stages,
   help,
+  menu,
 }: {
   run: RunMeta
   /**
@@ -50,12 +51,31 @@ export function RunHeader({
    * a reader with a number in front of them does not scroll past it to go and
    * read. */
   help?: ReactNode
+  /** The same three controls as one button, for a header with no room to lay
+   * them out. Drawn instead of them rather than beside them, so there is one
+   * route to the theme at any given width and no chance of two open at once. */
+  menu?: ReactNode
 }) {
   return (
     <header className="border-b">
-      <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-3 gap-y-2 px-6 py-4">
-        <h1 className="font-heading text-base font-semibold tracking-tight">DotaPredictions</h1>
-        <Badge variant="secondary">{tournamentLabel(run.tournamentId)}</Badge>
+      <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 sm:px-6 sm:py-4">
+        {/* The narrow header's first line, and the reason it is a line rather
+            than three items left to wrap: the title, the badge and the stage
+            control together are wider than 375px, so the menu button was the
+            item that broke off -- ending up alone on a second row, hard right,
+            under nothing it belongs to. At 320px the stage control went with
+            it. Full width below `md` puts identity and the one menu on a line
+            of their own and pushes the stage onto the next, which is a shape
+            rather than an overflow. From `md` up the wrapper is `w-auto` and
+            these sit inline again, exactly as before. */}
+        <div className="flex w-full items-center gap-2 md:w-auto md:gap-3">
+          <h1 className="font-heading text-base font-semibold tracking-tight">
+            DotaPredictions
+          </h1>
+          <Badge variant="secondary">{tournamentLabel(run.tournamentId)}</Badge>
+
+          <div className="ml-auto md:hidden">{menu}</div>
+        </div>
 
         {stages}
 
@@ -66,7 +86,7 @@ export function RunHeader({
             Grouped, the auto margin applies to the whole cluster, and the
             cluster stays right-aligned on whichever line it lands on, because
             an auto margin resolves per flex line. */}
-        <div className="ml-auto flex flex-wrap items-center justify-end gap-x-1 gap-y-2">
+        <div className="ml-auto hidden flex-wrap items-center justify-end gap-x-1 gap-y-2 md:flex">
           {help}
 
           <ThemeMenu />

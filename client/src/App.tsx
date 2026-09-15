@@ -1,6 +1,8 @@
 import { useMemo, useState, type ReactNode } from "react"
 
 import { AccountMenu } from "@/components/account-menu"
+import { AnswerBar, type AnswerSummary } from "@/components/answer-bar"
+import { AuthDialog } from "@/components/auth-dialog"
 import { BannerDialog } from "@/components/banner-dialog"
 import { FaqButton, FaqDialog } from "@/components/faq"
 import { ResultPanel } from "@/components/result-panel"
@@ -10,17 +12,24 @@ import { SlotTargetCard } from "@/components/slot-target-card"
 import { SavedBanners } from "@/components/saved-banners"
 import { SavedRosters } from "@/components/saved-rosters"
 import { SiteFooter } from "@/components/site-footer"
+import { SiteMenu } from "@/components/site-menu"
 import { StageSwitcher } from "@/components/stage-switcher"
 import { AwaitingInput, LoadingRun, RunError } from "@/components/states"
 import { ThemeMenu } from "@/components/theme-menu"
 import { UnitPicker } from "@/components/unit-picker"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Loading } from "@/components/ui/spinner"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Skeleton, SkeletonPanel } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { buildCatalog, type EmblemCatalog } from "@/lib/emblem-catalog"
 import { points } from "@/lib/format"
 import { ROLE_DETAIL, ROLE_LABEL, ROLE_ORDER } from "@/lib/labels"
+import { useMediaQuery } from "@/hooks/use-media-query"
 import { useTarget } from "@/hooks/use-target"
 import { useRank } from "@/hooks/use-rank"
 import { useRun } from "@/hooks/use-run"
@@ -55,6 +64,21 @@ const sized = (banner: (Emblem | null)[], slots: number): (Emblem | null)[] =>
 
 /** What a banner answer arrives as, for the panel that draws it. */
 type BannerQuery = ReturnType<typeof useTarget>
+
+/**
+ * The roster's three best scores added, or null until all three have one.
+ *
+ * One definition rather than one per place it is shown. The card and the
+ * narrow-screen bar are two renderings of a single number, and two sums written
+ * separately are two sums that can come to disagree -- which on this page reads
+ * as the tool being uncertain about its own arithmetic rather than as a bug.
+ */
+function rosterTotal(targets: Record<FantasyRole, BannerQuery>): number | null {
+  const bests = ROLE_ORDER.map((r) => targets[r].data?.best ?? null)
+  return bests.every((b) => b !== null)
+    ? bests.reduce((sum, b) => sum + b!.score, 0)
+    : null
+}
 
 /**
  * Two mirrored entry paths, one column of answers.
@@ -93,6 +117,20 @@ export default function App() {
   // the dialog is a sibling of the page rather than a child of a control in
   // a wrapping flex row, which is not somewhere a modal should be mounted.
   const [faqOpen, setFaqOpen] = useState(false)
+
+  // Sign-in is now asked for from two places -- the account button on a wide
+  // header, a menu item on a narrow one -- and the dialog belongs to neither.
+  // A modal mounted inside a menu item unmounts with the menu the moment the
+  // item is pressed, which is the press that was meant to open it.
+  const [authOpen, setAuthOpen] = useState(false)
+
+  // Whether the answer has a column of its own. Below this the page is one
+  // column, and the answer moves into a dialog the bottom bar opens rather than
+  // sitting a screen below the questions -- see `AnswerBar`. A media query
+  // rather than two copies behind `lg:hidden`, because the answer is written
+  // once and put in one of two places.
+  const wide = useMediaQuery("(min-width: 64rem)")
+  const [answerOpen, setAnswerOpen] = useState(false)
 
   // One banner per fantasy slot, each an ORDERED array with a null for every
   // slot not filled yet. Nulls are held in place rather than closed up: an
@@ -161,6 +199,65 @@ export default function App() {
     () => buildCatalog(data?.emblems ?? [], data?.scoring),
     [data?.emblems, data?.scoring],
   )
+
+  const answerHeading =
+    tab === "banner" ? "Who should wear these banners" : "What this roster scores"
+
+  /** What to do to get an answer, for the narrow layout's bar. The long form of
+   * the same sentence is what `AwaitingInput` prints inside the panel; this is
+   * the one line that fits above a thumb. */
+  const answerHint =
+    tab === "banner"
+      ? "Build a banner for any slot to see which units score best through it."
+      : "Pick a core, a mid and a support to see what the roster is worth."
+
+  /**
+   * The answer itself, written once.
+   *
+   * Rendered into the right-hand column on a wide screen and into a dialog on a
+   * narrow one. Two copies behind `lg:hidden` would be two live regions
+   * announcing the same number to a screen reader and two sets of the same
+   * headings to walk past, and the day one copy is edited they stop agreeing.
+   */
+  const answer =
+    tab === "banner" ? (
+      <BannerAnswers banners={banners} ranks={ranks} slots={slots} />
+    ) : (
+      <RosterAnswer
+        roster={roster}
+        targets={targets}
+        run={run}
+        slots={slots}
+        catalog={catalog}
+      />
+    )
+
+  /**
+   * What the narrow layout's bar says, or null while there is no answer behind
+   * it yet.
+   *
+   * Read off the same queries the panel draws, and null until at least one of
+   * them has resolved: a button offered the moment a picker is touched opens
+   * onto a box still saying "two more emblems to go". The roster total goes
+   * through `rosterTotal` rather than being added up again here, so the bar and
+   * the card cannot disagree.
+   */
+  const answerSummary: AnswerSummary | null = (() => {
+    if (tab === "banner") {
+      const ranked = ROLE_ORDER.filter(
+        (r) => slots > 0 && banners[r].filter(Boolean).length === slots && ranks[r].data?.best,
+      ).length
+      return ranked === 0 ? null : { title: `${ranked} of 3 banners ranked` }
+    }
+
+    const scored = ROLE_ORDER.filter((r) => targets[r].data?.best).length
+    if (scored === 0) return null
+
+    const total = rosterTotal(targets)
+    return total === null
+      ? { title: `${scored} of 3 slots scored` }
+      : { title: "Projected roster total", value: points(total) }
+  })()
 
   /**
    * Switching stage clears both inputs rather than carrying them across.
@@ -241,18 +338,30 @@ export default function App() {
       {/* The header carries the run's identity, a stage control and an account
           menu before the page proper starts, and every tab press walks through
           them. One link, invisible until it has focus. */}
-      <a
-        href="#answers"
-        className="focus-visible:ring-ring bg-popover text-popover-foreground sr-only rounded-md px-3 py-2 text-sm shadow-md focus-visible:not-sr-only focus-visible:absolute focus-visible:top-2 focus-visible:left-2 focus-visible:z-50 focus-visible:ring-2"
-      >
-        Skip to answers
-      </a>
+      {/* Only where the answer is on the page. In the narrow layout it is
+          behind a button at the bottom of the document, so a link offering to
+          skip to it would land on nothing. */}
+      {wide && (
+        <a
+          href="#answers"
+          className="focus-visible:ring-ring bg-popover text-popover-foreground sr-only rounded-md px-3 py-2 text-sm shadow-md focus-visible:not-sr-only focus-visible:absolute focus-visible:top-2 focus-visible:left-2 focus-visible:z-50 focus-visible:ring-2"
+        >
+          Skip to answers
+        </a>
+      )}
 
       <RunHeader
         run={data.run}
         overlay={data.overlay}
-        account={<AccountMenu state={auth} />}
+        account={<AccountMenu state={auth} onSignIn={() => setAuthOpen(true)} />}
         help={<FaqButton onClick={() => setFaqOpen(true)} />}
+        menu={
+          <SiteMenu
+            auth={auth}
+            onSignIn={() => setAuthOpen(true)}
+            onOpenFaq={() => setFaqOpen(true)}
+          />
+        }
         stages={
           <StageSwitcher
             available={data.available}
@@ -262,7 +371,7 @@ export default function App() {
         }
       />
 
-      <main className="mx-auto grid w-full max-w-6xl grow gap-6 px-6 py-8 content-start lg:grid-cols-[minmax(0,24rem)_1fr]">
+      <main className="mx-auto grid w-full max-w-6xl grow gap-6 px-4 py-6 content-start sm:px-6 sm:py-8 lg:grid-cols-[minmax(0,24rem)_1fr]">
         <Tabs value={tab} onValueChange={(next) => setTab(next as string)} className="flex flex-col gap-4">
           <TabsList className="w-full">
             <TabsTrigger value="banner" className="flex-1">
@@ -346,25 +455,62 @@ export default function App() {
 
         {/* Named, because "region" alone tells a screen-reader user nothing
             about which of the two columns they have landed in. Live, because
-            this is where an answer appears without the reader having moved. */}
-        <section id="answers" aria-label="Answer" aria-live="polite">
-          {tab === "banner" ? (
-            <BannerAnswers banners={banners} ranks={ranks} slots={slots} />
-          ) : (
-            <RosterAnswer
-              roster={roster}
-              targets={targets}
-              run={run}
-              slots={slots}
-              catalog={catalog}
-            />
-          )}
-        </section>
+            this is where an answer appears without the reader having moved.
+            Focusable, because the skip link moves the viewport here, and moving
+            the viewport without moving focus leaves a keyboard user tabbing on
+            from the control they were just sent away from. */}
+        {wide && (
+          <section
+            id="answers"
+            aria-labelledby="answers-heading"
+            aria-live="polite"
+            tabIndex={-1}
+            className="scroll-mt-4 outline-none"
+          >
+            <h2 id="answers-heading" className="sr-only">
+              {answerHeading}
+            </h2>
+
+            {answer}
+          </section>
+        )}
       </main>
+
+      {/* The narrow layout's answer: a bar that is always there and a dialog it
+          opens. Not rendered at all on a wide screen, so the answer exists once
+          in the document rather than once per layout. */}
+      {!wide && (
+        <>
+          <AnswerBar
+            summary={answerSummary}
+            hint={answerHint}
+            onOpen={() => setAnswerOpen(true)}
+          />
+
+          <Dialog open={answerOpen} onOpenChange={setAnswerOpen}>
+            {/* Capped against the viewport rather than given a height, and
+                scrolled inside: a roster answer is a total and three cards, and
+                the ranked list is longer still. */}
+            <DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>{answerHeading}</DialogTitle>
+              </DialogHeader>
+
+              {answer}
+            </DialogContent>
+          </Dialog>
+        </>
+      )}
 
       <SiteFooter run={data.run} />
 
       <FaqDialog open={faqOpen} onOpenChange={setFaqOpen} slots={slots} />
+
+      <AuthDialog
+        open={authOpen}
+        onOpenChange={setAuthOpen}
+        onGuest={() => setAuthOpen(false)}
+      />
     </div>
   )
 }
@@ -379,7 +525,7 @@ export default function App() {
  */
 function PreRun({ children }: { children: ReactNode }) {
   return (
-    <main className="mx-auto min-h-dvh max-w-6xl px-6 py-10">
+    <main className="mx-auto min-h-dvh max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
       <div className="mb-4 flex justify-end">
         <ThemeMenu />
       </div>
@@ -392,12 +538,13 @@ function PreRun({ children }: { children: ReactNode }) {
  * be indistinguishable from a real one. */
 function Pending() {
   return (
-    <div className="space-y-2" aria-busy>
-      <Loading>Scoring every unit through this banner…</Loading>
+    <SkeletonPanel label="Scoring every unit through this banner…">
+      {/* Five, because five rungs is what the ladder comes back with. A
+          placeholder that reserves the wrong number of rows still reflows. */}
       {Array.from({ length: 5 }, (_, i) => (
         <Skeleton key={i} className="h-16 w-full" />
       ))}
-    </div>
+    </SkeletonPanel>
   )
 }
 
@@ -502,10 +649,7 @@ function RosterAnswer({
   slots: number
   catalog: EmblemCatalog
 }) {
-  const bests = ROLE_ORDER.map((r) => targets[r].data?.best ?? null)
-  const total = bests.every((b) => b !== null)
-    ? bests.reduce((sum, b) => sum + b!.score, 0)
-    : null
+  const total = rosterTotal(targets)
 
   // Before the first player is picked the three slots have nothing to say
   // apart from each other, and saying it three times fills the whole answer
