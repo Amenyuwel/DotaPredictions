@@ -79,7 +79,7 @@ export function ConfirmDialog({
 
   return (
     <Dialog open={request !== null} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md" showCloseButton={false}>
         {request ? (
           <form
             onSubmit={(event) => {
