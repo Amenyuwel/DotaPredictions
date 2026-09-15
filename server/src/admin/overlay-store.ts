@@ -47,6 +47,17 @@ let fetchedAtMs = 0
 let inFlight: Promise<void> | null = null
 
 /**
+ * Which read is the newest.
+ *
+ * Reads are concurrent and the network does not preserve their order: a request
+ * issued at t=0 can return after one issued at t=1, and applying it would
+ * install older documents over newer ones -- silently, and for a whole poll
+ * interval. Each read takes a ticket on the way out and drops its result on the
+ * way back in if a later one has since been issued.
+ */
+let refreshSeq = 0
+
+/**
  * A token that changes whenever the effective configuration changes.
  *
  * Every cached answer in this process is keyed on it, so "the overlay moved"
@@ -119,6 +130,24 @@ export async function ensureFreshOverlays(): Promise<void> {
   await inFlight
 }
 
+/**
+ * Re-read now, and do not join a read that is already running.
+ *
+ * For the publish path, and the distinction is the whole point. By the time
+ * `POST /config/publish` runs its write, `overlayMiddleware` has usually
+ * already fired a background read for that same request -- one that was issued
+ * BEFORE the row existed. Awaiting `ensureFreshOverlays` would join it and come
+ * back with the state from a moment ago, which is indistinguishable from the
+ * publish not having worked.
+ *
+ * So this issues its own read unconditionally. It is the one caller that knows
+ * something changed, rather than suspecting it might have.
+ */
+export async function forceRefreshOverlays(): Promise<void> {
+  fetchedAtMs = 0
+  await refresh()
+}
+
 export function overlayMiddleware(_req: Request, _res: Response, next: NextFunction): void {
   // Deliberately not awaited into the request: `ensureFreshOverlays` never
   // rejects, and a request should not wait on a refresh it did not need. The
@@ -134,6 +163,7 @@ async function refresh(): Promise<void> {
   // the interval -- that turns an unreachable database into a request-rate
   // amplifier against it.
   fetchedAtMs = Date.now()
+  const seq = ++refreshSeq
 
   try {
     // Every published version, newest first; the first row per stage wins.
@@ -145,6 +175,11 @@ async function refresh(): Promise<void> {
       status: "eq.published",
       order: "tournament_id.asc,stage.asc,version.desc",
     })
+
+    // A later read has been issued since this one went out, so this answer is
+    // already history. Dropping it is what keeps a slow read from installing
+    // older documents over newer ones.
+    if (seq !== refreshSeq) return
 
     const next = new Map<string, PublishedOverlay>()
     for (const row of rows) {

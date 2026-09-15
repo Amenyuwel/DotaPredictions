@@ -1,6 +1,6 @@
 import { Router } from "express"
 
-import { overlayStore } from "../admin/overlay-store.js"
+import { forceRefreshOverlays, overlayStore } from "../admin/overlay-store.js"
 import {
   applyOverlay,
   countChanges,
@@ -12,7 +12,15 @@ import {
 } from "../admin/overlay.js"
 import { requireAdmin } from "../admin/auth.js"
 import { checkPassword, devLoginEnabled, mintToken } from "../admin/dev-login.js"
-import { del, insert, postgrest, rpc, upsert } from "../admin/rest.js"
+import {
+  del,
+  insert,
+  insertReturning,
+  isUniqueViolation,
+  patch,
+  postgrest,
+  rpc,
+} from "../admin/rest.js"
 import { toScoringYaml } from "../admin/yaml.js"
 import { runStore } from "../run-store.js"
 
@@ -338,23 +346,14 @@ adminRouter.put("/config/draft", async (req, res) => {
 
   try {
     const before = await readDraft(tournamentId, stage)
-    const row = await upsert<OverlayRow>(
-      OVERLAY_TABLE,
-      {
-        tournament_id: tournamentId,
-        stage,
-        status: "draft",
-        version: null,
-        doc,
-        note: String(body.note ?? "").slice(0, 2000),
-        author_id: req.admin!.userId,
-        author_email: req.admin!.email,
-        published_at: null,
-      },
-      // Matches the partial unique index. Two tabs saving at once write the same
-      // row rather than racing to create a second draft.
-      "tournament_id,stage,status",
-    )
+    const row = await writeDraft({
+      tournamentId,
+      stage,
+      existing: before,
+      doc,
+      note: String(body.note ?? "").slice(0, 2000),
+      admin: req.admin!,
+    })
     await audit("save_draft", {
       tournamentId,
       stage,
@@ -449,9 +448,16 @@ adminRouter.post("/config/publish", async (req, res) => {
       req,
     })
 
-    // So the admin who pressed the button sees it on their next page load.
-    // Other instances of this process converge within `overlayPollSeconds`.
-    overlayStore.invalidate()
+    // Awaited, not just marked stale. `overlayMiddleware` refreshes in the
+    // background and lets the request it fired on answer from the previous
+    // documents -- correct for ordinary traffic, and wrong here: the admin who
+    // just pressed Publish reloads immediately, sees the old numbers, and has
+    // no way to tell a slow cache from an edit that did not take. One extra
+    // read on an operation that happens a few times a day buys that certainty.
+    //
+    // Only for THIS process. Other instances converge within
+    // `overlayPollSeconds`, which is the honest bound and the reason it is 20.
+    await forceRefreshOverlays()
 
     res.status(201).json({ version: row.version, publishedAt: row.published_at })
   } catch (err) {
@@ -533,21 +539,14 @@ adminRouter.post("/config/revert", async (req, res) => {
     }
 
     const before = await readDraft(tournamentId, stage)
-    await upsert<OverlayRow>(
-      OVERLAY_TABLE,
-      {
-        tournament_id: tournamentId,
-        stage,
-        status: "draft",
-        version: null,
-        doc: source.doc,
-        note: `Loaded from version ${version}: ${source.note}`.slice(0, 2000),
-        author_id: req.admin!.userId,
-        author_email: req.admin!.email,
-        published_at: null,
-      },
-      "tournament_id,stage,status",
-    )
+    await writeDraft({
+      tournamentId,
+      stage,
+      existing: before,
+      doc: source.doc,
+      note: `Loaded from version ${version}: ${source.note}`.slice(0, 2000),
+      admin: req.admin!,
+    })
     await audit("save_draft", {
       tournamentId,
       stage,
@@ -597,6 +596,62 @@ function previewOf(published: ReturnType<typeof runStore.findPublished>, doc: Co
       ok: false as const,
       reasons: err instanceof OverlayRejected ? err.reasons : [describe(err)],
     }
+  }
+}
+
+/**
+ * Write the single draft row for a stage, creating it or replacing its contents.
+ *
+ * Not an upsert, and the reason is a property of the schema rather than a
+ * preference. The uniqueness this relies on -- one draft per stage -- is a
+ * PARTIAL index, `(tournament_id, stage) where status = 'draft'`, which is what
+ * lets one draft coexist with many published versions of the same stage.
+ * Postgres will only infer a partial index for `ON CONFLICT` if the predicate
+ * is given too, and PostgREST cannot send one, so an upsert here fails with
+ * `42P10: there is no unique or exclusion constraint matching the ON CONFLICT
+ * specification`. Every caller had already read the row anyway, to record its
+ * previous contents in the audit trail, so the branch costs nothing.
+ *
+ * The race -- two tabs, both seeing no draft, both inserting -- is settled by
+ * that index rather than by hoping. The loser gets a unique violation, re-reads,
+ * and patches what the winner wrote. Last write wins, which is the same answer
+ * an upsert would have given.
+ */
+async function writeDraft(input: {
+  tournamentId: string
+  stage: string
+  existing: OverlayRow | null
+  doc: ConfigOverlay
+  note: string
+  admin: { userId: string; email: string }
+}): Promise<OverlayRow> {
+  const fields = {
+    doc: input.doc,
+    note: input.note,
+    author_id: input.admin.userId,
+    author_email: input.admin.email,
+  }
+
+  if (input.existing) {
+    return patch<OverlayRow>(OVERLAY_TABLE, { id: `eq.${input.existing.id}` }, fields)
+  }
+
+  try {
+    return await insertReturning<OverlayRow>(OVERLAY_TABLE, {
+      tournament_id: input.tournamentId,
+      stage: input.stage,
+      status: "draft",
+      version: null,
+      published_at: null,
+      ...fields,
+    })
+  } catch (err) {
+    if (!isUniqueViolation(err)) throw err
+    // Somebody else created the draft between our read and our insert. Their
+    // row is the one that exists, so this save becomes an edit of it.
+    const theirs = await readDraft(input.tournamentId, input.stage)
+    if (!theirs) throw err
+    return patch<OverlayRow>(OVERLAY_TABLE, { id: `eq.${theirs.id}` }, fields)
   }
 }
 

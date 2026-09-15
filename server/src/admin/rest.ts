@@ -58,26 +58,30 @@ export async function postgrest<T>(
 }
 
 /**
- * An upsert, returning the row.
+ * An insert, returning the row.
  *
- * `resolution=merge-duplicates` against a unique index is what makes "save the
- * draft" one statement instead of a select-then-branch. Two tabs saving at once
- * then both write the same row rather than creating a second draft, which the
- * partial unique index would refuse anyway -- this just makes the common case
- * not an error.
+ * Not an upsert. PostgREST infers `ON CONFLICT` from the columns named in
+ * `on_conflict`, and the only unique index on `config_overlays` is PARTIAL --
+ * `(tournament_id, stage) where status = 'draft'` -- which is what allows one
+ * draft per stage alongside many published versions. Postgres can use a partial
+ * index for conflict inference only when the predicate is supplied too, and
+ * PostgREST has no way to send one, so every upsert against that table comes
+ * back `42P10: there is no unique or exclusion constraint matching the ON
+ * CONFLICT specification`.
+ *
+ * So the branch happens in the caller, which had already read the row it was
+ * about to write. See `writeDraft` in routes/admin.ts.
  */
-export async function upsert<T>(
+export async function insertReturning<T>(
   table: string,
   row: Record<string, unknown>,
-  onConflict: string,
 ): Promise<T> {
-  const url = `${config.supabaseUrl}/rest/v1/${table}?${new URLSearchParams({ on_conflict: onConflict })}`
-  const res = await fetch(url, {
+  const res = await fetch(`${config.supabaseUrl}/rest/v1/${table}`, {
     method: "POST",
     headers: {
       ...authHeaders(),
       "Content-Type": "application/json",
-      Prefer: "resolution=merge-duplicates,return=representation",
+      Prefer: "return=representation",
     },
     body: JSON.stringify(row),
     signal: AbortSignal.timeout(15_000),
@@ -90,6 +94,39 @@ export async function upsert<T>(
   }
   const rows = (await res.json()) as T[]
   return rows[0] as T
+}
+
+/** A PATCH against the rows `query` selects, returning the first. */
+export async function patch<T>(
+  table: string,
+  query: Record<string, string>,
+  row: Record<string, unknown>,
+): Promise<T> {
+  const url = `${config.supabaseUrl}/rest/v1/${table}?${new URLSearchParams(query)}`
+  const res = await fetch(url, {
+    method: "PATCH",
+    headers: {
+      ...authHeaders(),
+      "Content-Type": "application/json",
+      Prefer: "return=representation",
+    },
+    body: JSON.stringify(row),
+    signal: AbortSignal.timeout(15_000),
+  })
+  if (!res.ok) {
+    throw new RestError(
+      res.status,
+      `PATCH ${table} -> ${res.status} ${(await res.text()).slice(0, 300)}`,
+    )
+  }
+  const rows = (await res.json()) as T[]
+  return rows[0] as T
+}
+
+/** A unique violation, which is how the database reports the race `writeDraft`
+ * retries around. Worth naming: every other 409 here would be a real error. */
+export function isUniqueViolation(err: unknown): boolean {
+  return err instanceof RestError && err.message.includes('"code":"23505"')
 }
 
 /** A plain insert with no conflict handling. Used for the audit log, which has
