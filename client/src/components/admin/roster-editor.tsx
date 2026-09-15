@@ -1,16 +1,16 @@
 import { useMemo, useState } from "react"
-import { AlertTriangle, Plus, Trash2 } from "lucide-react"
+import { AlertTriangle, Pencil, Plus, Trash2 } from "lucide-react"
 
 import { AddDialog } from "@/components/admin/add-dialog"
 import { ConfirmDialog, type ConfirmRequest } from "@/components/admin/confirm-dialog"
+import { EditDialog, EditField } from "@/components/admin/edit-dialog"
 import {
-  Cell,
   FilterField,
-  LabelledField,
   RemovedChips,
   RowActions,
   SelectCell,
   TextCell,
+  ValueCell,
 } from "@/components/admin/cells"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
@@ -28,7 +28,7 @@ import { validateId } from "@/lib/admin-ui"
 import { LANE_LABEL, LANE_ORDER, ROLE_LABEL, ROLE_ORDER } from "@/lib/labels"
 import { cn } from "@/lib/utils"
 import type { AdminConfig, ConfigOverlay, PlayerPatch } from "@/types/admin"
-import type { Player, Team } from "@/types/run"
+import type { FantasyRole, Lane, Player, Team } from "@/types/run"
 
 /**
  * Teams and players.
@@ -74,6 +74,10 @@ export function RosterEditor({
   const [filter, setFilter] = useState("")
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [pending, setPending] = useState<ConfirmRequest | null>(null)
+  // Which player's dialog is open, by id: the row is read fresh on render,
+  // so nothing stale can sit in the box.
+  const [editingPlayer, setEditingPlayer] = useState<number | null>(null)
+  const [editingTeam, setEditingTeam] = useState(false)
 
   const teams = effective?.teams ?? config.published.teams
   const players = effective?.players ?? config.published.players
@@ -135,24 +139,6 @@ export function RosterEditor({
   // or a team the overlay removed, and the detail pane then describes something
   // the list no longer offers.
   const selected = shown.find((team) => team.teamId === selectedId) ?? shown[0] ?? null
-
-  const editTeam = (id: number, field: string, value: unknown) =>
-    onChange({
-      ...doc,
-      teams: {
-        ...(doc.teams ?? {}),
-        [String(id)]: { ...(doc.teams?.[String(id)] ?? {}), [field]: value },
-      },
-    })
-
-  const editPlayer = (id: number, field: keyof PlayerPatch, value: unknown) =>
-    onChange({
-      ...doc,
-      players: {
-        ...(doc.players ?? {}),
-        [String(id)]: { ...(doc.players?.[String(id)] ?? {}), [field]: value },
-      },
-    })
 
   const dropKey = (bucket: "teams" | "players", id: number) => {
     const next = { ...(doc[bucket] ?? {}) } as Record<string, unknown>
@@ -268,44 +254,29 @@ export function RosterEditor({
                 ) : null}
               </div>
 
-              <div className="grid gap-2 sm:grid-cols-2">
-                <LabelledField
-                  label="Name"
-                  changed={doc.teams?.[String(selected.teamId)]?.name !== undefined}
-                  was={publishedTeams.get(selected.teamId)?.name}
-                  onUndo={() => dropKey("teams", selected.teamId)}
-                >
-                  <TextCell
-                    value={selected.name}
-                    changed={doc.teams?.[String(selected.teamId)]?.name !== undefined}
-                    onCommit={(v) => editTeam(selected.teamId, "name", v)}
-                  />
-                </LabelledField>
+              <dl className="grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
+                <div className="flex items-baseline gap-2">
+                  <dt className="text-muted-foreground text-xs">Name</dt>
+                  <dd>
+                    <ValueCell
+                      value={selected.name}
+                      was={publishedTeams.get(selected.teamId)?.name}
+                      changed={doc.teams?.[String(selected.teamId)]?.name !== undefined}
+                    />
+                  </dd>
+                </div>
+                <div className="flex items-baseline gap-2">
+                  <dt className="text-muted-foreground text-xs">Also played under</dt>
+                  <dd>
+                    <ValueCell
+                      value={selected.alsoTeamIds.join(", ") || "none"}
+                      was={publishedTeams.get(selected.teamId)?.alsoTeamIds.join(", ") || "none"}
+                      changed={doc.teams?.[String(selected.teamId)]?.alsoTeamIds !== undefined}
+                    />
+                  </dd>
+                </div>
+              </dl>
 
-                <LabelledField
-                  label="Also played under"
-                  hint="One org on two ids splits its evidence in half. Takes effect at the next crawl."
-                  changed={doc.teams?.[String(selected.teamId)]?.alsoTeamIds !== undefined}
-                  was={publishedTeams.get(selected.teamId)?.alsoTeamIds.join(", ") || "none"}
-                  onUndo={() => dropKey("teams", selected.teamId)}
-                >
-                  <TextCell
-                    value={selected.alsoTeamIds.join(", ")}
-                    changed={doc.teams?.[String(selected.teamId)]?.alsoTeamIds !== undefined}
-                    placeholder="10182357, 9824702"
-                    onCommit={(v) =>
-                      editTeam(
-                        selected.teamId,
-                        "alsoTeamIds",
-                        v
-                          .split(",")
-                          .map((part) => Number(part.trim()))
-                          .filter((n) => Number.isInteger(n) && n > 0),
-                      )
-                    }
-                  />
-                </LabelledField>
-              </div>
             </CardHeader>
 
             <CardContent className="grid gap-3 px-0">
@@ -331,14 +302,11 @@ export function RosterEditor({
                         className={entry ? "bg-primary/5" : undefined}
                       >
                         <TableCell className="pl-6">
-                          <Cell changed={entry?.nick !== undefined} was={was?.nick}>
-                            <TextCell
-                              value={player.nick}
-                              changed={entry?.nick !== undefined}
-                              className="w-36"
-                              onCommit={(v) => editPlayer(player.playerId, "nick", v)}
-                            />
-                          </Cell>
+                          <ValueCell
+                            value={player.nick}
+                            was={was?.nick}
+                            changed={entry?.nick !== undefined}
+                          />
                         </TableCell>
 
                         <TableCell>
@@ -355,24 +323,18 @@ export function RosterEditor({
                         </TableCell>
 
                         <TableCell>
-                          <SelectCell
-                            label={`${player.nick} lane`}
-                            value={player.lane}
-                            options={LANE_OPTIONS}
+                          <ValueCell
+                            value={LANE_LABEL[player.lane]}
+                            was={was && LANE_LABEL[was.lane]}
                             changed={entry?.lane !== undefined}
-                            width="w-32"
-                            onChange={(v) => editPlayer(player.playerId, "lane", v)}
                           />
                         </TableCell>
 
                         <TableCell>
-                          <SelectCell
-                            label={`${player.nick} fantasy slot`}
-                            value={player.fantasyRole}
-                            options={ROLE_OPTIONS}
+                          <ValueCell
+                            value={ROLE_LABEL[player.fantasyRole]}
+                            was={was && ROLE_LABEL[was.fantasyRole]}
                             changed={entry?.fantasyRole !== undefined}
-                            width="w-28"
-                            onChange={(v) => editPlayer(player.playerId, "fantasyRole", v)}
                           />
                         </TableCell>
 
@@ -380,6 +342,7 @@ export function RosterEditor({
                           <RowActions
                             what={player.nick}
                             changed={Boolean(entry)}
+                            onEdit={() => setEditingPlayer(player.playerId)}
                             onUndo={() => dropKey("players", player.playerId)}
                             onRemove={() =>
                               setPending({
@@ -415,6 +378,15 @@ export function RosterEditor({
               </Table>
 
               <div className="flex flex-wrap items-center gap-2 px-6">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-xs"
+                  onClick={() => setEditingTeam(true)}
+                >
+                  <Pencil aria-hidden />
+                  Edit team
+                </Button>
                 <Button
                   size="sm"
                   variant="ghost"
@@ -537,7 +509,155 @@ export function RosterEditor({
         }}
       />
 
+      {editingPlayer !== null && players.some((p) => p.playerId === editingPlayer) ? (
+        <PlayerEditDialog
+          player={players.find((p) => p.playerId === editingPlayer)!}
+          published={publishedPlayers.get(editingPlayer)}
+          onClose={() => setEditingPlayer(null)}
+          onSave={(changes) =>
+            onChange({
+              ...doc,
+              players: {
+                ...(doc.players ?? {}),
+                [String(editingPlayer)]: {
+                  ...(doc.players?.[String(editingPlayer)] ?? {}),
+                  ...changes,
+                },
+              },
+            })
+          }
+        />
+      ) : null}
+
+      {editingTeam && selected ? (
+        <EditDialog
+          open
+          onOpenChange={(open) => !open && setEditingTeam(false)}
+          title={`Edit ${selected.name}`}
+          description="Labels only — a roster's measurements come from the crawler."
+          value={{
+            name: selected.name,
+            alsoTeamIds: selected.alsoTeamIds.join(", "),
+          }}
+          onSave={(next) =>
+            onChange({
+              ...doc,
+              teams: {
+                ...(doc.teams ?? {}),
+                [String(selected.teamId)]: {
+                  ...(doc.teams?.[String(selected.teamId)] ?? {}),
+                  name: next.name,
+                  alsoTeamIds: next.alsoTeamIds
+                    .split(",")
+                    .map((part) => Number(part.trim()))
+                    .filter((n) => Number.isInteger(n) && n > 0),
+                },
+              },
+            })
+          }
+        >
+          {(draft, set) => (
+            <>
+              <EditField label="Name" was={publishedTeams.get(selected.teamId)?.name}>
+                <TextCell value={draft.name} onCommit={(v) => set("name", v)} />
+              </EditField>
+
+              <EditField
+                label="Also played under"
+                was={publishedTeams.get(selected.teamId)?.alsoTeamIds.join(", ") || "none"}
+                hint="One org on two ids splits its evidence in half. Takes effect at the next crawl."
+              >
+                <TextCell
+                  value={draft.alsoTeamIds}
+                  placeholder="10182357, 9824702"
+                  onCommit={(v) => set("alsoTeamIds", v)}
+                />
+              </EditField>
+            </>
+          )}
+        </EditDialog>
+      ) : null}
+
       <ConfirmDialog request={pending} onClose={() => setPending(null)} />
     </div>
+  )
+}
+
+/**
+ * One player's labels.
+ *
+ * Its own component rather than another block inside the roster's render: the
+ * roster is already a list beside a detail pane beside three dialogs, and a
+ * fourth form inlined there is a file nobody can hold in their head.
+ *
+ * Only the fields that differ from the published run are handed back, so an
+ * overlay never carries an entry that AGREES with the run -- a standing
+ * instruction to hold a value if it ever changes, which is the silent revert
+ * this design exists to avoid.
+ */
+function PlayerEditDialog({
+  player,
+  published,
+  onClose,
+  onSave,
+}: {
+  player: Player
+  published: Player | undefined
+  onClose: () => void
+  onSave: (changes: PlayerPatch) => void
+}) {
+  return (
+    <EditDialog
+      open
+      onOpenChange={(open) => !open && onClose()}
+      title={`Edit ${player.nick}`}
+      description="Labels only — per-game stat lines come from the crawler."
+      value={{ nick: player.nick, lane: player.lane, fantasyRole: player.fantasyRole }}
+      onSave={(next) => {
+        const changes: PlayerPatch = {}
+        if (!published || next.nick !== published.nick) changes.nick = next.nick
+        if (!published || next.lane !== published.lane) changes.lane = next.lane
+        if (!published || next.fantasyRole !== published.fantasyRole) {
+          changes.fantasyRole = next.fantasyRole
+        }
+        onSave(changes)
+      }}
+    >
+      {(draft, set) => (
+        <>
+          <EditField label="Nickname" was={published?.nick}>
+            <TextCell value={draft.nick} onCommit={(v) => set("nick", v)} />
+          </EditField>
+
+          <EditField
+            label="Lane"
+            was={published && LANE_LABEL[published.lane]}
+            hint="The in-game position."
+          >
+            <SelectCell
+              label="Lane"
+              value={draft.lane}
+              options={LANE_OPTIONS}
+              width="w-full"
+              onChange={(v) => set("lane", v as Lane)}
+            />
+          </EditField>
+
+          <EditField
+            label="Fantasy slot"
+            was={published && ROLE_LABEL[published.fantasyRole]}
+            hint="Core and support are duos; mid is one player."
+          >
+            <SelectCell
+              label="Fantasy slot"
+              value={draft.fantasyRole}
+              options={ROLE_OPTIONS}
+              width="w-full"
+              onChange={(v) => set("fantasyRole", v as FantasyRole)}
+            />
+          </EditField>
+        </>
+      )}
+    </EditDialog>
   )
 }

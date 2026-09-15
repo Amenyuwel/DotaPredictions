@@ -3,8 +3,8 @@ import { Plus } from "lucide-react"
 
 import { AddDialog } from "@/components/admin/add-dialog"
 import { ConfirmDialog, type ConfirmRequest } from "@/components/admin/confirm-dialog"
+import { EditDialog, EditField } from "@/components/admin/edit-dialog"
 import {
-  Cell,
   FilterField,
   LabelledField,
   NumberCell,
@@ -13,6 +13,7 @@ import {
   RowActions,
   SelectCell,
   TextCell,
+  ValueCell,
 } from "@/components/admin/cells"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -65,6 +66,11 @@ const CONDITION_RULES = [
   { value: "never", label: "Never" },
 ] as const
 
+/** A rule key as the strip shows it. Falls back to the key so an
+ * unrecognised one is visible rather than blank. */
+const ruleLabel = (rule: string | null | undefined) =>
+  CONDITION_RULES.find((r) => r.value === rule)?.label ?? rule ?? "None"
+
 const RULE_DETAIL: Record<string, string> = {
   always: "Pays its bonus on every banner.",
   neighboursOnly: "Pays nothing to itself; the adjacent bonus is the whole effect.",
@@ -89,6 +95,30 @@ const pct = (value: number | undefined) =>
  * exists to prevent. An empty map left behind is the same problem smaller: it
  * still counts as a change and still publishes.
  */
+/** The rule names, as a type, so a select cannot hand back a string the
+ * contract does not admit. */
+type TraitRule = NonNullable<TraitPatch["conditionRule"]>
+
+/**
+ * Put an entry's changed fields into a patch map, or drop the entry entirely
+ * when nothing differs from the published run.
+ *
+ * An edit dialog hands back a whole row, so the diff happens on save. Writing
+ * every field would leave entries that AGREE with the run -- standing
+ * instructions to hold a value if it ever changes, which is the silent revert
+ * this design exists to avoid. `isKnown` is false for a row the run does not
+ * carry, where the entry is kept whole because there is nothing to merge onto.
+ */
+function mergeEntry<T extends object>(
+  map: Record<string, T> | undefined,
+  key: string,
+  changes: T,
+  isKnown: boolean,
+): Record<string, T> | undefined {
+  if (isKnown && Object.keys(changes).length === 0) return without(map, key)
+  return { ...(map ?? {}), [key]: changes }
+}
+
 function without<T extends object>(map: T | undefined, key: string): T | undefined {
   if (!map || !(key in map)) return map
   const next = { ...map } as Record<string, unknown>
@@ -182,6 +212,9 @@ function StatsCard({ scoring, published, patch, setScoring }: SectionProps) {
   const [adding, setAdding] = useState(false)
   const [filter, setFilter] = useState("")
   const [pending, setPending] = useState<ConfirmRequest | null>(null)
+  // Which row's dialog is open, by key rather than by value: the row is
+  // read fresh on render, so nothing stale can sit in the box.
+  const [editing, setEditing] = useState<string | null>(null)
   const removed = patch.statsRemoved ?? []
 
   // How many emblems go with a stat. The catalog is the cross product, so
@@ -242,16 +275,7 @@ function StatsCard({ scoring, published, patch, setScoring }: SectionProps) {
                 spec={scoring.stats[key]!}
                 was={published.stats[key]}
                 entry={patch.stats?.[key]}
-                colorOptions={colorOptions}
-                onEdit={(field, value) =>
-                  setScoring({
-                    ...patch,
-                    stats: {
-                      ...(patch.stats ?? {}),
-                      [key]: { ...(patch.stats?.[key] ?? {}), [field]: value },
-                    },
-                  })
-                }
+                onEdit={() => setEditing(key)}
                 onUndo={() => setScoring({ ...patch, stats: without(patch.stats, key) })}
                 onRemove={() =>
                   setPending({
@@ -328,6 +352,69 @@ function StatsCard({ scoring, published, patch, setScoring }: SectionProps) {
         }
       />
 
+      {editing !== null && scoring.stats[editing] ? (
+        <EditDialog
+          open
+          onOpenChange={(open) => !open && setEditing(null)}
+          title={`Edit ${statLabel(editing)}`}
+          description="What this stat pays, and which emblem colour carries it."
+          value={{
+            perUnit: scoring.stats[editing].perUnit,
+            base: scoring.stats[editing].base,
+            color: scoring.stats[editing].color,
+          }}
+          onSave={(next) => {
+            const base = published.stats[editing]
+            const changes: StatPatch = {}
+            if (!base || next.perUnit !== base.perUnit) changes.perUnit = next.perUnit
+            if (!base || next.base !== base.base) changes.base = next.base
+            if (!base || next.color !== base.color) changes.color = next.color
+            setScoring({
+              ...patch,
+              stats: mergeEntry(patch.stats, editing, changes, base !== undefined),
+            })
+          }}
+        >
+          {(draft, set) => (
+            <>
+              <EditField
+                label="Points per unit"
+                was={published.stats[editing]?.perUnit}
+                hint="Signed — Deaths pays -195."
+              >
+                <NumberCell
+                  value={draft.perUnit}
+                  width="w-full"
+                  onCommit={(v) => set("perUnit", v)}
+                />
+              </EditField>
+
+              <EditField
+                label="Flat base"
+                was={published.stats[editing]?.base}
+                hint="Paid once if the stat is present at all, before the per-unit amount."
+              >
+                <NumberCell value={draft.base} width="w-full" onCommit={(v) => set("base", v)} />
+              </EditField>
+
+              <EditField
+                label="Colour"
+                was={published.stats[editing] && capitalize(published.stats[editing].color)}
+                hint="Decides which banner slots can hold this stat."
+              >
+                <SelectCell
+                  label="Colour"
+                  value={draft.color}
+                  options={colorOptions}
+                  width="w-full"
+                  onChange={(v) => set("color", v)}
+                />
+              </EditField>
+            </>
+          )}
+        </EditDialog>
+      ) : null}
+
       <ConfirmDialog request={pending} onClose={() => setPending(null)} />
     </Card>
   )
@@ -338,7 +425,6 @@ function StatRow({
   spec,
   was,
   entry,
-  colorOptions,
   onEdit,
   onUndo,
   onRemove,
@@ -347,8 +433,7 @@ function StatRow({
   spec: Scoring["stats"][string]
   was: Scoring["stats"][string] | undefined
   entry: StatPatch | undefined
-  colorOptions: { value: string; label: string }[]
-  onEdit: (field: keyof StatPatch, value: unknown) => void
+  onEdit: () => void
   onUndo: () => void
   onRemove: () => void
 }) {
@@ -358,8 +443,7 @@ function StatRow({
         <div className="flex items-center gap-1.5">
           {/* The words only. The key is still what an emblem id is built from
               and what the YAML export names, so it is on the title rather than
-              gone -- but eighteen of them in lower snake case beside their own
-              labels was the same fact twice, in the harder-to-read spelling. */}
+              gone. */}
           <span className="text-sm font-medium" title={statKey}>
             {statLabel(statKey)}
           </span>
@@ -373,42 +457,30 @@ function StatRow({
       </TableCell>
 
       <TableCell>
-        <Cell changed={entry?.perUnit !== undefined} was={was?.perUnit}>
-          <NumberCell
-            value={spec.perUnit}
-            changed={entry?.perUnit !== undefined}
-            onCommit={(v) => onEdit("perUnit", v)}
-          />
-        </Cell>
+        <ValueCell
+          value={spec.perUnit}
+          was={was?.perUnit}
+          changed={entry?.perUnit !== undefined}
+        />
       </TableCell>
 
       <TableCell>
-        <Cell changed={entry?.base !== undefined} was={was?.base}>
-          <NumberCell
-            value={spec.base}
-            changed={entry?.base !== undefined}
-            onCommit={(v) => onEdit("base", v)}
-          />
-        </Cell>
+        <ValueCell value={spec.base} was={was?.base} changed={entry?.base !== undefined} />
       </TableCell>
 
       <TableCell>
-        <Cell changed={entry?.color !== undefined} was={was && capitalize(was.color)}>
-          <SelectCell
-            label={`${statLabel(statKey)} colour`}
-            value={spec.color}
-            options={colorOptions}
-            changed={entry?.color !== undefined}
-            width="w-28"
-            onChange={(v) => onEdit("color", v)}
-          />
-        </Cell>
+        <ValueCell
+          value={capitalize(spec.color)}
+          was={was && capitalize(was.color)}
+          changed={entry?.color !== undefined}
+        />
       </TableCell>
 
       <TableCell className="pr-6">
         <RowActions
           what={statLabel(statKey)}
           changed={Boolean(entry)}
+          onEdit={onEdit}
           onUndo={onUndo}
           onRemove={onRemove}
         />
@@ -424,6 +496,9 @@ function StatRow({
 function TraitsCard({ scoring, published, patch, setScoring }: SectionProps) {
   const [adding, setAdding] = useState(false)
   const [pending, setPending] = useState<ConfirmRequest | null>(null)
+  // Which row's dialog is open, by key rather than by value: the row is
+  // read fresh on render, so nothing stale can sit in the box.
+  const [editing, setEditing] = useState<string | null>(null)
   const removed = patch.traitsRemoved ?? []
   const perTrait = Object.keys(scoring.stats).length * Object.keys(scoring.quality).length
 
@@ -467,15 +542,7 @@ function TraitsCard({ scoring, published, patch, setScoring }: SectionProps) {
                 spec={spec}
                 was={published.traits[name]}
                 entry={patch.traits?.[name]}
-                onEdit={(field, value) =>
-                  setScoring({
-                    ...patch,
-                    traits: {
-                      ...(patch.traits ?? {}),
-                      [name]: { ...(patch.traits?.[name] ?? {}), [field]: value },
-                    },
-                  })
-                }
+                onEdit={() => setEditing(name)}
                 onUndo={() => setScoring({ ...patch, traits: without(patch.traits, name) })}
                 onRemove={() =>
                   setPending({
@@ -537,6 +604,87 @@ function TraitsCard({ scoring, published, patch, setScoring }: SectionProps) {
         }
       />
 
+      {editing !== null && scoring.traits[editing] ? (
+        <EditDialog
+          open
+          onOpenChange={(open) => !open && setEditing(null)}
+          title={`Edit ${traitLabel(editing)}`}
+          description="What it pays itself, and what it does to the emblem on either side."
+          value={{
+            bonus: scoring.traits[editing].bonus,
+            adjacentBonus: scoring.traits[editing].adjacentBonus,
+            conditionRule: scoring.traits[editing].conditionRule ?? "always",
+            condition: scoring.traits[editing].condition ?? "",
+          }}
+          onSave={(next) => {
+            const base = published.traits[editing]
+            const changes: TraitPatch = {}
+            if (!base || next.bonus !== base.bonus) changes.bonus = next.bonus
+            if (!base || next.adjacentBonus !== base.adjacentBonus) {
+              changes.adjacentBonus = next.adjacentBonus
+            }
+            if (!base || next.conditionRule !== base.conditionRule) {
+              changes.conditionRule = next.conditionRule
+            }
+            if (!base || next.condition !== (base.condition ?? "")) {
+              changes.condition = next.condition || null
+            }
+            setScoring({
+              ...patch,
+              traits: mergeEntry(patch.traits, editing, changes, base !== undefined),
+            })
+          }}
+        >
+          {(draft, set) => (
+            <>
+              <EditField label="Own bonus" was={pct(published.traits[editing]?.bonus)}>
+                <PercentCell value={draft.bonus} onCommit={(v) => set("bonus", v)} />
+              </EditField>
+
+              <EditField
+                label="To each neighbour"
+                was={pct(published.traits[editing]?.adjacentBonus)}
+                hint="Applied to the emblem above and below. Negative charges them."
+              >
+                <PercentCell
+                  value={draft.adjacentBonus}
+                  onCommit={(v) => set("adjacentBonus", v)}
+                />
+              </EditField>
+
+              <EditField
+                label="Rule"
+                was={
+                  published.traits[editing]?.conditionRule
+                    ? ruleLabel(published.traits[editing].conditionRule)
+                    : undefined
+                }
+                hint={RULE_DETAIL[draft.conditionRule] ?? "No rule named — pays nothing."}
+              >
+                <SelectCell
+                  label="Rule"
+                  value={draft.conditionRule}
+                  options={CONDITION_RULES}
+                  width="w-full"
+                  onChange={(v) => set("conditionRule", v as TraitRule)}
+                />
+              </EditField>
+
+              <EditField
+                label="Condition, in words"
+                hint="Shown to readers. Never evaluated — the rule above is what fires."
+              >
+                <TextCell
+                  value={draft.condition}
+                  placeholder="All emblem qualities differ"
+                  onCommit={(v) => set("condition", v)}
+                />
+              </EditField>
+            </>
+          )}
+        </EditDialog>
+      ) : null}
+
       <ConfirmDialog request={pending} onClose={() => setPending(null)} />
     </Card>
   )
@@ -555,7 +703,7 @@ function TraitRow({
   spec: Scoring["traits"][string]
   was: Scoring["traits"][string] | undefined
   entry: TraitPatch | undefined
-  onEdit: (field: keyof TraitPatch, value: unknown) => void
+  onEdit: () => void
   onUndo: () => void
   onRemove: () => void
 }) {
@@ -569,61 +717,42 @@ function TraitRow({
       </TableCell>
 
       <TableCell>
-        <Cell changed={entry?.bonus !== undefined} was={pct(was?.bonus)}>
-          <PercentCell
-            value={spec.bonus}
-            changed={entry?.bonus !== undefined}
-            onCommit={(v) => onEdit("bonus", v)}
-          />
-        </Cell>
+        <ValueCell
+          value={pct(spec.bonus)}
+          was={pct(was?.bonus)}
+          changed={entry?.bonus !== undefined}
+        />
       </TableCell>
 
       <TableCell>
-        <Cell changed={entry?.adjacentBonus !== undefined} was={pct(was?.adjacentBonus)}>
-          <PercentCell
-            value={spec.adjacentBonus}
-            changed={entry?.adjacentBonus !== undefined}
-            onCommit={(v) => onEdit("adjacentBonus", v)}
-          />
-        </Cell>
+        <ValueCell
+          value={pct(spec.adjacentBonus)}
+          was={pct(was?.adjacentBonus)}
+          changed={entry?.adjacentBonus !== undefined}
+        />
       </TableCell>
 
       <TableCell>
-        <Cell changed={entry?.conditionRule !== undefined} was={was?.conditionRule ?? undefined}>
-          <SelectCell
-            label={`${name} condition rule`}
-            value={spec.conditionRule ?? ""}
-            options={CONDITION_RULES}
-            changed={entry?.conditionRule !== undefined}
-            width="w-40"
-            format={(v) => CONDITION_RULES.find((r) => r.value === v)?.label ?? "Name the rule"}
-            onChange={(v) => onEdit("conditionRule", v)}
-          />
-        </Cell>
+        <ValueCell
+          value={ruleLabel(spec.conditionRule)}
+          was={was?.conditionRule ? ruleLabel(was.conditionRule) : undefined}
+          changed={entry?.conditionRule !== undefined}
+        />
       </TableCell>
 
-      {/* Its own column rather than a second line under the select, so the row
-          stays one line tall and the rule reads across from its name. */}
       <TableCell className="text-muted-foreground max-w-56 text-2xs whitespace-normal">
         {RULE_DETAIL[spec.conditionRule ?? ""] ?? "No rule named — scored as paying nothing."}
       </TableCell>
 
-      <TableCell>
-        <Cell changed={entry?.condition !== undefined}>
-          <TextCell
-            value={spec.condition ?? ""}
-            changed={entry?.condition !== undefined}
-            placeholder="All emblem qualities differ"
-            className="w-72"
-            onCommit={(v) => onEdit("condition", v || null)}
-          />
-        </Cell>
+      <TableCell className="text-muted-foreground max-w-64 text-xs whitespace-normal">
+        {spec.condition || "—"}
       </TableCell>
 
       <TableCell className="pr-6">
         <RowActions
           what={traitLabel(name)}
           changed={Boolean(entry)}
+          onEdit={onEdit}
           onUndo={onUndo}
           onRemove={onRemove}
         />
@@ -639,6 +768,9 @@ function TraitRow({
 function QualityCard({ scoring, published, patch, setScoring }: SectionProps) {
   const [adding, setAdding] = useState(false)
   const [pending, setPending] = useState<ConfirmRequest | null>(null)
+  // Which row's dialog is open, by key rather than by value: the row is
+  // read fresh on render, so nothing stale can sit in the box.
+  const [editing, setEditing] = useState<string | null>(null)
   const removed = patch.qualityRemoved ?? []
   const perTier = Object.keys(scoring.stats).length * Object.keys(scoring.traits).length
 
@@ -675,6 +807,7 @@ function QualityCard({ scoring, published, patch, setScoring }: SectionProps) {
                   <RowActions
                     what={tierLabel(tier)}
                     changed={changed}
+                    onEdit={() => setEditing(tier)}
                     onUndo={() => setScoring({ ...patch, quality: without(patch.quality, tier) })}
                     onRemove={() =>
                       setPending({
@@ -693,13 +826,7 @@ function QualityCard({ scoring, published, patch, setScoring }: SectionProps) {
                     }
                   />
                 </div>
-                <PercentCell
-                  value={bonus}
-                  changed={changed}
-                  onCommit={(v) =>
-                    setScoring({ ...patch, quality: { ...(patch.quality ?? {}), [tier]: v } })
-                  }
-                />
+                <p className={changed ? "text-sm font-medium" : "text-sm"}>{pct(bonus)}</p>
                 <p className="text-muted-foreground min-h-4 text-2xs">
                   {changed ? `was ${pct(published.quality[tier]) ?? "absent"}` : null}
                 </p>
@@ -736,6 +863,31 @@ function QualityCard({ scoring, published, patch, setScoring }: SectionProps) {
           setScoring({ ...patch, quality: { ...(patch.quality ?? {}), [key]: 0 } })
         }
       />
+
+      {editing !== null && scoring.quality[editing] !== undefined ? (
+        <EditDialog
+          open
+          onOpenChange={(open) => !open && setEditing(null)}
+          title={`Edit ${tierLabel(editing)}`}
+          description="What this tier adds to an emblem's multiplier."
+          value={{ bonus: scoring.quality[editing] }}
+          onSave={(next) => {
+            setScoring({
+              ...patch,
+              quality:
+                next.bonus === published.quality[editing]
+                  ? without(patch.quality, editing)
+                  : { ...(patch.quality ?? {}), [editing]: next.bonus },
+            })
+          }}
+        >
+          {(draft, set) => (
+            <EditField label="Quality bonus" was={pct(published.quality[editing])}>
+              <PercentCell value={draft.bonus} onCommit={(v) => set("bonus", v)} />
+            </EditField>
+          )}
+        </EditDialog>
+      ) : null}
 
       <ConfirmDialog request={pending} onClose={() => setPending(null)} />
     </Card>

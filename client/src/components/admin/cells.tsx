@@ -1,5 +1,5 @@
 import type { ReactNode } from "react"
-import { Search, Trash2, Undo2 } from "lucide-react"
+import { Pencil, Search, Trash2, Undo2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -331,21 +331,32 @@ export function LabelledField({
   )
 }
 
-/** Undo and remove, together and in this order, because every editable thing on
- * this page offers exactly these two and they must not move between rows. */
+/** Edit, undo and remove, in this order, because every editable thing on this
+ * page offers exactly these three and they must not move between rows. */
 export function RowActions({
   what,
   changed,
+  onEdit,
   onUndo,
   onRemove,
 }: {
   what: string
   changed: boolean
+  onEdit: () => void
   onUndo: () => void
   onRemove: () => void
 }) {
   return (
     <div className="flex items-center justify-end gap-0.5">
+      <Button
+        size="icon-sm"
+        variant="ghost"
+        className="size-7"
+        aria-label={`Edit ${what}`}
+        onClick={onEdit}
+      >
+        <Pencil aria-hidden />
+      </Button>
       <UndoCell changed={changed} what={what} onRevert={onUndo} />
       <Button
         size="icon-sm"
@@ -357,5 +368,30 @@ export function RowActions({
         <Trash2 aria-hidden />
       </Button>
     </div>
+  )
+}
+
+/** A value a row only displays, with what the published run said beside it.
+ *
+ * The rows stopped being editable in place, so most cells are now this: the
+ * number, and -- when an overlay has moved it -- the number it moved from. Same
+ * inline placement as an edited cell had, so a changed row is still the same
+ * height as an unchanged one. */
+export function ValueCell({
+  value,
+  was,
+  changed,
+}: {
+  value: ReactNode
+  was?: ReactNode
+  changed: boolean
+}) {
+  return (
+    <span className="flex items-center gap-1.5">
+      <span className={cn("tabular-nums", changed && "font-medium")}>{value}</span>
+      {changed && was !== undefined ? (
+        <span className="text-muted-foreground shrink-0 text-2xs tabular-nums">was {was}</span>
+      ) : null}
+    </span>
   )
 }
