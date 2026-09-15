@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react"
-import { Plus } from "lucide-react"
+import { ChevronRight, Plus } from "lucide-react"
 
 import { AddDialog } from "@/components/admin/add-dialog"
 import { ConfirmDialog, type ConfirmRequest } from "@/components/admin/confirm-dialog"
@@ -20,6 +20,12 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
   Table,
   TableBody,
   TableCell,
@@ -28,6 +34,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useMediaQuery } from "@/hooks/use-media-query"
 import { validateKey } from "@/lib/admin-ui"
 import { tierLabel, traitLabel } from "@/lib/emblem-catalog"
 import { capitalize, ROLE_LABEL, statLabel } from "@/lib/labels"
@@ -53,6 +60,15 @@ import type { Scoring } from "@/types/run"
  * by the other three being below the fold rather than behind a tab -- they were
  * not comparable with each other, only with the client. Comparison happens
  * WITHIN a table, which is why the rows are dense and the tables are not.
+ *
+ * Below 768px -- where the page is one column and the rail sits on top of the
+ * editor rather than beside it -- the strip becomes a list of four and the
+ * table opens over the page instead of under it. A tab strip promises that what
+ * is under it is the page; stacked, the rail, the draft controls and the
+ * caveats were above it, so "under it" was most of a scroll away and the table
+ * arrived without the width it was designed for. A dialog is the honest version
+ * of the same move: one table, the viewport it needs, and a way back that is
+ * not a scroll.
  */
 
 /** The rules the scorer implements. A closed list because they are code: a
@@ -215,6 +231,84 @@ export function ScoringEditor({
   // would put something in the page's state that cannot change an answer.
   const [pane, setPane] = useState<string>(PANES[0].value)
 
+  // Whether the four tables have a page wide enough to sit in. Below this they
+  // open in a dialog instead -- see the note above the component.
+  //
+  // 48rem, the same width at which the page itself stops being one column and
+  // puts the rail beside the editor. Two breakpoints would mean a band where
+  // the layout says there is room for two columns and this says there is not
+  // room for one, which is the state the strip was in at 768px: a rail, an
+  // editor column beside it, and four buttons in it leading nowhere on the page.
+  const wide = useMediaQuery("(min-width: 48rem)")
+  const [open, setOpen] = useState(false)
+
+  const table = (value: string) =>
+    value === "stats" ? (
+      <StatsCard {...shared} />
+    ) : value === "traits" ? (
+      <TraitsCard {...shared} />
+    ) : value === "quality" ? (
+      <QualityCard {...shared} />
+    ) : (
+      <ColorsCard {...shared} />
+    )
+
+  if (!wide) {
+    const current = PANES.find((entry) => entry.value === pane) ?? PANES[0]
+
+    return (
+      <div className="grid gap-3">
+        {/* Buttons, not tabs. A tab strip whose triggers open a dialog claims a
+            relationship to a panel below that is not there, and says so to a
+            screen reader in the roles it hands out. */}
+        <div className="grid gap-2">
+          {PANES.map((entry) => (
+            <Button
+              key={entry.value}
+              variant="outline"
+              className="justify-between"
+              onClick={() => {
+                setPane(entry.value)
+                setOpen(true)
+              }}
+            >
+              {entry.label}
+              <ChevronRight aria-hidden />
+            </Button>
+          ))}
+        </div>
+
+        <Dialog open={open} onOpenChange={setOpen}>
+          {/* The card is the surface here, so the dialog gives up its own: its
+              padding, background and ring would be a second frame drawn around
+              one that already has a heading, a description and an action. The
+              cross goes with them -- it lands on top of the card's own button
+              -- and "Done" below the table takes its place, which is also where
+              a thumb already is after scrolling one. */}
+          {/* Two rows: the table takes what is left and scrolls inside itself,
+              and the button is its own row. Scrolling the whole box instead put
+              the way out at the bottom of the table's own scroll length, where
+              it was reached last and clipped by the box's edge when it was
+              reached at all. */}
+          <DialogContent
+            showCloseButton={false}
+            className="grid max-h-[85dvh] max-w-[calc(100%-1rem)] grid-rows-[minmax(0,1fr)_auto] gap-2 overflow-hidden bg-transparent p-0 ring-0 sm:max-w-3xl"
+          >
+            {/* The card states the same word a line below. Kept for the
+                accessible name, which a dialog is required to have. */}
+            <DialogTitle className="sr-only">{current.label}</DialogTitle>
+
+            <div className="min-h-0 overflow-y-auto">{table(current.value)}</div>
+
+            <DialogClose render={<Button variant="outline" className="w-full" />}>
+              Done
+            </DialogClose>
+          </DialogContent>
+        </Dialog>
+      </div>
+    )
+  }
+
   return (
     <Tabs value={pane} onValueChange={(next) => setPane(next as string)} className="gap-3">
       {/* The same segmented control the public tool uses for its two
@@ -228,18 +322,11 @@ export function ScoringEditor({
         ))}
       </TabsList>
 
-      <TabsContent value="stats">
-        <StatsCard {...shared} />
-      </TabsContent>
-      <TabsContent value="traits">
-        <TraitsCard {...shared} />
-      </TabsContent>
-      <TabsContent value="quality">
-        <QualityCard {...shared} />
-      </TabsContent>
-      <TabsContent value="colours">
-        <ColorsCard {...shared} />
-      </TabsContent>
+      {PANES.map((entry) => (
+        <TabsContent key={entry.value} value={entry.value}>
+          {table(entry.value)}
+        </TabsContent>
+      ))}
     </Tabs>
   )
 }
@@ -975,7 +1062,6 @@ function QualityCard({ scoring, published, patch, setScoring }: SectionProps) {
           open
           onOpenChange={(open) => !open && setEditing(null)}
           title={`Edit ${tierLabel(editing)}`}
-          description="What this tier adds to an emblem's multiplier."
           value={{ bonus: scoring.quality[editing] }}
           onSave={(next) => {
             setScoring({
@@ -988,7 +1074,15 @@ function QualityCard({ scoring, published, patch, setScoring }: SectionProps) {
           }}
         >
           {(draft, set) => (
-            <EditField label="Quality bonus" was={pct(published.quality[editing])}>
+            // One field, so what the number MEANS goes on the field's own line
+            // beside what the published run says, rather than in a dialog
+            // description above a label that names the same number again. Three
+            // headings over one input is what made this box feel full.
+            <EditField
+              label="Quality bonus"
+              was={pct(published.quality[editing])}
+              hint="Added to an emblem's multiplier."
+            >
               <PercentCell value={draft.bonus} onCommit={(v) => set("bonus", v)} />
             </EditField>
           )}
