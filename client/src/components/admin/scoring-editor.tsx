@@ -257,6 +257,7 @@ function StatsCard({ scoring, published, patch, setScoring }: SectionProps) {
                   setPending({
                     title: `Remove ${statLabel(key)}?`,
                     detail: `${perStat} emblems carry this stat and go from the catalog with it.`,
+                    confirmText: statLabel(key),
                     confirmLabel: "Remove stat",
                     reversible: true,
                     onConfirm: () =>
@@ -480,6 +481,7 @@ function TraitsCard({ scoring, published, patch, setScoring }: SectionProps) {
                   setPending({
                     title: `Remove ${traitLabel(name)}?`,
                     detail: `${perTrait} emblems carry this trait and go from the catalog with it.`,
+                    confirmText: traitLabel(name),
                     confirmLabel: "Remove trait",
                     reversible: true,
                     onConfirm: () =>
@@ -678,6 +680,7 @@ function QualityCard({ scoring, published, patch, setScoring }: SectionProps) {
                       setPending({
                         title: `Remove ${tierLabel(tier)}?`,
                         detail: `${perTier} emblems are at this tier and go from the catalog with it.`,
+                        confirmText: tierLabel(tier),
                         confirmLabel: "Remove tier",
                         reversible: true,
                         onConfirm: () =>

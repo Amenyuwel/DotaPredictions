@@ -169,6 +169,10 @@ export function AdminPage() {
                 title: "Discard this draft?",
                 detail:
                   "Every unpublished edit in it goes. What is live now is unaffected — the published version keeps serving.",
+                // A draft has no name of its own, so the stage it belongs to is
+                // what gets typed. It is still the thing being destroyed, and it
+                // is still on screen to be read off.
+                confirmText: config.scope.stage,
                 confirmLabel: "Discard draft",
                 // The one action here that writes through: it deletes the draft
                 // row rather than adding an entry to it, so the Removed list

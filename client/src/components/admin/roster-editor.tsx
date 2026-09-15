@@ -385,6 +385,7 @@ export function RosterEditor({
                               setPending({
                                 title: `Remove ${player.nick}?`,
                                 detail: `They leave ${selected.name} for this stage's overlay.`,
+                                confirmText: player.nick,
                                 confirmLabel: "Remove player",
                                 reversible: true,
                                 onConfirm: () =>
@@ -431,6 +432,7 @@ export function RosterEditor({
                     setPending({
                       title: `Remove ${selected.name}?`,
                       detail: `Its ${(byTeam.get(selected.teamId) ?? []).length} players go with it — a player on no team cannot be ranked at all.`,
+                      confirmText: selected.name,
                       confirmLabel: "Remove team",
                       reversible: true,
                       onConfirm: () =>
