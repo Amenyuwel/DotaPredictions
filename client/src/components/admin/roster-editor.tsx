@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react"
-import { AlertTriangle, Pencil, Plus, Trash2 } from "lucide-react"
+import { AlertTriangle, Pencil, Plus, Trash2, Undo2 } from "lucide-react"
 
 import { AddDialog } from "@/components/admin/add-dialog"
 import { ConfirmDialog, type ConfirmRequest } from "@/components/admin/confirm-dialog"
 import { EditDialog, EditField } from "@/components/admin/edit-dialog"
+import { UndoDialog, type ChangeRow } from "@/components/admin/undo-dialog"
 import {
   FilterField,
   RemovedChips,
@@ -78,6 +79,8 @@ export function RosterEditor({
   // so nothing stale can sit in the box.
   const [editingPlayer, setEditingPlayer] = useState<number | null>(null)
   const [editingTeam, setEditingTeam] = useState(false)
+  const [undoingPlayer, setUndoingPlayer] = useState<number | null>(null)
+  const [undoingTeam, setUndoingTeam] = useState(false)
 
   const teams = effective?.teams ?? config.published.teams
   const players = effective?.players ?? config.published.players
@@ -259,8 +262,7 @@ export function RosterEditor({
                   <dt className="text-muted-foreground text-xs">Name</dt>
                   <dd>
                     <ValueCell
-                      value={selected.name}
-                      was={publishedTeams.get(selected.teamId)?.name}
+                      value={doc.teams?.[String(selected.teamId)]?.name ?? selected.name}
                       changed={doc.teams?.[String(selected.teamId)]?.name !== undefined}
                     />
                   </dd>
@@ -269,8 +271,12 @@ export function RosterEditor({
                   <dt className="text-muted-foreground text-xs">Also played under</dt>
                   <dd>
                     <ValueCell
-                      value={selected.alsoTeamIds.join(", ") || "none"}
-                      was={publishedTeams.get(selected.teamId)?.alsoTeamIds.join(", ") || "none"}
+                      value={
+                        (
+                          doc.teams?.[String(selected.teamId)]?.alsoTeamIds ??
+                          selected.alsoTeamIds
+                        ).join(", ") || "none"
+                      }
                       changed={doc.teams?.[String(selected.teamId)]?.alsoTeamIds !== undefined}
                     />
                   </dd>
@@ -295,7 +301,6 @@ export function RosterEditor({
                 <TableBody>
                   {(byTeam.get(selected.teamId) ?? []).map((player) => {
                     const entry = doc.players?.[String(player.playerId)]
-                    const was = publishedPlayers.get(player.playerId)
                     return (
                       <TableRow
                         key={player.playerId}
@@ -303,8 +308,7 @@ export function RosterEditor({
                       >
                         <TableCell className="pl-6">
                           <ValueCell
-                            value={player.nick}
-                            was={was?.nick}
+                            value={entry?.nick ?? player.nick}
                             changed={entry?.nick !== undefined}
                           />
                         </TableCell>
@@ -324,16 +328,14 @@ export function RosterEditor({
 
                         <TableCell>
                           <ValueCell
-                            value={LANE_LABEL[player.lane]}
-                            was={was && LANE_LABEL[was.lane]}
+                            value={LANE_LABEL[entry?.lane ?? player.lane]}
                             changed={entry?.lane !== undefined}
                           />
                         </TableCell>
 
                         <TableCell>
                           <ValueCell
-                            value={ROLE_LABEL[player.fantasyRole]}
-                            was={was && ROLE_LABEL[was.fantasyRole]}
+                            value={ROLE_LABEL[entry?.fantasyRole ?? player.fantasyRole]}
                             changed={entry?.fantasyRole !== undefined}
                           />
                         </TableCell>
@@ -343,7 +345,7 @@ export function RosterEditor({
                             what={player.nick}
                             changed={Boolean(entry)}
                             onEdit={() => setEditingPlayer(player.playerId)}
-                            onUndo={() => dropKey("players", player.playerId)}
+                            onUndo={() => setUndoingPlayer(player.playerId)}
                             onRemove={() =>
                               setPending({
                                 title: `Remove ${player.nick}?`,
@@ -387,6 +389,17 @@ export function RosterEditor({
                   <Pencil aria-hidden />
                   Edit team
                 </Button>
+                {doc.teams?.[String(selected.teamId)] ? (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-xs"
+                    onClick={() => setUndoingTeam(true)}
+                  >
+                    <Undo2 aria-hidden />
+                    Undo
+                  </Button>
+                ) : null}
                 <Button
                   size="sm"
                   variant="ghost"
@@ -578,6 +591,32 @@ export function RosterEditor({
         </EditDialog>
       ) : null}
 
+      {undoingPlayer !== null && doc.players?.[String(undoingPlayer)] ? (
+        <UndoDialog
+          open
+          onOpenChange={(open) => !open && setUndoingPlayer(null)}
+          title={`Changes to ${publishedPlayers.get(undoingPlayer)?.nick ?? "this player"}`}
+          rows={playerChangeRows(
+            doc.players[String(undoingPlayer)],
+            publishedPlayers.get(undoingPlayer),
+          )}
+          onUndo={() => dropKey("players", undoingPlayer)}
+        />
+      ) : null}
+
+      {undoingTeam && selected && doc.teams?.[String(selected.teamId)] ? (
+        <UndoDialog
+          open
+          onOpenChange={(open) => !open && setUndoingTeam(false)}
+          title={`Changes to ${publishedTeams.get(selected.teamId)?.name ?? "this team"}`}
+          rows={teamChangeRows(
+            doc.teams[String(selected.teamId)],
+            publishedTeams.get(selected.teamId),
+          )}
+          onUndo={() => dropKey("teams", selected.teamId)}
+        />
+      ) : null}
+
       <ConfirmDialog request={pending} onClose={() => setPending(null)} />
     </div>
   )
@@ -660,4 +699,47 @@ function PlayerEditDialog({
       )}
     </EditDialog>
   )
+}
+
+/**
+ * The fields an override actually moves, paired with what the run says.
+ *
+ * Built from the OVERLAY entry rather than by diffing two whole rows: the entry
+ * already holds exactly the fields that differ, and diffing again would be a
+ * second opinion on the same question.
+ */
+function playerChangeRows(entry: PlayerPatch, base: Player | undefined): ChangeRow[] {
+  const rows: ChangeRow[] = []
+  if (entry.nick !== undefined) rows.push({ label: "Nickname", was: base?.nick, now: entry.nick })
+  if (entry.lane !== undefined) {
+    rows.push({
+      label: "Lane",
+      was: base && LANE_LABEL[base.lane],
+      now: LANE_LABEL[entry.lane],
+    })
+  }
+  if (entry.fantasyRole !== undefined) {
+    rows.push({
+      label: "Fantasy slot",
+      was: base && ROLE_LABEL[base.fantasyRole],
+      now: ROLE_LABEL[entry.fantasyRole],
+    })
+  }
+  return rows
+}
+
+function teamChangeRows(
+  entry: NonNullable<ConfigOverlay["teams"]>[string],
+  base: Team | undefined,
+): ChangeRow[] {
+  const rows: ChangeRow[] = []
+  if (entry.name !== undefined) rows.push({ label: "Name", was: base?.name, now: entry.name })
+  if (entry.alsoTeamIds !== undefined) {
+    rows.push({
+      label: "Also played under",
+      was: base ? base.alsoTeamIds.join(", ") || "none" : undefined,
+      now: entry.alsoTeamIds.join(", ") || "none",
+    })
+  }
+  return rows
 }

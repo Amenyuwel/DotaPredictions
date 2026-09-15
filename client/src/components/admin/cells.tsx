@@ -31,31 +31,6 @@ import { cn } from "@/lib/utils"
  * whether or not it is shown.
  */
 
-/** One edited cell: the control, plus what the published run said when they
- * differ. Inline rather than on a second line, so a changed row is the same
- * height as an unchanged one. */
-export function Cell({
-  changed,
-  was,
-  children,
-}: {
-  changed: boolean
-  was?: ReactNode
-  children: ReactNode
-}) {
-  return (
-    <div className="flex items-center gap-1.5">
-      {children}
-      {/* `aria-hidden` is wrong here -- this is the one piece of context that
-          says the value is not the engine's -- so it is read, and kept short
-          enough to be worth hearing on every cell of a changed row. */}
-      {changed && was !== undefined ? (
-        <span className="text-muted-foreground shrink-0 text-2xs tabular-nums">was {was}</span>
-      ) : null}
-    </div>
-  )
-}
-
 /** A number, held as text until it parses.
  *
  * Binding straight to a number makes "-" and "1." unrepresentable, so the field
@@ -371,27 +346,16 @@ export function RowActions({
   )
 }
 
-/** A value a row only displays, with what the published run said beside it.
+/** A value a row only displays.
  *
- * The rows stopped being editable in place, so most cells are now this: the
- * number, and -- when an overlay has moved it -- the number it moved from. Same
- * inline placement as an edited cell had, so a changed row is still the same
- * height as an unchanged one. */
-export function ValueCell({
-  value,
-  was,
-  changed,
-}: {
-  value: ReactNode
-  was?: ReactNode
-  changed: boolean
-}) {
-  return (
-    <span className="flex items-center gap-1.5">
-      <span className={cn("tabular-nums", changed && "font-medium")}>{value}</span>
-      {changed && was !== undefined ? (
-        <span className="text-muted-foreground shrink-0 text-2xs tabular-nums">was {was}</span>
-      ) : null}
-    </span>
-  )
+ * What the published run said used to sit beside it -- "1340 was 1172" on every
+ * changed cell. That is the right information in the wrong place: it is wanted
+ * only when deciding whether to keep the change, and the rest of the time it
+ * doubles the width of a column that is otherwise one number. The undo control
+ * opens it now, for the whole row at once.
+ *
+ * Weight is what marks a changed value here, so the row still reads as edited
+ * at a glance and keeps exactly one height either way. */
+export function ValueCell({ value, changed }: { value: ReactNode; changed: boolean }) {
+  return <span className={cn("tabular-nums", changed && "font-medium")}>{value}</span>
 }

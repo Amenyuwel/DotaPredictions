@@ -4,6 +4,7 @@ import { Plus } from "lucide-react"
 import { AddDialog } from "@/components/admin/add-dialog"
 import { ConfirmDialog, type ConfirmRequest } from "@/components/admin/confirm-dialog"
 import { EditDialog, EditField } from "@/components/admin/edit-dialog"
+import { UndoDialog, type ChangeRow } from "@/components/admin/undo-dialog"
 import {
   FilterField,
   LabelledField,
@@ -95,6 +96,67 @@ const pct = (value: number | undefined) =>
  * exists to prevent. An empty map left behind is the same problem smaller: it
  * still counts as a change and still publishes.
  */
+/**
+ * The fields an override actually moves, paired with what the run says.
+ *
+ * Built from the OVERLAY entry rather than by diffing two whole rows: the entry
+ * already holds exactly the fields that differ, because `mergeEntry` writes
+ * only those. Diffing again here would be a second opinion on the same
+ * question, and the two could disagree.
+ */
+function statChangeRows(
+  entry: StatPatch,
+  base: Scoring["stats"][string] | undefined,
+): ChangeRow[] {
+  const rows: ChangeRow[] = []
+  if (entry.perUnit !== undefined) {
+    rows.push({ label: "Points per unit", was: base?.perUnit, now: entry.perUnit })
+  }
+  if (entry.base !== undefined) {
+    rows.push({ label: "Flat base", was: base?.base, now: entry.base })
+  }
+  if (entry.color !== undefined) {
+    rows.push({
+      label: "Colour",
+      was: base && capitalize(base.color),
+      now: capitalize(entry.color),
+    })
+  }
+  return rows
+}
+
+function traitChangeRows(
+  entry: TraitPatch,
+  base: Scoring["traits"][string] | undefined,
+): ChangeRow[] {
+  const rows: ChangeRow[] = []
+  if (entry.bonus !== undefined) {
+    rows.push({ label: "Own bonus", was: pct(base?.bonus), now: pct(entry.bonus) })
+  }
+  if (entry.adjacentBonus !== undefined) {
+    rows.push({
+      label: "To each neighbour",
+      was: pct(base?.adjacentBonus),
+      now: pct(entry.adjacentBonus),
+    })
+  }
+  if (entry.conditionRule !== undefined) {
+    rows.push({
+      label: "Rule",
+      was: base?.conditionRule ? ruleLabel(base.conditionRule) : undefined,
+      now: ruleLabel(entry.conditionRule),
+    })
+  }
+  if (entry.condition !== undefined) {
+    rows.push({
+      label: "Condition, in words",
+      was: base?.condition ?? undefined,
+      now: entry.condition || "—",
+    })
+  }
+  return rows
+}
+
 /** The rule names, as a type, so a select cannot hand back a string the
  * contract does not admit. */
 type TraitRule = NonNullable<TraitPatch["conditionRule"]>
@@ -215,6 +277,7 @@ function StatsCard({ scoring, published, patch, setScoring }: SectionProps) {
   // Which row's dialog is open, by key rather than by value: the row is
   // read fresh on render, so nothing stale can sit in the box.
   const [editing, setEditing] = useState<string | null>(null)
+  const [undoing, setUndoing] = useState<string | null>(null)
   const removed = patch.statsRemoved ?? []
 
   // How many emblems go with a stat. The catalog is the cross product, so
@@ -276,7 +339,7 @@ function StatsCard({ scoring, published, patch, setScoring }: SectionProps) {
                 was={published.stats[key]}
                 entry={patch.stats?.[key]}
                 onEdit={() => setEditing(key)}
-                onUndo={() => setScoring({ ...patch, stats: without(patch.stats, key) })}
+                onUndo={() => setUndoing(key)}
                 onRemove={() =>
                   setPending({
                     title: `Remove ${statLabel(key)}?`,
@@ -351,6 +414,16 @@ function StatsCard({ scoring, published, patch, setScoring }: SectionProps) {
           })
         }
       />
+
+      {undoing !== null && patch.stats?.[undoing] ? (
+        <UndoDialog
+          open
+          onOpenChange={(open) => !open && setUndoing(null)}
+          title={`Changes to ${statLabel(undoing)}`}
+          rows={statChangeRows(patch.stats[undoing], published.stats[undoing])}
+          onUndo={() => setScoring({ ...patch, stats: without(patch.stats, undoing) })}
+        />
+      ) : null}
 
       {editing !== null && scoring.stats[editing] ? (
         <EditDialog
@@ -437,6 +510,16 @@ function StatRow({
   onUndo: () => void
   onRemove: () => void
 }) {
+  // What this row currently SAYS, which is the draft's value where it has one.
+  // `spec` is the effective table, and that falls back to the published run
+  // while there are unsaved edits -- so reading it alone showed the published
+  // number on a row marked as changed.
+  const shown = {
+    perUnit: entry?.perUnit ?? spec.perUnit,
+    base: entry?.base ?? spec.base,
+    color: entry?.color ?? spec.color,
+  }
+
   return (
     <TableRow className={entry ? "bg-primary/5" : undefined}>
       <TableCell className="pl-6">
@@ -457,23 +540,15 @@ function StatRow({
       </TableCell>
 
       <TableCell>
-        <ValueCell
-          value={spec.perUnit}
-          was={was?.perUnit}
-          changed={entry?.perUnit !== undefined}
-        />
+        <ValueCell value={shown.perUnit} changed={entry?.perUnit !== undefined} />
       </TableCell>
 
       <TableCell>
-        <ValueCell value={spec.base} was={was?.base} changed={entry?.base !== undefined} />
+        <ValueCell value={shown.base} changed={entry?.base !== undefined} />
       </TableCell>
 
       <TableCell>
-        <ValueCell
-          value={capitalize(spec.color)}
-          was={was && capitalize(was.color)}
-          changed={entry?.color !== undefined}
-        />
+        <ValueCell value={capitalize(shown.color)} changed={entry?.color !== undefined} />
       </TableCell>
 
       <TableCell className="pr-6">
@@ -499,6 +574,7 @@ function TraitsCard({ scoring, published, patch, setScoring }: SectionProps) {
   // Which row's dialog is open, by key rather than by value: the row is
   // read fresh on render, so nothing stale can sit in the box.
   const [editing, setEditing] = useState<string | null>(null)
+  const [undoing, setUndoing] = useState<string | null>(null)
   const removed = patch.traitsRemoved ?? []
   const perTrait = Object.keys(scoring.stats).length * Object.keys(scoring.quality).length
 
@@ -543,7 +619,7 @@ function TraitsCard({ scoring, published, patch, setScoring }: SectionProps) {
                 was={published.traits[name]}
                 entry={patch.traits?.[name]}
                 onEdit={() => setEditing(name)}
-                onUndo={() => setScoring({ ...patch, traits: without(patch.traits, name) })}
+                onUndo={() => setUndoing(name)}
                 onRemove={() =>
                   setPending({
                     title: `Remove ${traitLabel(name)}?`,
@@ -603,6 +679,16 @@ function TraitsCard({ scoring, published, patch, setScoring }: SectionProps) {
           })
         }
       />
+
+      {undoing !== null && patch.traits?.[undoing] ? (
+        <UndoDialog
+          open
+          onOpenChange={(open) => !open && setUndoing(null)}
+          title={`Changes to ${traitLabel(undoing)}`}
+          rows={traitChangeRows(patch.traits[undoing], published.traits[undoing])}
+          onUndo={() => setScoring({ ...patch, traits: without(patch.traits, undoing) })}
+        />
+      ) : null}
 
       {editing !== null && scoring.traits[editing] ? (
         <EditDialog
@@ -707,6 +793,15 @@ function TraitRow({
   onUndo: () => void
   onRemove: () => void
 }) {
+  // See `StatRow`: the effective table falls back to the published run while
+  // there are unsaved edits, so the draft's own value has to win here.
+  const shown = {
+    bonus: entry?.bonus ?? spec.bonus,
+    adjacentBonus: entry?.adjacentBonus ?? spec.adjacentBonus,
+    conditionRule: entry?.conditionRule ?? spec.conditionRule,
+    condition: entry?.condition !== undefined ? entry.condition : spec.condition,
+  }
+
   return (
     <TableRow className={entry ? "bg-primary/5" : undefined}>
       <TableCell className="pl-6">
@@ -717,35 +812,29 @@ function TraitRow({
       </TableCell>
 
       <TableCell>
-        <ValueCell
-          value={pct(spec.bonus)}
-          was={pct(was?.bonus)}
-          changed={entry?.bonus !== undefined}
-        />
+        <ValueCell value={pct(shown.bonus)} changed={entry?.bonus !== undefined} />
       </TableCell>
 
       <TableCell>
         <ValueCell
-          value={pct(spec.adjacentBonus)}
-          was={pct(was?.adjacentBonus)}
+          value={pct(shown.adjacentBonus)}
           changed={entry?.adjacentBonus !== undefined}
         />
       </TableCell>
 
       <TableCell>
         <ValueCell
-          value={ruleLabel(spec.conditionRule)}
-          was={was?.conditionRule ? ruleLabel(was.conditionRule) : undefined}
+          value={ruleLabel(shown.conditionRule)}
           changed={entry?.conditionRule !== undefined}
         />
       </TableCell>
 
       <TableCell className="text-muted-foreground max-w-56 text-2xs whitespace-normal">
-        {RULE_DETAIL[spec.conditionRule ?? ""] ?? "No rule named — scored as paying nothing."}
+        {RULE_DETAIL[shown.conditionRule ?? ""] ?? "No rule named — scored as paying nothing."}
       </TableCell>
 
       <TableCell className="text-muted-foreground max-w-64 text-xs whitespace-normal">
-        {spec.condition || "—"}
+        {shown.condition || "—"}
       </TableCell>
 
       <TableCell className="pr-6">
@@ -771,6 +860,7 @@ function QualityCard({ scoring, published, patch, setScoring }: SectionProps) {
   // Which row's dialog is open, by key rather than by value: the row is
   // read fresh on render, so nothing stale can sit in the box.
   const [editing, setEditing] = useState<string | null>(null)
+  const [undoing, setUndoing] = useState<string | null>(null)
   const removed = patch.qualityRemoved ?? []
   const perTier = Object.keys(scoring.stats).length * Object.keys(scoring.traits).length
 
@@ -808,7 +898,7 @@ function QualityCard({ scoring, published, patch, setScoring }: SectionProps) {
                     what={tierLabel(tier)}
                     changed={changed}
                     onEdit={() => setEditing(tier)}
-                    onUndo={() => setScoring({ ...patch, quality: without(patch.quality, tier) })}
+                    onUndo={() => setUndoing(tier)}
                     onRemove={() =>
                       setPending({
                         title: `Remove ${tierLabel(tier)}?`,
@@ -863,6 +953,22 @@ function QualityCard({ scoring, published, patch, setScoring }: SectionProps) {
           setScoring({ ...patch, quality: { ...(patch.quality ?? {}), [key]: 0 } })
         }
       />
+
+      {undoing !== null && patch.quality?.[undoing] !== undefined ? (
+        <UndoDialog
+          open
+          onOpenChange={(open) => !open && setUndoing(null)}
+          title={`Changes to ${tierLabel(undoing)}`}
+          rows={[
+            {
+              label: "Quality bonus",
+              was: pct(published.quality[undoing]),
+              now: pct(patch.quality[undoing]),
+            },
+          ]}
+          onUndo={() => setScoring({ ...patch, quality: without(patch.quality, undoing) })}
+        />
+      ) : null}
 
       {editing !== null && scoring.quality[editing] !== undefined ? (
         <EditDialog
