@@ -73,27 +73,32 @@ export function EditDialog<T>({
             onSave(draft)
             onOpenChange(false)
           }}
-          className="grid gap-4"
+          className="grid gap-5"
         >
           <DialogHeader>
             <DialogTitle>{title}</DialogTitle>
             {description ? <DialogDescription>{description}</DialogDescription> : null}
           </DialogHeader>
 
-          <div className="grid gap-3">{children(draft, set)}</div>
+          <div className="grid gap-4">{children(draft, set)}</div>
 
           {/* Two meanings of "save" meet here, and conflating them is how an
               edit gets believed to be public when it is in a draft nobody has
-              published. */}
-          <p className="text-muted-foreground text-xs">
-            Saves into the draft. Nothing public changes until you publish.
-          </p>
-
-          <DialogFooter>
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-            <Button type="submit">Save</Button>
+              published. So it is said on the button's own bar rather than as a
+              paragraph in the body: it is a caption on this action, identical in
+              every one of these dialogs, and stacked above the footer it read as
+              one more thing to weigh up in a box that had four already. The
+              footer had the room standing empty. */}
+          <DialogFooter className="flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-muted-foreground text-xs">
+              Saves into the draft. Nothing public changes until you publish.
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+                Cancel
+              </Button>
+              <Button type="submit">Save</Button>
+            </div>
           </DialogFooter>
         </form>
       </DialogContent>
