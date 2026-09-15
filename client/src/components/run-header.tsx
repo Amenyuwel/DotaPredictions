@@ -1,9 +1,11 @@
 import type { ReactNode } from "react"
-import { AlertTriangle } from "lucide-react"
+import { AlertTriangle, SlidersHorizontal } from "lucide-react"
 
 import { ThemeMenu } from "@/components/theme-menu"
 import { Badge } from "@/components/ui/badge"
 import { tournamentLabel } from "@/lib/labels"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import type { OverlayStatus } from "@/types/admin"
 import type { RunMeta } from "@/types/run"
 
 /**
@@ -24,11 +26,24 @@ import type { RunMeta } from "@/types/run"
  */
 export function RunHeader({
   run,
+  overlay,
   account,
   stages,
   help,
+  menu,
 }: {
   run: RunMeta
+  /**
+   * What was changed by hand after this run was published, or null/undefined
+   * when nothing was.
+   *
+   * Beside the forced-gate badge because it is the same kind of statement: not
+   * a date a reader might want, but the answer telling them something about how
+   * it came to be. An override is not a fault -- it is usually a correction
+   * that is MORE current than the crawl -- so it is stated, not warned about.
+   * What would be a fault is it being invisible.
+   */
+  overlay?: OverlayStatus | null
   account?: ReactNode
   stages?: ReactNode
   /** The way into the FAQ. In the header rather than at the foot of the page
@@ -36,12 +51,31 @@ export function RunHeader({
    * a reader with a number in front of them does not scroll past it to go and
    * read. */
   help?: ReactNode
+  /** The same three controls as one button, for a header with no room to lay
+   * them out. Drawn instead of them rather than beside them, so there is one
+   * route to the theme at any given width and no chance of two open at once. */
+  menu?: ReactNode
 }) {
   return (
     <header className="border-b">
-      <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-3 gap-y-2 px-6 py-4">
-        <h1 className="font-heading text-base font-semibold tracking-tight">DotaPredictions</h1>
-        <Badge variant="secondary">{tournamentLabel(run.tournamentId)}</Badge>
+      <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 sm:px-6 sm:py-4">
+        {/* The narrow header's first line, and the reason it is a line rather
+            than three items left to wrap: the title, the badge and the stage
+            control together are wider than 375px, so the menu button was the
+            item that broke off -- ending up alone on a second row, hard right,
+            under nothing it belongs to. At 320px the stage control went with
+            it. Full width below `md` puts identity and the one menu on a line
+            of their own and pushes the stage onto the next, which is a shape
+            rather than an overflow. From `md` up the wrapper is `w-auto` and
+            these sit inline again, exactly as before. */}
+        <div className="flex w-full items-center gap-2 md:w-auto md:gap-3">
+          <h1 className="font-heading text-base font-semibold tracking-tight">
+            DotaPredictions
+          </h1>
+          <Badge variant="secondary">{tournamentLabel(run.tournamentId)}</Badge>
+
+          <div className="ml-auto md:hidden">{menu}</div>
+        </div>
 
         {stages}
 
@@ -52,13 +86,39 @@ export function RunHeader({
             Grouped, the auto margin applies to the whole cluster, and the
             cluster stays right-aligned on whichever line it lands on, because
             an auto margin resolves per flex line. */}
-        <div className="ml-auto flex flex-wrap items-center justify-end gap-x-1 gap-y-2">
+        <div className="ml-auto hidden flex-wrap items-center justify-end gap-x-1 gap-y-2 md:flex">
           {help}
 
           <ThemeMenu />
 
           {account}
         </div>
+
+        {overlay && overlay.changeCount > 0 && (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Badge variant="outline" className="gap-1">
+                  <SlidersHorizontal className="size-3.5" aria-hidden />
+                  {overlay.changeCount} configuration override
+                  {overlay.changeCount === 1 ? "" : "s"} (v{overlay.version})
+                </Badge>
+              }
+            />
+            <TooltipContent className="max-w-80">
+              {overlay.note || "No reason was recorded."} Published{" "}
+              {new Date(overlay.publishedAt).toLocaleString()}. These values were set by hand
+              after the run was crawled, so they are newer than it rather than part of it.
+            </TooltipContent>
+          </Tooltip>
+        )}
+
+        {overlay?.failed && (
+          <Badge variant="destructive" className="gap-1">
+            <AlertTriangle className="size-3.5" aria-hidden />
+            configuration override not applied
+          </Badge>
+        )}
 
         {run.gatesForced.length > 0 && (
           <Badge variant="destructive" className="gap-1">

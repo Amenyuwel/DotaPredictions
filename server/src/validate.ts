@@ -10,9 +10,11 @@ import type {
   Lane,
   Player,
   PlayerSamples,
+  RunMeta,
   RunPayload,
   Scoring,
   StageProjection,
+  Team,
 } from "../../shared/run-types.js"
 
 /**
@@ -114,4 +116,15 @@ function base64Bytes(value: unknown): number {
   return typeof value === "string" ? Buffer.from(value, "base64").byteLength : -1
 }
 
-export type { Emblem, FantasyRole, Lane, Player, PlayerSamples, RunPayload, Scoring, StageProjection }
+export type {
+  Emblem,
+  FantasyRole,
+  Lane,
+  Player,
+  PlayerSamples,
+  RunMeta,
+  RunPayload,
+  Scoring,
+  StageProjection,
+  Team,
+}

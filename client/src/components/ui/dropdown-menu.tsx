@@ -50,6 +50,17 @@ function DropdownMenuGroup({ ...props }: MenuPrimitive.Group.Props) {
   return <MenuPrimitive.Group data-slot="dropdown-menu-group" {...props} />
 }
 
+/**
+ * A heading for the items under it -- and only ever inside a
+ * `DropdownMenuGroup` or `DropdownMenuRadioGroup`.
+ *
+ * Base UI's `Menu.GroupLabel` reads the group context and THROWS when there is
+ * none. Nothing between a menu popup and the root catches that, so the failure
+ * is not a menu that renders without its heading: it is React unmounting the
+ * entire application, leaving a blank page and a console message, from pressing
+ * a button. Written here rather than at the call sites because the call site
+ * that gets it wrong is by definition the one that did not know.
+ */
 function DropdownMenuLabel({
   className,
   inset,

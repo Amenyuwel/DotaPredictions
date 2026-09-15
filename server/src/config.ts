@@ -90,8 +90,38 @@ export const config = {
    */
   search: { screenSims: 240, keep: 10, maxInventory: 12, targetShortlist: 3000 },
 
-  /** Runs are immutable, so the current run can be cached hard. */
+  /**
+   * How long the current run may be cached by a browser.
+   *
+   * Runs are immutable, so an hour was free. Configuration overlays are not:
+   * an admin publishes one and every browser holding a cached
+   * `/api/run/current` keeps the previous scoring table until it expires --
+   * rendering percentages and colours that disagree with the scores the server
+   * is now computing. So the ceiling is the overlay's staleness bound, and the
+   * two numbers below are picked together for that reason.
+   *
+   * `runCacheSeconds` still applies where overlays cannot exist at all: a
+   * `RUN_FILE` deployment with no Supabase credentials has no table to publish
+   * one to, and its run really is immutable for the life of the process.
+   */
   runCacheSeconds: 3600,
+
+  /** The ceiling when an overlay is possible. See `runCacheSeconds`. */
+  overlayCacheSeconds: 30,
+
+  /**
+   * How stale an overlay may be in one server process.
+   *
+   * Read lazily from the request path rather than on a timer, so this is an
+   * upper bound on how long after a publish a given instance is still answering
+   * from the previous configuration -- not a polling rate. An idle server makes
+   * no requests at all.
+   *
+   * It is deliberately short. The alternative to a small number here is a
+   * cross-instance invalidation channel, which is a queue, a subscription and a
+   * failure mode, to save reading a few hundred bytes twice a minute.
+   */
+  overlayPollSeconds: 20,
 
   isProduction: process.env.NODE_ENV === "production",
 } as const

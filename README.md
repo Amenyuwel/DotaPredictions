@@ -324,6 +324,29 @@ cd server && npm install && npm run dev    # http://localhost:3000
 cd client && npm install && npm run dev    # http://localhost:5173, proxies /api
 ```
 
+Two ports is the arrangement that gets hot reload. It is not the only one: in
+production Express serves `client/dist` from its own origin, and that path works
+locally too, so everything can sit on **one** port.
+
+```bash
+cd server && npm run dev:solo    # builds client/dist, then serves it on :3000
+```
+
+Then `http://localhost:3000` is the tool and `/admin` is the editor, both
+same-origin with the API. The trade is hot
+reload: `client/dist` is a static build, so a change to client source needs a
+rebuild. Leave one running beside it if you are editing the front end, and
+reload the page rather than waiting for HMR:
+
+```bash
+cd client && npm run build:watch
+```
+
+Which to use is a question about what you are changing, not about which is
+correct. Editing components, use two ports. Editing the engine, the server, or
+just *using* the tool, one port is fewer moving parts and is what a deployment
+actually looks like.
+
 `GET /api/health` reports which of three states the server booted into:
 `unconfigured` (no source of runs), `empty` (reachable, nothing published), or
 `ready`. A payload that fails schema validation is deliberately *not* a state -
@@ -686,6 +709,108 @@ A wrong `account_id` does not raise an error. It produces a confident,
 completely wrong projection. `scripts.resolve_ids` refuses to guess and tells
 you what to pin.
 
+## Changing the numbers without a re-crawl
+
+Every International moves the numbers. New tiers, a retuned trait, a stat
+revalued, a roster that changed between the qualifier and the event. Until now
+each of those was a YAML edit plus a full crawl and publish, which is the right
+price when the **measurements** change and a needless one when only the
+**table** does.
+
+The web tool has a second, smaller path for the second case: a signed-in
+administrator can edit the scoring table and the roster metadata at
+`/admin`, and the change applies to the published run without the engine
+running again.
+
+That is possible because of a fact about the server rather than a decision
+anyone made: `server/src/scoring/banner.ts` turns a stat line into points at
+**request** time, reading `payload.scoring` against raw per-game values in
+`playerSamples`. So the scoring half of a run is a pure function of a table that
+can be replaced, and the measurement half is not.
+
+**The line, exactly.**
+
+| Overlayable | Not |
+|---|---|
+| stat `perUnit`, `base`, `color`, `measurable`, `source` | the per-game stat matrices in `playerSamples` |
+| emblem quality tiers | the simulated schedules in `stageProjections` |
+| trait bonus, adjacent bonus, condition rule | anything the crawler measured |
+| the palette and `banner_slot_colors` | |
+| team name, tag, region, `alsoTeamIds` | |
+| player nick, team, fantasy slot, lane | |
+
+`playerSamples` and `stageProjections` are not *rejected* by the overlay schema
+-- they cannot be expressed in it. A player added through the page therefore has
+no sample matrix, is reported everywhere as having no data, and is absent from
+the pickers until the next `python -m scripts.publish`. That is the point: a
+player scored from nothing reads as a *weak* player rather than an unknown one.
+
+**Emblems are not edited.** The catalog is every stat x tier x trait the client
+can produce, so it is the product of three tables rather than an input. Adding a
+tier adds a row for every stat and every trait; removing a stat removes every
+emblem carrying it. An emblem list edited beside those tables would be a second
+source of truth that disagrees the moment either side moves, so the page shows
+the catalog and its count and offers no way to change it directly.
+
+**What stops this from being the project's worst idea.**
+
+1. **Draft, then publish.** Nothing typed is public until somebody publishes it.
+   Published versions are immutable and numbered, per tournament and stage, with
+   an author and a written reason. Reverting is publishing an earlier document
+   again as a new version -- the same rule `runs` already keeps.
+2. **Three validations, and the last one is the run contract.** The document is
+   checked against `shared/overlay-schema.json`; then against the things JSON
+   Schema cannot say; then the **patched payload** is checked against
+   `shared/run-schema.json` itself. Whatever an overlay does, what comes out has
+   passed exactly the schema the engine's own output passes.
+3. **The silent failures are refused by name.** A stat naming a `source` column
+   the run does not carry does not error at scoring time -- it quietly pays the
+   stat's flat base on every game -- so it is refused, with the available columns
+   listed. `measurable: true` with no source is refused as a measurement claim
+   with nothing behind it. A slot colour no stat carries is refused as a slot
+   that could never be filled. A trait with no `condition_rule` is refused,
+   because a trait without one pays on every banner and every score goes up with
+   nothing looking broken.
+4. **An overlay that stops applying is never half-applied.** Publish a new run
+   whose columns or roster no longer support the overlay and the published run
+   is served untouched, with the reasons attached to it and shown on the page.
+5. **The reader is told.** `/api/run/current` carries an `overlay` block, and
+   the header shows how many overrides are in force and why -- for the same
+   reason `gatesForced` travels on the run. An override is usually a correction
+   *newer* than the crawl; what would be a fault is it being invisible.
+
+**It is meant to be temporary.** An overlay corrects a table between crawls, and
+the correction belongs in the config the engine reads. The editor's **Export
+YAML** hands back exactly what to paste into
+`engine/config/<tournament>/scoring.yaml`, and once a later crawl carries it into
+the run the page lists those entries as matching the published run and asks you
+to drop them. Do drop them: an override that agrees with the run is not nothing,
+it is a standing instruction to hold that value **if the run ever changes** --
+which is how a deliberate future edit gets silently reverted by something nobody
+remembers setting.
+
+**Who is an administrator** is deliberately not something this application can
+change. It is a row in `public.admins`, inserted by whoever holds the database
+credentials:
+
+```sql
+insert into public.admins (user_id, email, note)
+select id, email, 'first admin' from auth.users where email = 'you@example.com';
+```
+
+An admin page that can mint admins is one where a single stolen session is
+permanent. This way the blast radius of a stolen token is the configuration,
+which is versioned, attributed and revertible.
+
+**Trait conditions are data now.** `scoring.yaml` gained a required
+`condition_rule` per trait, naming which of the scorer's implemented rules gates
+its own bonus -- `always`, `never`, `neighboursOnly`, `allQualitiesDiffer`,
+`countAtLeast3`, `onlyOne`. The scorer used to switch on the trait's *name*,
+which works for exactly the five the TI 2026 client shipped and fails silently
+for a sixth or a renamed one: an unrecognised name fell through to paying
+unconditionally. Naming the rule makes that unreachable, and is what lets a 2027
+client rename Fractal without a release.
+
 ## Layout
 
 The repo is a monorepo: `engine/` is this Python model, `server/` and `client/`
@@ -708,6 +833,11 @@ config/
                      qualifier league ids, the drawn Main Event bracket
     banners.yaml     the emblems you rolled: stat, tier, trait and POSITION
     patch.yaml       gameplay-patch prior  <- hand-entered, one comment per line
+shared/
+  run-schema.json      what the engine publishes and the server serves
+  overlay-schema.json  what an admin may change about it without a re-crawl
+server/src/admin/      the configuration overlay: auth, store, apply, YAML export
+client/src/pages/admin.tsx  the editor behind /admin
 docs/
   ti2026-how-to-play.md  the client's HOW TO PLAY, transcribed. The reference.
 dota/
@@ -772,6 +902,21 @@ Worse than noise, because it is silent, systematic, and no interval covers it.
   screenshot read by a human. One mistyped multiplier moves everything downstream,
   and Vampiric/Benevolent are *positional* - reordering emblems in the client
   silently invalidates the file.
+* **A published overlay is a hand-typed number wearing a measured one's
+  clothes.** An administrator can change the scoring table at `/admin` and it
+  applies to the served run immediately (see *Changing the numbers without a
+  re-crawl*). Everything that makes that safe is procedural - draft before
+  publish, three validations, an immutable numbered history, a visible badge on
+  the page - and none of it can tell a correctly-transcribed 1,340 from a
+  mistyped one. The engine's own values at least came from a file somebody
+  reviewed in a diff; an overlay value came from a form. Treat a run carrying
+  overrides as carrying that much unreviewed input, and get the correction back
+  into `scoring.yaml` where a diff can see it.
+* **An overlay does not expire.** It applies to whatever run is current, so a
+  correction that a later crawl has already carried into the run keeps applying
+  invisibly - and would revert that value the day a run deliberately sets it
+  differently. The editor detects and reports exactly this case, but detecting
+  it is not the same as somebody acting on it.
 
 ### 2. Unmeasurable - stats the game pays for and this model cannot see
 
@@ -889,6 +1034,13 @@ that was false, and it was the more expensive direction to be wrong in.
   it knows nothing about drafts. A balance patch landing mid-event is unmodelled.
 * **LAN, stakes and pacing.** The Main Event is a different environment from the
   online games that dominate the corpus.
+* **Editing a roster does not re-measure it.** `/admin` can add a stand-in,
+  move a player between fantasy slots, or correct an `alsoTeamIds` entry, and
+  none of that produces a game. An added player has no sample matrix and is
+  unrankable until the next crawl; a corrected `alsoTeamIds` takes effect at the
+  next crawl too, because the samples already gathered were attributed under
+  whatever ids the last one knew. The page says so on every affected row, but
+  the limit is real: the fast path fixes labels, not evidence.
 * **Roster and lineup risk.** Stand-ins, illness, visa problems, or a role swap
   inside a team all invalidate a slot. Re-run `scripts.resolve_ids` near the lock.
   `gates.roster_freshness` now bounds how old that check may be and forces a

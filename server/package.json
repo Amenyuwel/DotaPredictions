@@ -10,7 +10,8 @@
     "start": "node dist/server/src/index.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "gen:types": "node scripts/gen-types.mjs",
-    "check:payload": "tsx scripts/check-payload.ts"
+    "check:payload": "tsx scripts/check-payload.ts",
+    "dev:solo": "npm --prefix ../client run build && tsx watch src/index.ts"
   },
   "keywords": [],
   "author": "",

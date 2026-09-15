@@ -4,8 +4,10 @@ import { Bookmark, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Loading, Spinner } from "@/components/ui/spinner"
+import { Skeleton, SkeletonPanel } from "@/components/ui/skeleton"
+// The spinner survives in one place here: the save button, which is acting
+// rather than filling. Everything that fills uses a skeleton.
+import { Spinner } from "@/components/ui/spinner"
 import {
   useDeleteBanner,
   useSaveBanner,
@@ -51,7 +53,7 @@ export function SavedBanners({
 
   const saved = useSavedBanners(run.tournamentId, run.stage, signedIn)
   const save = useSaveBanner(run.tournamentId, run.stage)
-  const remove = useDeleteBanner(run.tournamentId, run.stage)
+  const remove = useDeleteBanner()
 
   const emblemsOf = (r: FantasyRole) =>
     banners[r].filter((e): e is Emblem => e !== null)
@@ -149,11 +151,10 @@ export function SavedBanners({
         </form>
 
         {saved.isPending ? (
-          <div className="space-y-2" aria-busy>
-            <Loading>Loading your saved banners…</Loading>
+          <SkeletonPanel label="Loading your saved banners…">
             <Skeleton className="h-10 w-full" />
             <Skeleton className="h-10 w-full" />
-          </div>
+          </SkeletonPanel>
         ) : saved.error ? (
           <p className="text-destructive text-xs">
             Could not load your saved banners: {saved.error.message}

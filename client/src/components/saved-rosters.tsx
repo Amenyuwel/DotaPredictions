@@ -4,8 +4,10 @@ import { Bookmark, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Loading, Spinner } from "@/components/ui/spinner"
+import { Skeleton, SkeletonPanel } from "@/components/ui/skeleton"
+// The spinner survives in one place here: the save button, which is acting
+// rather than filling. Everything that fills uses a skeleton.
+import { Spinner } from "@/components/ui/spinner"
 import {
   useDeleteRoster,
   useSaveRoster,
@@ -46,7 +48,7 @@ export function SavedRosters({
 
   const saved = useSavedRosters(run.tournamentId, run.stage, signedIn)
   const save = useSaveRoster(run.tournamentId, run.stage)
-  const remove = useDeleteRoster(run.tournamentId, run.stage)
+  const remove = useDeleteRoster()
 
   const short = ROLE_ORDER.filter((r) => roster[r] === null)
   const complete = short.length === 0
@@ -118,11 +120,10 @@ export function SavedRosters({
         </form>
 
         {saved.isPending ? (
-          <div className="space-y-2" aria-busy>
-            <Loading>Loading your saved rosters…</Loading>
+          <SkeletonPanel label="Loading your saved rosters…">
             <Skeleton className="h-10 w-full" />
             <Skeleton className="h-10 w-full" />
-          </div>
+          </SkeletonPanel>
         ) : saved.error ? (
           <p className="text-destructive text-xs">
             Could not load your saved rosters: {saved.error.message}

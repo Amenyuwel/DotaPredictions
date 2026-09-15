@@ -9,11 +9,17 @@ import { cn } from "@/lib/utils"
  * hand-rolled spinners at three sizes read as three different kinds of waiting,
  * and only one of them is ever right.
  *
- * Skeletons stay where they are. The two say different things and both are
- * needed: a skeleton reserves the SHAPE of an answer that has never been on
- * screen, so nothing jumps when it arrives; the spinner says work is happening
- * NOW. Where an answer is already drawn and being replaced, the spinner is the
- * whole story and a skeleton would throw away the layout it was protecting.
+ * WHERE IT BELONGS, and the rule is narrow: a spinner goes inside something
+ * that is acting -- a button mid-save, an overlay across an answer being
+ * recomputed. Anywhere a region is filling for the first time, the placeholder
+ * is a `SkeletonPanel` instead.
+ *
+ * The split is not taste. A spinner reserves no space, so a page waiting on its
+ * only query shows one short grey line above an empty screen and then reflows
+ * the entire layout in when the data lands. A skeleton reserves the shape, so
+ * nothing jumps. The inverse holds where an answer is ALREADY drawn and being
+ * replaced: swapping it for skeletons throws away the very layout the skeleton
+ * exists to protect, so that case keeps the spinner, over the dimmed answer.
  *
  * Motion is confirmation here, never information: the label beside it says the
  * same thing, so a reader with `prefers-reduced-motion` (where the base layer

@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import {
   deleteRoster,
+  listAllSavedRosters,
   listSavedRosters,
   saveRoster,
   type SavedRoster,
@@ -36,11 +37,23 @@ export function useSaveRoster(tournamentId: string, stage: string) {
   })
 }
 
-export function useDeleteRoster(tournamentId: string, stage: string) {
+/** Every saved roster, across tournaments and stages -- see
+ * `useAllSavedBanners` for why this is a separate question. */
+export function useAllSavedRosters(enabled: boolean) {
+  return useQuery<SavedRoster[]>({
+    queryKey: ["saved-rosters", "all"],
+    queryFn: listAllSavedRosters,
+    enabled,
+    staleTime: 30_000,
+  })
+}
+
+/** Invalidates the whole key, for the reason `useDeleteBanner` gives: one row
+ * can be sitting in both the scoped and the unscoped cached list. */
+export function useDeleteRoster() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: deleteRoster,
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["saved-rosters", tournamentId, stage] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["saved-rosters"] }),
   })
 }

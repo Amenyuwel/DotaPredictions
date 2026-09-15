@@ -4,7 +4,9 @@ import { fileURLToPath } from "node:url"
 import express, { type Express, type NextFunction, type Request, type Response } from "express"
 import rateLimit from "express-rate-limit"
 
+import { overlayMiddleware } from "./admin/overlay-store.js"
 import { config } from "./config.js"
+import { adminRouter } from "./routes/admin.js"
 import { healthRouter } from "./routes/health.js"
 import { optimizeRouter } from "./routes/optimize.js"
 import { rankRouter } from "./routes/rank.js"
@@ -34,11 +36,21 @@ export function createApp(): Express {
     }),
   )
 
+  // Before every route that reads a run, because the run a request means is the
+  // published one with the current overlay on it. Cheap by construction: a
+  // clock comparison per request, and one small read per `overlayPollSeconds`.
+  app.use("/api", overlayMiddleware)
+
   app.use("/api", healthRouter)
   app.use("/api", runRouter)
   app.use("/api", rankRouter)
   app.use("/api", optimizeRouter)
   app.use("/api", targetRouter)
+
+  // Last, and every route inside it carries `requireAdmin`. Mounted here rather
+  // than beside the others to keep the one group of endpoints that WRITES
+  // visually separate from the four that only answer questions.
+  app.use("/api/admin", adminRouter)
 
   app.use("/api", (_req, res) => {
     res.status(404).json({ error: "not_found" })

@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs"
 import { resolve } from "node:path"
 
+import { overlayStore } from "./admin/overlay-store.js"
+import { applyOverlay, OverlayRejected } from "./admin/overlay.js"
 import { config } from "./config.js"
 import { assertRunPayload, SchemaMismatch, type RunPayload } from "./validate.js"
 
@@ -45,21 +47,57 @@ export const runStore = {
   },
 
   /**
-   * The run a request means.
+   * The run a request means, WITH the configuration overlay in force.
    *
    * Both arguments are optional and both narrow: no arguments means the newest
    * run of any stage, which is what a first page load asks for. An unmatched
    * request returns null rather than falling back to a different stage --
    * answering a Group Stage question with Main Event numbers would be a wrong
    * answer wearing the right shape.
+   *
+   * Every scoring path in this server goes through here, which is the reason it
+   * is the overlay's only entry point. A second accessor returning the
+   * unpatched run would eventually be used by one route, and that route would
+   * disagree with the other four about what a stat pays -- while all five
+   * looked right.
    */
   find(tournamentId?: string, stage?: string): RunPayload | null {
+    const published = runStore.findPublished(tournamentId, stage)
+    return published ? effectiveOf(published) : null
+  },
+
+  /**
+   * The run exactly as it was published, overlay and all ignored.
+   *
+   * For the admin routes only, and for one reason: an overlay is edited AGAINST
+   * the published run, so the editor has to be able to see what it is patching.
+   * Scoring an answer from this would be scoring from a table the reader is not
+   * being shown.
+   */
+  findPublished(tournamentId?: string, stage?: string): RunPayload | null {
     const match = runStore.runs.find(
       ({ payload }) =>
         (!tournamentId || payload.run.tournamentId === tournamentId) &&
         (!stage || payload.run.stage === stage),
     )
     return match?.payload ?? null
+  },
+
+  /** What is on top of a run, for the client to report and for a cache to key
+   * on. Null when the run is being served exactly as published. */
+  overlayFor(payload: RunPayload): OverlayStatus | null {
+    const { tournamentId, stage } = payload.run
+    const overlay = overlayStore.for(tournamentId, stage)
+    if (!overlay) return null
+    const applied = effective.get(cacheKey(payload.run.runId))
+    return {
+      version: overlay.version,
+      note: overlay.note,
+      publishedAt: overlay.publishedAt,
+      changeCount: applied?.changeCount ?? 0,
+      notes: applied?.notes ?? [],
+      failed: applied?.failed ?? null,
+    }
   },
 
   /** What the client can offer in a switcher. */
@@ -71,6 +109,89 @@ export const runStore = {
       createdAt: payload.run.createdAt,
     }))
   },
+}
+
+/**
+ * What is sitting on top of a published run, as the client is told it.
+ *
+ * Reported rather than merely applied. A reader acting on a projection is
+ * entitled to know that a number in it was changed by hand this afternoon and
+ * has not been through a crawl -- the same reason `FactorReport` carries a
+ * `kind` and `gatesForced` travels on the run.
+ */
+export interface OverlayStatus {
+  version: number
+  note: string
+  publishedAt: string
+  changeCount: number
+  notes: string[]
+  /** Why the overlay is NOT being applied, when it could not be. The published
+   * run is being served untouched, and that has to be said out loud: an admin
+   * looking at their own edit having no effect deserves the reason. */
+  failed: string[] | null
+}
+
+interface Effective {
+  generation: number
+  payload: RunPayload
+  notes: string[]
+  changeCount: number
+  failed: string[] | null
+}
+
+/**
+ * Patched runs, one per published run, rebuilt when the overlay generation
+ * moves.
+ *
+ * Cached because `applyOverlay` rebuilds the whole emblem catalog -- 450 rows
+ * for TI 2026 -- and revalidates the result against the run schema, which is
+ * far too much to do per request and exactly the right amount to do per
+ * publish. Keyed on runId and checked against `overlayStore.generation`, so a
+ * stale entry is impossible rather than unlikely: the generation is the same
+ * token `resetMemos` fires on.
+ */
+const effective = new Map<string, Effective>()
+
+const cacheKey = (runId: string) => runId
+
+function effectiveOf(published: RunPayload): RunPayload {
+  const key = cacheKey(published.run.runId)
+  const generation = overlayStore.generation
+  const hit = effective.get(key)
+  if (hit && hit.generation === generation) return hit.payload
+
+  const { tournamentId, stage } = published.run
+  const doc = overlayStore.docFor(tournamentId, stage)
+
+  let entry: Effective
+  try {
+    const applied = applyOverlay(published, doc)
+    entry = {
+      generation,
+      payload: applied.payload,
+      notes: applied.notes,
+      changeCount: applied.changeCount,
+      failed: null,
+    }
+  } catch (err) {
+    // An overlay that cannot be applied does NOT take the public tool down, and
+    // it does not get half-applied. The published run is served exactly as it
+    // was published, the reason is attached to it, and the admin page shows the
+    // same list. This is reachable in one realistic way: an overlay published
+    // against one run, then a NEW run published whose columns or roster no
+    // longer support it. The correct answer then is the engine's, not a
+    // partially patched hybrid of the two.
+    const reasons =
+      err instanceof OverlayRejected ? err.reasons : [err instanceof Error ? err.message : String(err)]
+    console.warn(
+      `[server] overlay for ${tournamentId}/${stage} does not apply to run ` +
+        `${published.run.runId}; serving the published run untouched:\n  ${reasons.join("\n  ")}`,
+    )
+    entry = { generation, payload: published, notes: [], changeCount: 0, failed: reasons }
+  }
+
+  effective.set(key, entry)
+  return entry.payload
 }
 
 /**

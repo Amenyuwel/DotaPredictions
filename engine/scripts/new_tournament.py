@@ -210,6 +210,12 @@ def main() -> int:
         )
         (target / "scoring.yaml").write_text(
             "# Fantasy point values, transcribed from the client's HOW TO PLAY.\n"
+            "#\n"
+            "# Every entry under `emblem_traits` needs a `condition_rule` naming which\n"
+            "# of the scorer's implemented rules gates its own bonus -- `always`,\n"
+            "# `never`, `neighboursOnly`, `allQualitiesDiffer`, `countAtLeast3` or\n"
+            "# `onlyOne`. publish.py refuses a trait without one, because a trait with\n"
+            "# no rule pays on every banner and nothing downstream would notice.\n"
             "version: TODO\nverified_against_client: false\nstats: {}\n",
             encoding="utf-8",
         )

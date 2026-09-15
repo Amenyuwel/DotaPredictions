@@ -126,12 +126,27 @@ emblem_quality:
   tier_iv:  1.00
   tier_v:   1.50
 
+# `condition` is prose for the reader. `condition_rule` names which of the
+# scorer's IMPLEMENTED rules gates the trait's own bonus, and it is required:
+# a trait with no rule pays its bonus unconditionally, which is right for
+# Vampiric and catastrophically wrong-and-silent for a trait whose rule was
+# merely left blank. Naming it here rather than matching on the trait's name in
+# code is what lets a 2027 client rename Fractal, or ship a sixth trait, without
+# a release -- and what stops a renamed trait from quietly paying always.
+#
+# The rules, all of which read the WHOLE banner:
+#   always              no condition; pay `bonus` every time
+#   never               never pays its own bonus (it pays neighbours instead)
+#   allQualitiesDiffer  every tier on the banner is distinct
+#   countAtLeast3       three or more emblems carry this same trait
+#   onlyOne             exactly one emblem on the banner carries this trait
+#   neighboursOnly      synonym of `never`, for a trait that is PURELY adjacent
 emblem_traits:
-  fractal:    {bonus: 0.60, condition: "all emblem qualities on the banner differ"}
-  benevolent: {bonus: 0.00, adjacent_bonus: 0.20}
-  vampiric:   {bonus: 0.50, adjacent_bonus: -0.10}
-  unique:     {bonus: 0.30, condition: "only Unique emblem on the banner"}
-  friendly:   {bonus: 0.50, condition: "at least 3 Friendly emblems on the banner"}
+  fractal:    {bonus: 0.60, condition_rule: allQualitiesDiffer, condition: "all emblem qualities on the banner differ"}
+  benevolent: {bonus: 0.00, adjacent_bonus: 0.20, condition_rule: neighboursOnly}
+  vampiric:   {bonus: 0.50, adjacent_bonus: -0.10, condition_rule: always}
+  unique:     {bonus: 0.30, condition_rule: onlyOne, condition: "only Unique emblem on the banner"}
+  friendly:   {bonus: 0.50, condition_rule: countAtLeast3, condition: "at least 3 Friendly emblems on the banner"}
 
 # The palette. Every stat carries one of these.
 banner_colors: [red, blue, green]

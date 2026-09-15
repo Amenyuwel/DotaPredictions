@@ -35,7 +35,7 @@ export function SiteFooter({ run }: { run?: RunMeta }) {
           because each one is a thing to read down; this is one line about the
           page as a whole, and hanging it off the left edge made it read as the
           first item of a fourth column that is not there. */}
-      <p className="text-muted-foreground mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5 px-6 py-4 text-xs">
+      <p className="text-muted-foreground mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5 px-4 py-4 text-xs sm:px-6">
         <Database className="size-3.5 shrink-0" aria-hidden />
         <span>
           {day(run.dataWindow.from)} – {day(run.dataWindow.to)},{" "}

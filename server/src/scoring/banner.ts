@@ -52,14 +52,24 @@ export function multipliers(banner: Emblem[], scoring: Scoring): number[] {
  * Three of the five are whole-banner conditions that no rearrangement can help,
  * which is why a Fractal showing -10% is Fractal *not firing* plus a Vampiric
  * neighbour charging it, rather than a bug.
+ *
+ * The rule is looked up by `conditionRule`, which the trait NAMES, rather than
+ * by switching on the trait's name. The difference only shows up when the
+ * catalog moves -- and then it is the whole ball game. A 2027 client that
+ * renames Fractal, or an admin who adds a sixth trait through the config page,
+ * would fall through a name switch to the default branch and pay the bonus on
+ * every banner unconditionally: a banner scored too high, confidently, with
+ * nothing in the stack in a position to notice. Naming the rule makes that
+ * case impossible to reach by accident -- an unrecognised rule pays nothing and
+ * is reported, rather than paying always and staying quiet.
  */
 function selfBonus(emblem: Emblem, banner: Emblem[], scoring: Scoring): number {
   const spec = scoring.traits[emblem.trait]
   if (!spec) return 0
-  switch (emblem.trait) {
-    case "fractal": {
-      // Fires only if every quality on the banner differs. A banner is three to
-      // five emblems, so the pairwise scan beats building a set of tiers.
+  switch (spec.conditionRule ?? legacyRule(emblem.trait)) {
+    case "allQualitiesDiffer": {
+      // A banner is three to five emblems, so the pairwise scan beats building
+      // a set of tiers.
       for (let i = 0; i < banner.length; i++) {
         for (let j = i + 1; j < banner.length; j++) {
           if (banner[i]!.tier === banner[j]!.tier) return 0
@@ -67,14 +77,47 @@ function selfBonus(emblem: Emblem, banner: Emblem[], scoring: Scoring): number {
       }
       return spec.bonus
     }
-    case "friendly":
-      return count(banner, "friendly") >= 3 ? spec.bonus : 0
-    case "unique":
-      return count(banner, "unique") === 1 ? spec.bonus : 0
-    case "benevolent":
+    case "countAtLeast3":
+      return count(banner, emblem.trait) >= 3 ? spec.bonus : 0
+    case "onlyOne":
+      return count(banner, emblem.trait) === 1 ? spec.bonus : 0
+    case "never":
+    case "neighboursOnly":
       return 0 // pays its neighbours, nothing to itself
-    default:
+    case "always":
       return spec.bonus
+    default:
+      // A rule nobody implemented. Paying nothing understates the banner, which
+      // is the direction that gets noticed; paying `bonus` would overstate it in
+      // the direction that does not.
+      return 0
+  }
+}
+
+/**
+ * The rule for a run published before traits carried one.
+ *
+ * Correct for exactly the five traits the TI 2026 client shipped, and correct
+ * for nothing else -- which is the point of retiring it. Reached only by a
+ * payload whose `conditionRule` is absent, so it shrinks to nothing as old runs
+ * age out rather than needing a migration. A trait it does not know pays
+ * nothing, the same as an unimplemented rule: see the note above on which
+ * direction to be wrong in.
+ */
+function legacyRule(trait: string): string {
+  switch (trait) {
+    case "fractal":
+      return "allQualitiesDiffer"
+    case "friendly":
+      return "countAtLeast3"
+    case "unique":
+      return "onlyOne"
+    case "benevolent":
+      return "neighboursOnly"
+    case "vampiric":
+      return "always"
+    default:
+      return "unknown"
   }
 }
 
