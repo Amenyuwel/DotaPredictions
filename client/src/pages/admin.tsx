@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { ArrowLeft, ShieldAlert } from "lucide-react"
+import { ArrowLeft, LogOut, ShieldAlert } from "lucide-react"
 
 import { AccountMenu } from "@/components/account-menu"
 import { HistoryPanel } from "@/components/admin/history-panel"
@@ -17,7 +17,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useAdmin } from "@/hooks/use-admin"
 import { useDraft } from "@/hooks/use-draft"
 import { useSession, type AuthState } from "@/hooks/use-session"
-import { exportYaml } from "@/lib/admin-api"
+import { devLogout, exportYaml } from "@/lib/admin-api"
+import { devSession } from "@/lib/dev-session"
 import type { Stage } from "@/types/run"
 
 /**
@@ -45,6 +46,10 @@ export function AdminPage() {
   const admin = useAdmin(session)
   const [selected, setSelected] = useState<{ tournamentId: string; stage: Stage } | null>(null)
   const draft = useDraft(selected?.tournamentId, selected?.stage)
+  // Present only when the local password door was used. Read once per render
+  // rather than held in state: it is a `sessionStorage` lookup, and state would
+  // be a second copy that can disagree with the one the API client reads.
+  const local = devSession()
 
   if (session.status === "loading" || admin.status === "loading") {
     return (
@@ -70,7 +75,15 @@ export function AdminPage() {
               : "Sign in with an account that can change the configuration."}
           </AlertDescription>
         </Alert>
-        <Back />
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Offered without checking whether the door exists: the login page
+              asks that itself and says so plainly, which is one place holding
+              the answer instead of two that can disagree. */}
+          <Button size="sm" variant="outline" render={<a href="/admin/login" />}>
+            Sign in with a username
+          </Button>
+          <Back />
+        </div>
       </Shell>
     )
   }
@@ -114,7 +127,7 @@ export function AdminPage() {
         <div className="mr-auto grid gap-0.5">
           <h1 className="font-heading text-xl font-semibold">Configuration</h1>
           <p className="text-muted-foreground text-xs">
-            Signed in as {session.status === "user" ? session.session.user.email : "an admin"}
+            Signed in as {local?.email ?? (session.status === "user" ? session.session.user.email : "an admin")}
           </p>
         </div>
         <StageSwitcher
@@ -125,6 +138,19 @@ export function AdminPage() {
           }}
           onSelect={setSelected}
         />
+        {local ? (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              devLogout()
+              window.location.assign("/admin/login")
+            }}
+          >
+            <LogOut aria-hidden />
+            Sign out
+          </Button>
+        ) : null}
         <Back />
       </div>
 

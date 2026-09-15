@@ -1,27 +1,13 @@
-import { lazy, StrictMode, Suspense } from "react"
+import { StrictMode, Suspense } from "react"
 import { createRoot } from "react-dom/client"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { Loading } from "@/components/ui/spinner"
 import { TooltipProvider } from "@/components/ui/tooltip"
 
+import { AdminLoginPage, AdminPage } from "@/pages/lazy"
+
 import App from "./App.tsx"
 import "./index.css"
-
-/**
- * The editor is loaded only on its own path.
- *
- * Almost nobody who opens this site is an administrator, and the editing
- * surface -- four tabs of forms over the scoring table -- is a large thing to
- * put in the bundle every visitor downloads to look at a ranking. A dynamic
- * import keeps it in its own chunk, fetched when `/admin` is opened and never
- * otherwise.
- *
- * This is a bundling decision and not a security one. The chunk is public, like
- * every other asset here; what protects the configuration is that the page
- * refuses to render without an admin session and the server refuses every
- * request behind it.
- */
-const AdminPage = lazy(async () => ({ default: (await import("@/pages/admin")).AdminPage }))
 
 /**
  * Runs are immutable, so a fetched answer cannot go stale on its own. Refetching
@@ -38,11 +24,11 @@ const queryClient = new QueryClient({
 })
 
 /**
- * Two pages, chosen by path, with no router.
+ * Three pages, chosen by path, with no router.
  *
  * A router is a dependency, a bundle, and an API surface, and this application
- * has exactly two destinations that never share a layout, never nest and never
- * need a parameter. `location.pathname` answers the question completely.
+ * has three destinations that never share a layout, never nest and never need a
+ * parameter. `location.pathname` answers the question completely.
  *
  * The server already sends `index.html` for every non-`/api` path (see
  * `serveClient` in server/src/app.ts), so `/admin` is a real URL that can be
@@ -51,16 +37,19 @@ const queryClient = new QueryClient({
  * can change what the tool says" should be visible in the address bar.
  *
  * Nothing here decides whether the visitor may see the editor. Anyone can load
- * this path; the page refuses to render, and the server refuses every request
- * behind it.
+ * either path; the editor refuses to render without an admin session, the login
+ * page refuses to draw a form unless the server says that door exists, and the
+ * server refuses every request behind both.
  */
-const isAdminPath = window.location.pathname.replace(/\/+$/, "") === "/admin"
+const path = window.location.pathname.replace(/\/+$/, "")
+const isAdminPath = path === "/admin"
+const isAdminLoginPath = path === "/admin/login"
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        {isAdminPath ? (
+        {isAdminPath || isAdminLoginPath ? (
           <Suspense
             fallback={
               <div className="mx-auto w-full max-w-5xl px-4 py-6">
@@ -68,7 +57,7 @@ createRoot(document.getElementById("root")!).render(
               </div>
             }
           >
-            <AdminPage />
+            {isAdminLoginPath ? <AdminLoginPage /> : <AdminPage />}
           </Suspense>
         ) : (
           <App />

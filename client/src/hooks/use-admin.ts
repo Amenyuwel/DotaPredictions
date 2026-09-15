@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 
+import { devSession } from "@/lib/dev-session"
 import { supabase } from "@/lib/supabase"
 import type { AuthState } from "@/hooks/use-session"
 
@@ -61,6 +62,16 @@ export function useAdmin(session: AuthState): AdminState {
       live = false
     }
   }, [userId])
+
+  // The local development session, checked first and for the same reason the
+  // server checks its token first: on a machine where BOTH are configured -- the
+  // normal case, since one .env holds both -- a stale Supabase session must not
+  // win over the password somebody just typed.
+  //
+  // This decides what renders and nothing else. The token travels on every
+  // admin request and is verified server-side, so a forged answer here buys a
+  // page that 401s.
+  if (devSession()) return { status: "admin" }
 
   // Derived during render rather than pushed into state by an effect. Three of
   // the four answers follow from the session alone and need no round trip, and

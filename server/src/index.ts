@@ -1,3 +1,4 @@
+import { assertDevLoginSafe, devLoginEnabled } from "./admin/dev-login.js"
 import { createApp } from "./app.js"
 import { config } from "./config.js"
 import { closeRunStore, loadCurrentRun, SchemaMismatch } from "./run-store.js"
@@ -11,6 +12,19 @@ import { closeRunStore, loadCurrentRun, SchemaMismatch } from "./run-store.js"
  * published" apart from "server down".
  */
 async function main(): Promise<void> {
+  // Before anything else. A production process with the local admin login
+  // switched on has a username and password where a verified session should
+  // be, and it must not reach the point of listening.
+  assertDevLoginSafe()
+  if (devLoginEnabled()) {
+    console.warn(
+      "[server] LOCAL ADMIN LOGIN IS ON. /api/admin/login accepts a username and\n" +
+        "         password from the environment in place of a Supabase session and\n" +
+        "         the public.admins check. For local development only -- the process\n" +
+        "         refuses to start with this set and NODE_ENV=production.",
+    )
+  }
+
   try {
     const state = await loadCurrentRun()
     if (state.status === "ready") {
