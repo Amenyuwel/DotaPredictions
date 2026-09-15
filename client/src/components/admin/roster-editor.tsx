@@ -2,6 +2,7 @@ import { useMemo, useState } from "react"
 import { AlertTriangle, Plus, Trash2 } from "lucide-react"
 
 import { AddDialog } from "@/components/admin/add-dialog"
+import { ConfirmDialog, type ConfirmRequest } from "@/components/admin/confirm-dialog"
 import {
   Cell,
   FilterField,
@@ -72,6 +73,7 @@ export function RosterEditor({
   const [addingPlayer, setAddingPlayer] = useState(false)
   const [filter, setFilter] = useState("")
   const [selectedId, setSelectedId] = useState<number | null>(null)
+  const [pending, setPending] = useState<ConfirmRequest | null>(null)
 
   const teams = effective?.teams ?? config.published.teams
   const players = effective?.players ?? config.published.players
@@ -97,17 +99,37 @@ export function RosterEditor({
     return map
   }, [players])
 
+  const isTouched = (team: Team) =>
+    Boolean(doc.teams?.[String(team.teamId)]) ||
+    (byTeam.get(team.teamId) ?? []).some((p) => doc.players?.[String(p.playerId)])
+
+  /**
+   * Teams this stage can actually answer for.
+   *
+   * A Main Event run carries all sixteen rosters and eight projections, so
+   * half the list was teams knocked out weeks ago. Editing one changes
+   * nothing anybody sees: an overlay is per stage, and a team with no
+   * projection is absent from every picker on the public page.
+   *
+   * A team the draft has TOUCHED stays regardless. Hiding one would make an
+   * edit that is still in the document unreachable -- impossible to see and
+   * impossible to undo -- which is the one thing worse than a long list. That
+   * also covers a team added here, which has no projection by definition.
+   */
+  const inStage = teams.filter((team) => projected.has(team.teamId) || isTouched(team))
+  const hidden = teams.length - inStage.length
+
   // Matches a team by its own name or by any of its players', so looking for a
   // person finds the team they are on rather than nothing.
   const needle = filter.trim().toLowerCase()
   const shown = needle
-    ? teams.filter(
+    ? inStage.filter(
         (team) =>
           team.name.toLowerCase().includes(needle) ||
           String(team.teamId).includes(needle) ||
           (byTeam.get(team.teamId) ?? []).some((p) => p.nick.toLowerCase().includes(needle)),
       )
-    : teams
+    : inStage
 
   // Derived, not stored: a stored selection survives a filter that excludes it,
   // or a team the overlay removed, and the detail pane then describes something
@@ -138,10 +160,6 @@ export function RosterEditor({
     onChange({ ...doc, [bucket]: Object.keys(next).length > 0 ? next : undefined })
   }
 
-  const isTouched = (team: Team) =>
-    Boolean(doc.teams?.[String(team.teamId)]) ||
-    (byTeam.get(team.teamId) ?? []).some((p) => doc.players?.[String(p.playerId)])
-
   return (
     <div className="grid gap-4">
       <Alert>
@@ -169,7 +187,9 @@ export function RosterEditor({
               onChange={setFilter}
               label="Filter by team or player"
               summary={
-                shown.length === teams.length ? `${teams.length}` : `${shown.length} of ${teams.length}`
+                shown.length === inStage.length
+                  ? `${inStage.length}`
+                  : `${shown.length} of ${inStage.length}`
               }
             />
           </CardHeader>
@@ -219,6 +239,16 @@ export function RosterEditor({
                 </li>
               ) : null}
             </ul>
+
+            {/* Said rather than left to be noticed. A list that quietly drops
+                half its rows is one a reader checks against another source. */}
+            {hidden > 0 ? (
+              <p className="text-muted-foreground mt-2 px-1 text-2xs">
+                {hidden} team{hidden === 1 ? "" : "s"} not in this stage are hidden. An
+                overlay is per stage, and a team with no projection is absent from every
+                picker anyway.
+              </p>
+            ) : null}
           </CardContent>
         </Card>
 
@@ -233,7 +263,7 @@ export function RosterEditor({
                 ) : null}
                 {!projected.has(selected.teamId) ? (
                   <Badge variant="outline" title="No projection in this stage">
-                    not in stage
+                    no projection
                   </Badge>
                 ) : null}
               </div>
@@ -352,9 +382,19 @@ export function RosterEditor({
                             changed={Boolean(entry)}
                             onUndo={() => dropKey("players", player.playerId)}
                             onRemove={() =>
-                              onChange({
-                                ...doc,
-                                playersRemoved: [...playersRemoved, String(player.playerId)],
+                              setPending({
+                                title: `Remove ${player.nick}?`,
+                                detail: `They leave ${selected.name} for this stage's overlay.`,
+                                confirmLabel: "Remove player",
+                                reversible: true,
+                                onConfirm: () =>
+                                  onChange({
+                                    ...doc,
+                                    playersRemoved: [
+                                      ...playersRemoved,
+                                      String(player.playerId),
+                                    ],
+                                  }),
                               })
                             }
                           />
@@ -388,7 +428,17 @@ export function RosterEditor({
                   variant="ghost"
                   className="text-destructive ml-auto text-xs"
                   onClick={() =>
-                    onChange({ ...doc, teamsRemoved: [...teamsRemoved, String(selected.teamId)] })
+                    setPending({
+                      title: `Remove ${selected.name}?`,
+                      detail: `Its ${(byTeam.get(selected.teamId) ?? []).length} players go with it — a player on no team cannot be ranked at all.`,
+                      confirmLabel: "Remove team",
+                      reversible: true,
+                      onConfirm: () =>
+                        onChange({
+                          ...doc,
+                          teamsRemoved: [...teamsRemoved, String(selected.teamId)],
+                        }),
+                    })
                   }
                 >
                   <Trash2 aria-hidden />
@@ -484,6 +534,8 @@ export function RosterEditor({
           })
         }}
       />
+
+      <ConfirmDialog request={pending} onClose={() => setPending(null)} />
     </div>
   )
 }

@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react"
 import { ArrowLeft, LogOut, ShieldAlert } from "lucide-react"
 
 import { AdminSidebar } from "@/components/admin/admin-sidebar"
+import { ConfirmDialog, type ConfirmRequest } from "@/components/admin/confirm-dialog"
 import { HistoryPanel } from "@/components/admin/history-panel"
 import { PublishDialog } from "@/components/admin/publish-dialog"
 import { RosterEditor } from "@/components/admin/roster-editor"
@@ -53,6 +54,7 @@ export function AdminPage() {
   const [selected, setSelected] = useState<{ tournamentId: string; stage: Stage } | null>(null)
   const [section, setSection] = useState<string>(SECTIONS[0].value)
   const [publishOpen, setPublishOpen] = useState(false)
+  const [pending, setPending] = useState<ConfirmRequest | null>(null)
   const draft = useDraft(selected?.tournamentId, selected?.stage)
   // Present only when the local password door was used. A `sessionStorage` read
   // per render rather than state, so it cannot disagree with what the API
@@ -178,7 +180,19 @@ export function AdminPage() {
             saving={draft.saving}
             onSave={draft.save}
             onPublish={() => setPublishOpen(true)}
-            onDiscard={draft.discard}
+            onDiscard={() =>
+              setPending({
+                title: "Discard this draft?",
+                detail:
+                  "Every unpublished edit in it goes. What is live now is unaffected — the published version keeps serving.",
+                confirmLabel: "Discard draft",
+                // The one action here that writes through: it deletes the draft
+                // row rather than adding an entry to it, so the Removed list
+                // cannot bring it back.
+                reversible: false,
+                onConfirm: draft.discard,
+              })
+            }
             onExport={() => void download(config.scope.tournamentId, config.scope.stage)}
           />
         </div>
@@ -280,6 +294,8 @@ export function AdminPage() {
           ) : null}
         </main>
       </div>
+
+      <ConfirmDialog request={pending} onClose={() => setPending(null)} />
 
       <PublishDialog
         open={publishOpen}

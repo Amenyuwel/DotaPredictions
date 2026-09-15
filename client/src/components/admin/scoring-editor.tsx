@@ -2,6 +2,7 @@ import { useMemo, useState } from "react"
 import { Plus } from "lucide-react"
 
 import { AddDialog } from "@/components/admin/add-dialog"
+import { ConfirmDialog, type ConfirmRequest } from "@/components/admin/confirm-dialog"
 import {
   Cell,
   FilterField,
@@ -180,7 +181,13 @@ interface SectionProps {
 function StatsCard({ scoring, published, patch, setScoring }: SectionProps) {
   const [adding, setAdding] = useState(false)
   const [filter, setFilter] = useState("")
+  const [pending, setPending] = useState<ConfirmRequest | null>(null)
   const removed = patch.statsRemoved ?? []
+
+  // How many emblems go with a stat. The catalog is the cross product, so
+  // this is the other two axes multiplied -- worth stating, because it is
+  // the part of the removal nobody expects.
+  const perStat = Object.keys(scoring.quality).length * Object.keys(scoring.traits).length
 
   const colorOptions = useMemo(
     () => scoring.colors.map((c) => ({ value: c, label: capitalize(c) })),
@@ -247,10 +254,17 @@ function StatsCard({ scoring, published, patch, setScoring }: SectionProps) {
                 }
                 onUndo={() => setScoring({ ...patch, stats: without(patch.stats, key) })}
                 onRemove={() =>
-                  setScoring({
-                    ...patch,
-                    stats: without(patch.stats, key),
-                    statsRemoved: [...removed, key],
+                  setPending({
+                    title: `Remove ${statLabel(key)}?`,
+                    detail: `${perStat} emblems carry this stat and go from the catalog with it.`,
+                    confirmLabel: "Remove stat",
+                    reversible: true,
+                    onConfirm: () =>
+                      setScoring({
+                        ...patch,
+                        stats: without(patch.stats, key),
+                        statsRemoved: [...removed, key],
+                      }),
                   })
                 }
               />
@@ -312,6 +326,8 @@ function StatsCard({ scoring, published, patch, setScoring }: SectionProps) {
           })
         }
       />
+
+      <ConfirmDialog request={pending} onClose={() => setPending(null)} />
     </Card>
   )
 }
@@ -406,7 +422,9 @@ function StatRow({
 
 function TraitsCard({ scoring, published, patch, setScoring }: SectionProps) {
   const [adding, setAdding] = useState(false)
+  const [pending, setPending] = useState<ConfirmRequest | null>(null)
   const removed = patch.traitsRemoved ?? []
+  const perTrait = Object.keys(scoring.stats).length * Object.keys(scoring.quality).length
 
   return (
     <Card>
@@ -459,10 +477,17 @@ function TraitsCard({ scoring, published, patch, setScoring }: SectionProps) {
                 }
                 onUndo={() => setScoring({ ...patch, traits: without(patch.traits, name) })}
                 onRemove={() =>
-                  setScoring({
-                    ...patch,
-                    traits: without(patch.traits, name),
-                    traitsRemoved: [...removed, name],
+                  setPending({
+                    title: `Remove ${traitLabel(name)}?`,
+                    detail: `${perTrait} emblems carry this trait and go from the catalog with it.`,
+                    confirmLabel: "Remove trait",
+                    reversible: true,
+                    onConfirm: () =>
+                      setScoring({
+                        ...patch,
+                        traits: without(patch.traits, name),
+                        traitsRemoved: [...removed, name],
+                      }),
                   })
                 }
               />
@@ -509,6 +534,8 @@ function TraitsCard({ scoring, published, patch, setScoring }: SectionProps) {
           })
         }
       />
+
+      <ConfirmDialog request={pending} onClose={() => setPending(null)} />
     </Card>
   )
 }
@@ -609,7 +636,9 @@ function TraitRow({
 
 function QualityCard({ scoring, published, patch, setScoring }: SectionProps) {
   const [adding, setAdding] = useState(false)
+  const [pending, setPending] = useState<ConfirmRequest | null>(null)
   const removed = patch.qualityRemoved ?? []
+  const perTier = Object.keys(scoring.stats).length * Object.keys(scoring.traits).length
 
   return (
     <Card>
@@ -646,10 +675,17 @@ function QualityCard({ scoring, published, patch, setScoring }: SectionProps) {
                     changed={changed}
                     onUndo={() => setScoring({ ...patch, quality: without(patch.quality, tier) })}
                     onRemove={() =>
-                      setScoring({
-                        ...patch,
-                        quality: without(patch.quality, tier),
-                        qualityRemoved: [...removed, tier],
+                      setPending({
+                        title: `Remove ${tierLabel(tier)}?`,
+                        detail: `${perTier} emblems are at this tier and go from the catalog with it.`,
+                        confirmLabel: "Remove tier",
+                        reversible: true,
+                        onConfirm: () =>
+                          setScoring({
+                            ...patch,
+                            quality: without(patch.quality, tier),
+                            qualityRemoved: [...removed, tier],
+                          }),
                       })
                     }
                   />
@@ -697,6 +733,8 @@ function QualityCard({ scoring, published, patch, setScoring }: SectionProps) {
           setScoring({ ...patch, quality: { ...(patch.quality ?? {}), [key]: 0 } })
         }
       />
+
+      <ConfirmDialog request={pending} onClose={() => setPending(null)} />
     </Card>
   )
 }
