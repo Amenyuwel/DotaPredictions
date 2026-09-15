@@ -1,5 +1,8 @@
+import { useState } from "react"
 import { AlertTriangle, Plus, Trash2, Undo2 } from "lucide-react"
 
+import { AddDialog } from "@/components/admin/add-dialog"
+import { validateId } from "@/lib/admin-ui"
 import { FieldRow, TextField } from "@/components/admin/field"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
@@ -46,6 +49,12 @@ interface Props {
 }
 
 export function RosterEditor({ config, doc, onChange, effective }: Props) {
+  const [addingTeam, setAddingTeam] = useState(false)
+  // Which team a new player is being added to, or null when the dialog is shut.
+  // Held rather than passed, because the dialog is one element outside the list
+  // instead of one per team: N dialogs mounted for N teams is N copies of a
+  // form only ever used once at a time.
+  const [addingPlayerTo, setAddingPlayerTo] = useState<{ id: number; name: string } | null>(null)
   const teams = effective?.teams ?? config.published.teams
   const players = effective?.players ?? config.published.players
   const publishedTeams = new Map(config.published.teams.map((t) => [t.teamId, t]))
@@ -107,17 +116,7 @@ export function RosterEditor({ config, doc, onChange, effective }: Props) {
               ranked at all.
             </p>
           </div>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => {
-              const raw = window.prompt("OpenDota team id:")?.trim()
-              if (!raw || !/^[1-9][0-9]*$/.test(raw)) return
-              const name = window.prompt("Team name:")?.trim()
-              if (!name) return
-              onChange({ ...doc, teams: { ...(doc.teams ?? {}), [raw]: { name } } })
-            }}
-          >
+          <Button size="sm" variant="outline" onClick={() => setAddingTeam(true)}>
             <Plus aria-hidden />
             Add team
           </Button>
@@ -280,27 +279,7 @@ export function RosterEditor({ config, doc, onChange, effective }: Props) {
                     size="sm"
                     variant="ghost"
                     className="justify-start text-xs"
-                    onClick={() => {
-                      const raw = window.prompt("OpenDota account id:")?.trim()
-                      if (!raw || !/^[1-9][0-9]*$/.test(raw)) return
-                      const nick = window.prompt("Nickname:")?.trim()
-                      if (!nick) return
-                      onChange({
-                        ...doc,
-                        players: {
-                          ...(doc.players ?? {}),
-                          // Every field named: a player the run does not carry has
-                          // nothing to merge onto, and the server refuses a partial
-                          // one rather than filling in a lane nobody chose.
-                          [raw]: {
-                            nick,
-                            teamId: team.teamId,
-                            fantasyRole: "core",
-                            lane: "carry",
-                          },
-                        },
-                      })
-                    }}
+                    onClick={() => setAddingPlayerTo({ id: team.teamId, name: team.name })}
                   >
                     <Plus aria-hidden />
                     Add player to {team.name}
@@ -353,6 +332,69 @@ export function RosterEditor({ config, doc, onChange, effective }: Props) {
           )}
         </CardContent>
       </Card>
+
+      <AddDialog
+        open={addingTeam}
+        onOpenChange={setAddingTeam}
+        title="Add a team"
+        description="A team with no projection in this stage is absent from the pickers until the next crawl."
+        fields={[
+          {
+            name: "teamId",
+            label: "OpenDota team id",
+            placeholder: "7119388",
+            hint: "From the team's OpenDota URL.",
+            numeric: true,
+            validate: validateId,
+          },
+          { name: "name", label: "Team name", placeholder: "Team Spirit" },
+        ]}
+        submitLabel="Add team"
+        onSubmit={({ teamId, name }) =>
+          onChange({ ...doc, teams: { ...(doc.teams ?? {}), [teamId]: { name } } })
+        }
+      />
+
+      <AddDialog
+        open={addingPlayerTo !== null}
+        onOpenChange={(open) => {
+          if (!open) setAddingPlayerTo(null)
+        }}
+        title={`Add a player to ${addingPlayerTo?.name ?? ""}`}
+        description="They will have no sample matrix, so they are shown as having no data and cannot be ranked until the next crawl."
+        fields={[
+          {
+            name: "playerId",
+            label: "OpenDota account id",
+            placeholder: "111620041",
+            hint: "From the player's OpenDota URL.",
+            numeric: true,
+            validate: validateId,
+          },
+          { name: "nick", label: "Nickname", placeholder: "SumaiL" },
+        ]}
+        submitLabel="Add player"
+        onSubmit={({ playerId, nick }) => {
+          if (!addingPlayerTo) return
+          onChange({
+            ...doc,
+            players: {
+              ...(doc.players ?? {}),
+              // Every field named: a player the run does not carry has nothing
+              // to merge onto, and the server refuses a partial one rather than
+              // filling in a lane nobody chose. Carry and core are a starting
+              // point to correct, not a guess presented as a fact -- both
+              // controls sit on the row that appears.
+              [playerId]: {
+                nick,
+                teamId: addingPlayerTo.id,
+                fantasyRole: "core",
+                lane: "carry",
+              },
+            },
+          })
+        }}
+      />
     </div>
   )
 }

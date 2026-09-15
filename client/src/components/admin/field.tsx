@@ -40,17 +40,34 @@ export function FieldRow({
   return (
     <div
       className={cn(
-        "grid gap-1 rounded-md border px-2.5 py-2 transition-colors",
+        // The border is there whichever state the row is in, transparent when
+        // unchanged: one that APPEARS on change moves everything beside it by a
+        // pixel, and a column of fields ripples as you edit one of them.
+        "grid content-start gap-1 rounded-md border px-2.5 py-2 transition-colors",
         changed ? "border-primary/40 bg-primary/5" : "border-transparent",
       )}
     >
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-sm font-medium">{label}</span>
-        {changed && onRevert ? (
+      <div className="flex items-start justify-between gap-2">
+        {/* The control sits INSIDE the label, which associates the two without
+            an id -- one generated here would have to be threaded through every
+            field component to be of any use. The undo button stays outside it:
+            a button inside a label activates that label's control when clicked,
+            so "undo" would also focus the input it had just reset. */}
+        <label className="grid min-w-0 flex-1 gap-1">
+          <span className="text-sm font-medium">{label}</span>
+          {children}
+        </label>
+        {onRevert ? (
           <Button
             size="sm"
             variant="ghost"
-            className="h-6 px-1.5 text-xs"
+            // Hidden rather than absent while unchanged, so the row does not
+            // reflow the moment a value is edited. `invisible` keeps the box;
+            // aria-hidden and tabIndex keep it off the accessibility tree and
+            // out of the keyboard order while it means nothing.
+            className={cn("h-6 shrink-0 px-1.5 text-xs", !changed && "invisible")}
+            aria-hidden={!changed}
+            tabIndex={changed ? undefined : -1}
             onClick={onRevert}
             aria-label={`Undo the change to ${typeof label === "string" ? label : "this field"}`}
           >
@@ -59,15 +76,18 @@ export function FieldRow({
           </Button>
         ) : null}
       </div>
-      {children}
-      {/* Announced, not merely drawn. An admin who changed a value by keyboard
-          is the person most likely to have changed the wrong one. */}
-      {changed && wasLabel ? (
-        <p className="text-muted-foreground text-xs" aria-live="polite">
-          Published run says {wasLabel}.
-        </p>
-      ) : null}
-      {hint ? <p className="text-muted-foreground text-xs">{hint}</p> : null}
+
+      {/* One line for both, with a reserved height. Two conditional paragraphs
+          gave every row a different height depending on whether it had been
+          edited, so a column of fields jumped as you worked down it -- exactly
+          the failure §5 describes, content resizing its own box.
+
+          Announced, because an admin who changed a value by keyboard is the one
+          most likely to have changed the wrong one. */}
+      <p className="text-muted-foreground min-h-4 text-xs" aria-live="polite">
+        {changed && wasLabel ? <>Published run says {wasLabel}. </> : null}
+        {hint}
+      </p>
     </div>
   )
 }
@@ -87,18 +107,15 @@ export function NumberField({
   onCommit,
   step,
   suffix,
-  id,
 }: {
   value: number
   onCommit: (next: number) => void
   step?: string
   suffix?: string
-  id?: string
 }) {
   return (
     <div className="flex items-center gap-1.5">
       <Input
-        id={id}
         type="number"
         inputMode="decimal"
         step={step ?? "any"}
@@ -127,15 +144,12 @@ export function NumberField({
 export function PercentField({
   value,
   onCommit,
-  id,
 }: {
   value: number
   onCommit: (next: number) => void
-  id?: string
 }) {
   return (
     <NumberField
-      id={id}
       value={Math.round(value * 1000) / 10}
       onCommit={(percent) => onCommit(Math.round(percent * 10) / 1000)}
       step="0.1"
@@ -148,16 +162,13 @@ export function TextField({
   value,
   onCommit,
   placeholder,
-  id,
 }: {
   value: string
   onCommit: (next: string) => void
   placeholder?: string
-  id?: string
 }) {
   return (
     <Input
-      id={id}
       key={value}
       defaultValue={value}
       placeholder={placeholder}

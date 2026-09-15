@@ -1,5 +1,8 @@
+import { useState } from "react"
 import { Plus, Trash2, Undo2 } from "lucide-react"
 
+import { AddDialog } from "@/components/admin/add-dialog"
+import { validateKey } from "@/lib/admin-ui"
 import { FieldRow, NumberField, PercentField, TextField } from "@/components/admin/field"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -138,6 +141,7 @@ function StatsSection({
   setScoring: (next: Patch) => void
   dropFrom: Drop
 }) {
+  const [adding, setAdding] = useState(false)
   const removed = new Set(patch.statsRemoved ?? [])
 
   const editStat = (key: string, field: string, value: unknown) =>
@@ -146,16 +150,7 @@ function StatsSection({
       stats: { ...(patch.stats ?? {}), [key]: { ...(patch.stats?.[key] ?? {}), [field]: value } },
     })
 
-  const addStat = () => {
-    const key = window.prompt("New stat key (lower case, underscores):")?.trim()
-    if (!key) return
-    if (!/^[a-z0-9][a-z0-9_]{0,63}$/.test(key)) {
-      window.alert(
-        "A stat key must be lower case letters, digits and underscores. Anything else " +
-          "breaks the emblem ids, which are built by joining stat, tier and trait with colons.",
-      )
-      return
-    }
+  const addStat = (key: string) => {
     setScoring({
       ...patch,
       stats: {
@@ -185,11 +180,29 @@ function StatsSection({
             the stats on their banner, so these values are the whole ranking.
           </p>
         </div>
-        <Button size="sm" variant="outline" onClick={addStat}>
+        <Button size="sm" variant="outline" onClick={() => setAdding(true)}>
           <Plus aria-hidden />
           Add stat
         </Button>
       </CardHeader>
+
+      <AddDialog
+        open={adding}
+        onOpenChange={setAdding}
+        title="Add a stat"
+        description="It starts unmeasured and paying nothing. Point it at a source column and set its value once it exists."
+        fields={[
+          {
+            name: "key",
+            label: "Stat key",
+            placeholder: "courier_kills",
+            hint: "As the scoring table names it.",
+            validate: validateKey,
+          },
+        ]}
+        submitLabel="Add stat"
+        onSubmit={({ key }) => addStat(key)}
+      />
       <CardContent className="grid gap-3">
         {Object.keys(scoring.stats)
           .sort()
@@ -400,6 +413,7 @@ function QualitySection({
   setScoring: (next: Patch) => void
   dropFrom: Drop
 }) {
+  const [adding, setAdding] = useState(false)
   const removed = new Set(patch.qualityRemoved ?? [])
 
   return (
@@ -413,19 +427,31 @@ function QualitySection({
             row to the catalog for every stat and every trait.
           </p>
         </div>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => {
-            const key = window.prompt("New tier key, e.g. tier_vi:")?.trim()
-            if (!key) return
-            setScoring({ ...patch, quality: { ...(patch.quality ?? {}), [key]: 0 } })
-          }}
-        >
+        <Button size="sm" variant="outline" onClick={() => setAdding(true)}>
           <Plus aria-hidden />
           Add tier
         </Button>
       </CardHeader>
+
+      <AddDialog
+        open={adding}
+        onOpenChange={setAdding}
+        title="Add an emblem tier"
+        description="A new tier adds a catalog row for every stat and every trait."
+        fields={[
+          {
+            name: "key",
+            label: "Tier key",
+            placeholder: "tier_vi",
+            hint: "The client stamps the numeral; this is the key behind it.",
+            validate: validateKey,
+          },
+        ]}
+        submitLabel="Add tier"
+        onSubmit={({ key }) =>
+          setScoring({ ...patch, quality: { ...(patch.quality ?? {}), [key]: 0 } })
+        }
+      />
       <CardContent className="grid gap-2 sm:grid-cols-2">
         {Object.entries(scoring.quality).map(([tier, bonus]) => (
           <FieldRow
@@ -483,6 +509,7 @@ function TraitsSection({
   setScoring: (next: Patch) => void
   dropFrom: Drop
 }) {
+  const [adding, setAdding] = useState(false)
   const editTrait = (key: string, field: string, value: unknown) =>
     setScoring({
       ...patch,
@@ -500,28 +527,40 @@ function TraitsSection({
             not only on which ones they are.
           </p>
         </div>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => {
-            const key = window.prompt("New trait key, e.g. voracious:")?.trim()
-            if (!key) return
-            setScoring({
-              ...patch,
-              traits: {
-                ...(patch.traits ?? {}),
-                // `conditionRule` is set, not left blank. A trait with no rule
-                // pays on every banner, which is how every score on the public
-                // page goes up with nothing looking broken.
-                [key]: { bonus: 0, adjacentBonus: 0, conditionRule: "always", condition: null },
-              },
-            })
-          }}
-        >
+        <Button size="sm" variant="outline" onClick={() => setAdding(true)}>
           <Plus aria-hidden />
           Add trait
         </Button>
       </CardHeader>
+
+      <AddDialog
+        open={adding}
+        onOpenChange={setAdding}
+        title="Add an emblem trait"
+        description="It starts unconditional and paying nothing. Set its bonus and its rule once it exists."
+        fields={[
+          {
+            name: "key",
+            label: "Trait key",
+            placeholder: "voracious",
+            hint: "Lower case, as the scoring table names it.",
+            validate: validateKey,
+          },
+        ]}
+        submitLabel="Add trait"
+        onSubmit={({ key }) =>
+          setScoring({
+            ...patch,
+            traits: {
+              ...(patch.traits ?? {}),
+              // `conditionRule` is set, not left blank. A trait with no rule
+              // pays on every banner, which is how every score on the public
+              // page goes up with nothing looking broken.
+              [key]: { bonus: 0, adjacentBonus: 0, conditionRule: "always", condition: null },
+            },
+          })
+        }
+      />
       <CardContent className="grid gap-3">
         {Object.entries(scoring.traits).map(([name, spec]) => {
           const was = published.traits[name]
