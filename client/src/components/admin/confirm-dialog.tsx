@@ -99,13 +99,19 @@ export function ConfirmDialog({
             </p>
 
             <div className="grid gap-1.5">
-              <label htmlFor={inputId} className="text-sm">
-                To confirm, type <strong className="font-semibold">{request.confirmText}</strong>
+              {/* The hint is the placeholder, and the label is kept for anyone
+                  who cannot see one. A placeholder is normally the wrong place
+                  for it -- it vanishes at the first keystroke, taking the
+                  instruction with it -- which is survivable only because the
+                  title above says the same name and does not vanish. */}
+              <label htmlFor={inputId} className="sr-only">
+                To confirm, type {request.confirmText}
               </label>
               <Input
                 id={inputId}
                 value={typed}
                 onChange={(event) => setTyped(event.currentTarget.value)}
+                placeholder={request.confirmText}
                 aria-describedby={hintId}
                 autoComplete="off"
                 autoFocus
@@ -113,7 +119,11 @@ export function ConfirmDialog({
               {/* Announced, because the only other sign that the name matches is
                   a button changing from disabled to enabled, which is silent. */}
               <p id={hintId} className="text-muted-foreground min-h-4 text-xs" aria-live="polite">
-                {typed.length === 0 ? null : matches ? "Matches." : "Does not match yet."}
+                {typed.length === 0
+                  ? "Type the name shown to enable the button."
+                  : matches
+                    ? "Matches."
+                    : "Does not match yet."}
               </p>
             </div>
 
