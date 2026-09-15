@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react"
-import { ArrowLeft, LogOut, ShieldAlert } from "lucide-react"
+import { ArrowLeft, ShieldAlert } from "lucide-react"
 
 import { AdminSidebar } from "@/components/admin/admin-sidebar"
 import { ConfirmDialog, type ConfirmRequest } from "@/components/admin/confirm-dialog"
@@ -16,7 +16,7 @@ import { Loading } from "@/components/ui/spinner"
 import { useAdmin } from "@/hooks/use-admin"
 import { useDraft } from "@/hooks/use-draft"
 import { useSession } from "@/hooks/use-session"
-import { devLogout, exportYaml } from "@/lib/admin-api"
+import { exportYaml } from "@/lib/admin-api"
 import { SECTIONS } from "@/lib/admin-ui"
 import { devSession } from "@/lib/dev-session"
 import type { Stage } from "@/types/run"
@@ -132,30 +132,14 @@ export function AdminPage() {
   return (
     <Shell
       toolbar={
-        <>
-          <StageSwitcher
-            available={config.available}
-            current={{
-              tournamentId: config.scope.tournamentId,
-              stage: config.scope.stage as Stage,
-            }}
-            onSelect={setSelected}
-          />
-          {local ? (
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => {
-                devLogout()
-                window.location.assign("/admin/login")
-              }}
-            >
-              <LogOut aria-hidden />
-              Sign out
-            </Button>
-          ) : null}
-          <BackLink />
-        </>
+        <StageSwitcher
+          available={config.available}
+          current={{
+            tournamentId: config.scope.tournamentId,
+            stage: config.scope.stage as Stage,
+          }}
+          onSelect={setSelected}
+        />
       }
       subtitle={
         local
@@ -365,6 +349,14 @@ function Shell({
   )
 }
 
+/**
+ * The way back to the public tool.
+ *
+ * Only on the two states that are dead ends -- refused, and failed to load --
+ * where there is nothing on screen to do and no other exit. The working page
+ * dropped it: /admin is a URL somebody reached deliberately, and the browser's
+ * own back button is the control for undoing that.
+ */
 function BackLink() {
   return (
     <Button size="sm" variant="ghost" render={<a href="/" />}>
