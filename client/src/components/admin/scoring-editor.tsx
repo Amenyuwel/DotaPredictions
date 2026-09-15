@@ -136,7 +136,7 @@ export function ScoringEditor({
       </TabsList>
 
       <TabsContent value="stats">
-        <StatsCard {...shared} sourceColumns={config.sourceColumns} />
+        <StatsCard {...shared} />
       </TabsContent>
       <TabsContent value="traits">
         <TraitsCard {...shared} />
@@ -177,13 +177,7 @@ interface SectionProps {
   setScoring: (next: Patch) => void
 }
 
-function StatsCard({
-  scoring,
-  published,
-  patch,
-  setScoring,
-  sourceColumns,
-}: SectionProps & { sourceColumns: string[] }) {
+function StatsCard({ scoring, published, patch, setScoring }: SectionProps) {
   const [adding, setAdding] = useState(false)
   const [filter, setFilter] = useState("")
   const removed = patch.statsRemoved ?? []
@@ -192,13 +186,6 @@ function StatsCard({
     () => scoring.colors.map((c) => ({ value: c, label: capitalize(c) })),
     [scoring.colors],
   )
-  const sourceOptions = useMemo(
-    // Column names stay verbatim: they must match the run's own, and a
-    // prettified one would not be the thing being named.
-    () => [{ value: NO_SOURCE, label: "None" }, ...sourceColumns.map((c) => ({ value: c, label: c }))],
-    [sourceColumns],
-  )
-
   const all = Object.keys(scoring.stats).sort()
   const keys = all.filter((key) => key.includes(filter.trim().toLowerCase()))
 
@@ -214,9 +201,10 @@ function StatsCard({
         </div>
         <p className="text-muted-foreground max-w-prose text-xs">
           What each stat pays, and which emblem colour carries it. A player scores only the
-          stats on their banner, so these values are the whole ranking. A source column
-          cannot be invented — one that does not exist makes the stat pay its flat base on
-          every game, silently.
+          stats on their banner, so these values are the whole ranking. Which measured
+          column feeds a stat is not set here — that is <code>STAT_SOURCE</code> in the
+          engine, and it changes when the crawler learns to read a new field. A stat this
+          run could not measure is marked, and stays excluded from emblem choice.
         </p>
         <FilterField
           value={filter}
@@ -234,7 +222,6 @@ function StatsCard({
               <TableHead>Per unit</TableHead>
               <TableHead>Base</TableHead>
               <TableHead>Colour</TableHead>
-              <TableHead>Source column</TableHead>
               <TableHead className="w-0 pr-6 text-right">
                 <span className="sr-only">Actions</span>
               </TableHead>
@@ -249,30 +236,12 @@ function StatsCard({
                 was={published.stats[key]}
                 entry={patch.stats?.[key]}
                 colorOptions={colorOptions}
-                sourceOptions={sourceOptions}
                 onEdit={(field, value) =>
                   setScoring({
                     ...patch,
                     stats: {
                       ...(patch.stats ?? {}),
                       [key]: { ...(patch.stats?.[key] ?? {}), [field]: value },
-                    },
-                  })
-                }
-                onSetSource={(source) =>
-                  setScoring({
-                    ...patch,
-                    stats: {
-                      ...(patch.stats ?? {}),
-                      [key]: {
-                        ...(patch.stats?.[key] ?? {}),
-                        source,
-                        // Measurability follows the source rather than being a
-                        // second switch that can disagree with it. Measurable
-                        // with nothing behind it is a claim the server refuses,
-                        // so the form does not offer the combination.
-                        measurable: source !== null,
-                      },
                     },
                   })
                 }
@@ -313,7 +282,7 @@ function StatsCard({
         open={adding}
         onOpenChange={setAdding}
         title="Add a stat"
-        description="It starts unmeasured and paying nothing. Point it at a source column and set its value once it exists."
+        description="It starts paying nothing, and unmeasured — nothing here can attach a stat to a measured column, so it stays excluded from emblem choice until the engine learns to read one and a new run is published."
         fields={[
           {
             name: "key",
@@ -347,19 +316,13 @@ function StatsCard({
   )
 }
 
-/** The select's stand-in for "no source". A sentinel because an empty string is
- * a legal option value and `null` is not one at all. */
-const NO_SOURCE = "__none__"
-
 function StatRow({
   statKey,
   spec,
   was,
   entry,
   colorOptions,
-  sourceOptions,
   onEdit,
-  onSetSource,
   onUndo,
   onRemove,
 }: {
@@ -368,9 +331,7 @@ function StatRow({
   was: Scoring["stats"][string] | undefined
   entry: StatPatch | undefined
   colorOptions: { value: string; label: string }[]
-  sourceOptions: { value: string; label: string }[]
   onEdit: (field: keyof StatPatch, value: unknown) => void
-  onSetSource: (source: string | null) => void
   onUndo: () => void
   onRemove: () => void
 }) {
@@ -423,23 +384,6 @@ function StatRow({
             changed={entry?.color !== undefined}
             width="w-28"
             onChange={(v) => onEdit("color", v)}
-          />
-        </Cell>
-      </TableCell>
-
-      <TableCell>
-        <Cell changed={entry?.source !== undefined} was={was ? (was.source ?? "None") : undefined}>
-          <SelectCell
-            label={`${statLabel(statKey)} source column`}
-            value={spec.source ?? NO_SOURCE}
-            options={sourceOptions}
-            changed={entry?.source !== undefined}
-            // `observer_wards_planted` and `teamfight_participation` are the
-            // longest columns a run carries; narrower than this truncates the
-            // one thing in the cell that has to be read exactly.
-            width="w-56"
-            format={(v) => (v === NO_SOURCE ? "None" : v)}
-            onChange={(v) => onSetSource(v === NO_SOURCE ? null : v)}
           />
         </Cell>
       </TableCell>

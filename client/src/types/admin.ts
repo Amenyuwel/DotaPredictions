@@ -71,9 +71,19 @@ export interface AdminConfig {
     emblemCount: number
   }
 
-  /** The columns the sample matrices actually carry. A stat's `source` must be
-   * one of these -- an admin cannot invent a measurement, so this is a list to
-   * pick from and never a text field. */
+  /**
+   * The columns the sample matrices actually carry.
+   *
+   * No longer rendered. The editor used to offer these as a stat's `source`,
+   * and the control could not do anything useful: every column exists BECAUSE
+   * some stat already names it, so there is nothing to point a new stat at, and
+   * re-pointing an existing one at another stat's column is always wrong. The
+   * mapping is `STAT_SOURCE` in the engine and moves when the crawler learns to
+   * read a new field.
+   *
+   * Still on the wire, because the server uses the same list to say which
+   * columns exist when it refuses an overlay that names one that does not.
+   */
   sourceColumns: string[]
   /** Players this run can rank. Anyone absent is shown as having no data. */
   measuredPlayerIds: number[]
