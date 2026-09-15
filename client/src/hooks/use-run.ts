@@ -12,10 +12,25 @@ import type { Stage } from "@/types/run"
  * is a state to render, not a failure to retry.
  */
 export function useRun(tournamentId?: string, stage?: Stage) {
-  return useQuery({
-    queryKey: ["run", tournamentId ?? "latest", stage ?? "latest"],
+  return useQuery(runQueryOptions(tournamentId, stage))
+}
+
+/**
+ * The same query, as options, for a caller that needs several at once.
+ *
+ * The account page lists saved work across every tournament and stage, and a
+ * saved roster holds player ids rather than names -- so it has to resolve each
+ * group against its own run, which is `useQueries` and not a hook it can call
+ * in a loop. Shared rather than rewritten there because the KEY is the shared
+ * part: a second spelling of `["run", id, stage]` would fetch a second copy of
+ * a payload this cache already holds, and the two could disagree about which
+ * run is current.
+ */
+export function runQueryOptions(tournamentId?: string, stage?: Stage) {
+  return {
+    queryKey: ["run", tournamentId ?? "latest", stage ?? "latest"] as const,
     queryFn: () => getCurrentRun(tournamentId, stage),
     staleTime: 60 * 60 * 1000,
     retry: false,
-  })
+  }
 }

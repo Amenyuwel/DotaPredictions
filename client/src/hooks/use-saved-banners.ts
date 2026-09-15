@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import {
   deleteBanner,
+  listAllSavedBanners,
   listSavedBanners,
   saveBanner,
   type SavedBanner,
@@ -35,11 +36,35 @@ export function useSaveBanner(tournamentId: string, stage: string) {
   })
 }
 
-export function useDeleteBanner(tournamentId: string, stage: string) {
+/**
+ * Every saved banner, across tournaments and stages.
+ *
+ * The account page's question, and one the scoped list structurally cannot
+ * answer -- it is the only place a banner saved against a stage that has since
+ * ended is still visible, and so the only place it can be deleted.
+ */
+export function useAllSavedBanners(enabled: boolean) {
+  return useQuery<SavedBanner[]>({
+    queryKey: ["saved-banners", "all"],
+    queryFn: listAllSavedBanners,
+    enabled,
+    staleTime: 30_000,
+  })
+}
+
+/**
+ * Deleting invalidates the whole `saved-banners` key rather than one run's.
+ *
+ * A deleted row can sit in two cached lists at once -- the scoped one the
+ * sidebar reads and the unscoped one the account page reads -- and they are the
+ * same row. Invalidating only the list the delete was issued from leaves the
+ * other showing a banner that no longer exists, which is the one failure a
+ * saved list has: it is a record of what is there.
+ */
+export function useDeleteBanner() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: deleteBanner,
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["saved-banners", tournamentId, stage] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["saved-banners"] }),
   })
 }

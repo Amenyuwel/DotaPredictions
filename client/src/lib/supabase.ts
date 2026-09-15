@@ -110,17 +110,35 @@ const fromRow = (row: SavedBannerRow): SavedBanner => ({
  * offering to save. That is deliberate: "continue as guest" means the rows do
  * not exist, not that they are hidden.
  */
-export async function listSavedBanners(tournamentId: string, stage: string) {
+const BANNER_COLUMNS = "id, tournament_id, stage, role, emblem_ids, label, created_at"
+
+/**
+ * Two screens ask different questions of one table, so the scope is a
+ * parameter rather than a second query.
+ *
+ * The sidebar asks "what did I save for the run on screen" and MUST be scoped:
+ * a Group Stage banner offered inside a Main Event would load three emblems
+ * into five slots and score as if it belonged there. The account page asks
+ * "what have I saved at all", which a scoped list cannot answer however many
+ * times it is called. One builder for both, because the column list and the
+ * ordering are the parts that would drift.
+ */
+async function queryBanners(scope?: { tournamentId: string; stage: string }) {
   if (!supabase) return []
-  const { data, error } = await supabase
-    .from("saved_banners")
-    .select("id, tournament_id, stage, role, emblem_ids, label, created_at")
-    .eq("tournament_id", tournamentId)
-    .eq("stage", stage)
-    .order("created_at", { ascending: false })
+  const base = supabase.from("saved_banners").select(BANNER_COLUMNS)
+  const scoped = scope
+    ? base.eq("tournament_id", scope.tournamentId).eq("stage", scope.stage)
+    : base
+  const { data, error } = await scoped.order("created_at", { ascending: false })
   if (error) throw new Error(error.message)
   return (data as SavedBannerRow[]).map(fromRow)
 }
+
+export const listSavedBanners = (tournamentId: string, stage: string) =>
+  queryBanners({ tournamentId, stage })
+
+/** Every saved banner this user has, whichever run it belongs to. */
+export const listAllSavedBanners = () => queryBanners()
 
 export async function saveBanner(input: {
   tournamentId: string
@@ -201,17 +219,23 @@ const rosterFromRow = (row: SavedRosterRow): SavedRoster => ({
   createdAt: row.created_at,
 })
 
-export async function listSavedRosters(tournamentId: string, stage: string) {
+/** Scoped or not, for the same reason banners are -- see `queryBanners`. */
+async function queryRosters(scope?: { tournamentId: string; stage: string }) {
   if (!supabase) return []
-  const { data, error } = await supabase
-    .from("saved_rosters")
-    .select(ROSTER_COLUMNS)
-    .eq("tournament_id", tournamentId)
-    .eq("stage", stage)
-    .order("created_at", { ascending: false })
+  const base = supabase.from("saved_rosters").select(ROSTER_COLUMNS)
+  const scoped = scope
+    ? base.eq("tournament_id", scope.tournamentId).eq("stage", scope.stage)
+    : base
+  const { data, error } = await scoped.order("created_at", { ascending: false })
   if (error) throw new Error(error.message)
   return (data as SavedRosterRow[]).map(rosterFromRow)
 }
+
+export const listSavedRosters = (tournamentId: string, stage: string) =>
+  queryRosters({ tournamentId, stage })
+
+/** Every saved roster this user has, whichever run it belongs to. */
+export const listAllSavedRosters = () => queryRosters()
 
 export async function saveRoster(input: {
   tournamentId: string

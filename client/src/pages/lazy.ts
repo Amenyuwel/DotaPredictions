@@ -1,13 +1,13 @@
 import { lazy } from "react"
 
 /**
- * The admin pages, loaded only on their own paths.
+ * The admin page, loaded only on its own path.
  *
  * Almost nobody who opens this site is an administrator, and the editing
  * surface -- four tabs of forms over the scoring table -- is a large thing to
- * put in the bundle every visitor downloads to look at a ranking. Dynamic
- * imports keep both pages in their own chunks, fetched when `/admin` or
- * `/admin/login` is opened and never otherwise.
+ * put in the bundle every visitor downloads to look at a ranking. A dynamic
+ * import keeps it in its own chunk, fetched when `/admin` is opened and never
+ * otherwise.
  *
  * This is a bundling decision and not a security one. The chunks are public,
  * like every other asset here; what protects the configuration is that the
@@ -22,6 +22,8 @@ export const AdminPage = lazy(async () => ({
   default: (await import("@/pages/admin")).AdminPage,
 }))
 
-export const AdminLoginPage = lazy(async () => ({
-  default: (await import("@/pages/admin-login")).AdminLoginPage,
+/** Split for the same reason, if less dramatically: most visits never open an
+ * account page, and several of them are guests who have no account to open. */
+export const AccountPage = lazy(async () => ({
+  default: (await import("@/pages/account")).AccountPage,
 }))

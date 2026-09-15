@@ -1,10 +1,10 @@
 import { StrictMode, Suspense } from "react"
 import { createRoot } from "react-dom/client"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { Loading } from "@/components/ui/spinner"
+import { Skeleton, SkeletonPanel } from "@/components/ui/skeleton"
 import { TooltipProvider } from "@/components/ui/tooltip"
 
-import { AdminLoginPage, AdminPage } from "@/pages/lazy"
+import { AccountPage, AdminPage } from "@/pages/lazy"
 
 import App from "./App.tsx"
 import "./index.css"
@@ -37,27 +37,38 @@ const queryClient = new QueryClient({
  * can change what the tool says" should be visible in the address bar.
  *
  * Nothing here decides whether the visitor may see the editor. Anyone can load
- * either path; the editor refuses to render without an admin session, the login
- * page refuses to draw a form unless the server says that door exists, and the
- * server refuses every request behind both.
+ * the path; the editor refuses to render without an admin session, and the
+ * server refuses every request behind it.
  */
 const path = window.location.pathname.replace(/\/+$/, "")
 const isAdminPath = path === "/admin"
-const isAdminLoginPath = path === "/admin/login"
+const isAccountPath = path === "/account"
+const isLazyPath = isAdminPath || isAccountPath
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        {isAdminPath || isAdminLoginPath ? (
+        {isLazyPath ? (
           <Suspense
             fallback={
+              // Held open until the chunk arrives. Generic on purpose: this
+              // fallback is showing while the code that knows the real shape is
+              // still being fetched, so it reserves a page rather than a layout
+              // it cannot yet be sure of.
               <div className="mx-auto w-full max-w-5xl px-4 py-6">
-                <Loading>Loading the configuration editor…</Loading>
+                <SkeletonPanel
+                  label={isAccountPath ? "Loading your account…" : "Loading the configuration editor…"}
+                  className="space-y-3"
+                >
+                  <Skeleton className="h-9 w-56" />
+                  <Skeleton className="h-40 w-full rounded-xl" />
+                  <Skeleton className="h-40 w-full rounded-xl" />
+                </SkeletonPanel>
               </div>
             }
           >
-            {isAdminLoginPath ? <AdminLoginPage /> : <AdminPage />}
+            {isAccountPath ? <AccountPage /> : <AdminPage />}
           </Suspense>
         ) : (
           <App />
