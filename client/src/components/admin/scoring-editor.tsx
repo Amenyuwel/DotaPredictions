@@ -27,7 +27,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { validateKey } from "@/lib/admin-ui"
 import { tierLabel, traitLabel } from "@/lib/emblem-catalog"
-import { capitalize, statLabel } from "@/lib/labels"
+import { capitalize, ROLE_LABEL, statLabel } from "@/lib/labels"
+import type { FantasyRole } from "@/types/run"
 import type { AdminConfig, ConfigOverlay, StatPatch, TraitPatch } from "@/types/admin"
 import type { Scoring } from "@/types/run"
 
@@ -377,12 +378,13 @@ function StatRow({
     <TableRow className={entry ? "bg-primary/5" : undefined}>
       <TableCell className="pl-6">
         <div className="flex items-center gap-1.5">
-          {/* The words, then the key. The key is what an emblem id is built
-              from and what the YAML export names, so it cannot simply go --
-              but it is the identifier, not the label, and reading eighteen of
-              them in lower snake case was the complaint. */}
-          <span className="text-sm font-medium">{statLabel(statKey)}</span>
-          <code className="text-muted-foreground text-2xs">{statKey}</code>
+          {/* The words only. The key is still what an emblem id is built from
+              and what the YAML export names, so it is on the title rather than
+              gone -- but eighteen of them in lower snake case beside their own
+              labels was the same fact twice, in the harder-to-read spelling. */}
+          <span className="text-sm font-medium" title={statKey}>
+            {statLabel(statKey)}
+          </span>
           {!was ? <Badge variant="secondary">new</Badge> : null}
           {!spec.measurable ? (
             <Badge variant="outline" title="Excluded from emblem choice, never scored as zero">
@@ -415,7 +417,7 @@ function StatRow({
       <TableCell>
         <Cell changed={entry?.color !== undefined} was={was && capitalize(was.color)}>
           <SelectCell
-            label={`${statKey} colour`}
+            label={`${statLabel(statKey)} colour`}
             value={spec.color}
             options={colorOptions}
             changed={entry?.color !== undefined}
@@ -428,11 +430,14 @@ function StatRow({
       <TableCell>
         <Cell changed={entry?.source !== undefined} was={was ? (was.source ?? "None") : undefined}>
           <SelectCell
-            label={`${statKey} source column`}
+            label={`${statLabel(statKey)} source column`}
             value={spec.source ?? NO_SOURCE}
             options={sourceOptions}
             changed={entry?.source !== undefined}
-            width="w-44"
+            // `observer_wards_planted` and `teamfight_participation` are the
+            // longest columns a run carries; narrower than this truncates the
+            // one thing in the cell that has to be read exactly.
+            width="w-56"
             format={(v) => (v === NO_SOURCE ? "None" : v)}
             onChange={(v) => onSetSource(v === NO_SOURCE ? null : v)}
           />
@@ -440,7 +445,12 @@ function StatRow({
       </TableCell>
 
       <TableCell className="pr-6">
-        <RowActions what={statKey} changed={Boolean(entry)} onUndo={onUndo} onRemove={onRemove} />
+        <RowActions
+          what={statLabel(statKey)}
+          changed={Boolean(entry)}
+          onUndo={onUndo}
+          onRemove={onRemove}
+        />
       </TableCell>
     </TableRow>
   )
@@ -630,8 +640,8 @@ function TraitRow({
           <TextCell
             value={spec.condition ?? ""}
             changed={entry?.condition !== undefined}
-            placeholder="all emblem qualities differ"
-            className="w-56"
+            placeholder="All emblem qualities differ"
+            className="w-72"
             onCommit={(v) => onEdit("condition", v || null)}
           />
         </Cell>
@@ -775,11 +785,11 @@ function ColorsCard({ scoring, published, patch, setScoring }: SectionProps) {
         <LabelledField
           label="Palette"
           changed={patch.colors !== undefined}
-          was={published.colors.join(", ")}
+          was={words(published.colors)}
           onUndo={() => setScoring({ ...patch, colors: undefined })}
         >
           <TextCell
-            value={scoring.colors.join(", ")}
+            value={words(scoring.colors)}
             changed={patch.colors !== undefined}
             onCommit={(v) => setScoring({ ...patch, colors: commaList(v) })}
           />
@@ -788,13 +798,13 @@ function ColorsCard({ scoring, published, patch, setScoring }: SectionProps) {
         {Object.entries(rows).map(([role, row]) => (
           <LabelledField
             key={role}
-            label={`${role} slots`}
+            label={`${roleLabel(role)} slots`}
             changed={patch.bannerColors?.[role] !== undefined}
-            was={published.bannerColors?.[role]?.join(", ")}
+            was={words(published.bannerColors?.[role])}
             onUndo={() => setRow(role, undefined)}
           >
             <TextCell
-              value={row.join(", ")}
+              value={words(row)}
               changed={patch.bannerColors?.[role] !== undefined}
               onCommit={(v) => setRow(role, commaList(v))}
             />
@@ -814,7 +824,19 @@ function ColorsCard({ scoring, published, patch, setScoring }: SectionProps) {
 
 
 /**
- * A comma-separated list, or undefined when empty.
+ * A colour list as words: `["red","blue"]` -> `"Red, Blue"`.
+ *
+ * Read with `commaList`, which lowercases on the way back. The pair is written
+ * together because the round trip is the whole point: a colour key is lowercase
+ * by contract -- the overlay schema's `Key` pattern admits nothing else -- and a
+ * capitalised one saved as-is would name a colour no stat carries, emptying a
+ * banner slot. So the capitals exist only between these two functions.
+ */
+const words = (list: readonly string[] | undefined) =>
+  (list ?? []).map(capitalize).join(", ")
+
+/**
+ * A comma-separated list, lowercased, or undefined when empty.
  *
  * The contract types these as non-empty -- a palette with no colours and a
  * banner row with no slots are both meaningless -- so an emptied field drops the
@@ -823,7 +845,13 @@ function ColorsCard({ scoring, published, patch, setScoring }: SectionProps) {
 function commaList(value: string): [string, ...string[]] | undefined {
   const parts = value
     .split(",")
-    .map((part) => part.trim())
+    .map((part) => part.trim().toLowerCase())
     .filter(Boolean)
   return parts.length > 0 ? (parts as [string, ...string[]]) : undefined
 }
+
+/** A banner-colour row's role as a reader knows it. `bannerColors` is keyed by
+ * plain string in the contract, so an unrecognised role still gets capitals
+ * rather than falling through as typed. */
+const roleLabel = (role: string) =>
+  ROLE_LABEL[role as FantasyRole] ?? capitalize(role)
