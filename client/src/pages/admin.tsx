@@ -170,7 +170,7 @@ export function AdminPage() {
         onValueChange={(next) => setSection(next as string)}
         className="items-start gap-6 md:flex-row"
       >
-        <div className="w-full shrink-0 md:w-64">
+        <div className="w-full shrink-0 md:w-64 xl:w-72">
           <AdminSidebar
             config={config}
             preview={preview}
@@ -316,7 +316,12 @@ function Shell({
   subtitle?: string
 }) {
   return (
-    <div className="mx-auto grid w-full max-w-6xl gap-4 px-4 py-6">
+    // No max width. The public tool is reading material and caps its line
+    // length; this is a table of eighteen stats across five columns, and
+    // capping it at 1152px left the tables cramped while the screen sat empty
+    // on both sides. Prose inside the cards carries `max-w-prose` instead, so
+    // the paragraphs stay readable without holding the tables back.
+    <div className="grid w-full gap-4 px-4 py-6 2xl:px-8">
       <a
         href="#editor"
         className="bg-background focus:ring-ring sr-only rounded-md px-3 py-2 text-sm focus:not-sr-only focus:ring-2"

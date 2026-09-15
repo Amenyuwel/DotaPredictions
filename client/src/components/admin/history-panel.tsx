@@ -85,7 +85,14 @@ export function HistoryPanel({
                       <Badge className="ml-1.5">live</Badge>
                     ) : null}
                   </TableCell>
-                  <TableCell className="max-w-96">{version.note}</TableCell>
+                  <TableCell>
+                    {/* The cell's own max-width is only a suggestion in auto table
+                        layout, so a long note escapes the column and paints over the
+                        author. The inner block is a real box that wraps. */}
+                    <div className="max-w-96 min-w-0 wrap-break-word whitespace-normal">
+                      {version.note}
+                    </div>
+                  </TableCell>
                   <TableCell className="text-muted-foreground text-xs">
                     {version.authorEmail || "unknown"}
                   </TableCell>

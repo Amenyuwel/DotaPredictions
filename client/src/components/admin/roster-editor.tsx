@@ -1,17 +1,32 @@
 import { useMemo, useState } from "react"
-import { AlertTriangle, ChevronRight, Plus, Search, Trash2, Undo2 } from "lucide-react"
+import { AlertTriangle, Plus, Trash2 } from "lucide-react"
 
 import { AddDialog } from "@/components/admin/add-dialog"
-import { Cell, SelectCell, TextCell, UndoCell } from "@/components/admin/cells"
+import {
+  Cell,
+  FilterField,
+  LabelledField,
+  RemovedChips,
+  RowActions,
+  SelectCell,
+  TextCell,
+} from "@/components/admin/cells"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 import { validateId } from "@/lib/admin-ui"
 import { ROLE_LABEL } from "@/lib/labels"
 import { cn } from "@/lib/utils"
-import type { AdminConfig, ConfigOverlay } from "@/types/admin"
+import type { AdminConfig, ConfigOverlay, PlayerPatch } from "@/types/admin"
 import type { FantasyRole, Lane, Player, Team } from "@/types/run"
 
 /**
@@ -28,11 +43,11 @@ import type { FantasyRole, Lane, Player, Team } from "@/types/run"
  * them: no sample matrix means no distribution to draw from, and a player
  * scored from nothing looks like a weak player rather than an unknown one.
  *
- * One team open at a time. Sixteen teams with five players each, all expanded,
- * was several thousand pixels to reach the one being corrected -- and a roster
- * edit is almost always one team, because that is the unit that changes. The
- * closed row still carries what you scan for: the name, the id, how many
- * players, and whether any of them have no data.
+ * A list beside a detail pane, rather than sixteen expanding panels. Expanding
+ * panels made the page grow with every team opened, so reading two of them
+ * meant scrolling past the first; here the list is fixed height and scrolls
+ * inside itself, and the page never grows at all. It also matches the job: a
+ * roster edit is one team, because that is the unit that changes.
  */
 
 const LANES: Lane[] = ["carry", "mid", "offlane", "soft_support", "hard_support"]
@@ -44,32 +59,38 @@ const ROLE_OPTIONS = FANTASY_ROLES.map((role) => ({
   label: ROLE_LABEL[role] ?? role,
 }))
 
-interface Props {
+export function RosterEditor({
+  config,
+  doc,
+  onChange,
+  effective,
+}: {
   config: AdminConfig
   doc: ConfigOverlay
   onChange: (next: ConfigOverlay) => void
   /** From the server's own apply, or undefined while there are unsaved edits. */
   effective: { teams: Team[]; players: Player[] } | undefined
-}
-
-export function RosterEditor({ config, doc, onChange, effective }: Props) {
+}) {
   const [addingTeam, setAddingTeam] = useState(false)
-  // Which team a new player is being added to, or null when shut. One dialog
-  // outside the list rather than one per team: N dialogs mounted for N teams is
-  // N copies of a form only ever used once at a time.
-  const [addingPlayerTo, setAddingPlayerTo] = useState<{ id: number; name: string } | null>(null)
-  const [open, setOpen] = useState<number | null>(null)
+  const [addingPlayer, setAddingPlayer] = useState(false)
   const [filter, setFilter] = useState("")
+  const [selectedId, setSelectedId] = useState<number | null>(null)
 
   const teams = effective?.teams ?? config.published.teams
   const players = effective?.players ?? config.published.players
-  const publishedTeams = new Map(config.published.teams.map((t) => [t.teamId, t]))
-  const publishedPlayers = new Map(config.published.players.map((p) => [p.playerId, p]))
-  const measured = new Set(config.measuredPlayerIds)
-  const projected = new Set(config.projectedTeamIds)
+  const publishedTeams = useMemo(
+    () => new Map(config.published.teams.map((t) => [t.teamId, t])),
+    [config.published.teams],
+  )
+  const publishedPlayers = useMemo(
+    () => new Map(config.published.players.map((p) => [p.playerId, p])),
+    [config.published.players],
+  )
+  const measured = useMemo(() => new Set(config.measuredPlayerIds), [config.measuredPlayerIds])
+  const projected = useMemo(() => new Set(config.projectedTeamIds), [config.projectedTeamIds])
 
-  const teamsRemoved = new Set(doc.teamsRemoved ?? [])
-  const playersRemoved = new Set(doc.playersRemoved ?? [])
+  const teamsRemoved = doc.teamsRemoved ?? []
+  const playersRemoved = doc.playersRemoved ?? []
 
   const byTeam = useMemo(() => {
     const map = new Map<number, Player[]>()
@@ -78,6 +99,23 @@ export function RosterEditor({ config, doc, onChange, effective }: Props) {
     }
     return map
   }, [players])
+
+  // Matches a team by its own name or by any of its players', so looking for a
+  // person finds the team they are on rather than nothing.
+  const needle = filter.trim().toLowerCase()
+  const shown = needle
+    ? teams.filter(
+        (team) =>
+          team.name.toLowerCase().includes(needle) ||
+          String(team.teamId).includes(needle) ||
+          (byTeam.get(team.teamId) ?? []).some((p) => p.nick.toLowerCase().includes(needle)),
+      )
+    : teams
+
+  // Derived, not stored: a stored selection survives a filter that excludes it,
+  // or a team the overlay removed, and the detail pane then describes something
+  // the list no longer offers.
+  const selected = shown.find((team) => team.teamId === selectedId) ?? shown[0] ?? null
 
   const editTeam = (id: number, field: string, value: unknown) =>
     onChange({
@@ -88,7 +126,7 @@ export function RosterEditor({ config, doc, onChange, effective }: Props) {
       },
     })
 
-  const editPlayer = (id: number, field: string, value: unknown) =>
+  const editPlayer = (id: number, field: keyof PlayerPatch, value: unknown) =>
     onChange({
       ...doc,
       players: {
@@ -103,17 +141,9 @@ export function RosterEditor({ config, doc, onChange, effective }: Props) {
     onChange({ ...doc, [bucket]: Object.keys(next).length > 0 ? next : undefined })
   }
 
-  // Matches a team by its own name or by any of its players', so looking for a
-  // person finds the team they are on rather than nothing.
-  const needle = filter.trim().toLowerCase()
-  const shown = needle
-    ? teams.filter(
-        (team) =>
-          team.name.toLowerCase().includes(needle) ||
-          String(team.teamId).includes(needle) ||
-          (byTeam.get(team.teamId) ?? []).some((p) => p.nick.toLowerCase().includes(needle)),
-      )
-    : teams
+  const isTouched = (team: Team) =>
+    Boolean(doc.teams?.[String(team.teamId)]) ||
+    (byTeam.get(team.teamId) ?? []).some((p) => doc.players?.[String(p.playerId)])
 
   return (
     <div className="grid gap-4">
@@ -127,285 +157,279 @@ export function RosterEditor({ config, doc, onChange, effective }: Props) {
         </AlertDescription>
       </Alert>
 
-      <Card>
-        <CardHeader className="gap-2">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <CardTitle>Teams and players</CardTitle>
-            <Button size="sm" variant="outline" onClick={() => setAddingTeam(true)}>
-              <Plus aria-hidden />
-              Add team
-            </Button>
-          </div>
-          <p className="text-muted-foreground text-xs">
-            Open a team to edit it. Removing a team removes its players with it — a player
-            on no team cannot be ranked at all.
-          </p>
-          <div className="flex items-center gap-2">
-            <label className="relative flex-1 sm:max-w-xs">
-              <span className="sr-only">Filter teams and players</span>
-              <Search
-                aria-hidden
-                className="text-muted-foreground pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2"
-              />
-              <Input
-                value={filter}
-                onChange={(event) => setFilter(event.currentTarget.value)}
-                placeholder="Filter by team or player"
-                className="h-7 pl-7"
-              />
-            </label>
-            <span className="text-muted-foreground text-2xs tabular-nums" aria-live="polite">
-              {shown.length === teams.length
-                ? `${teams.length} teams`
-                : `${shown.length} of ${teams.length}`}
-            </span>
-          </div>
-        </CardHeader>
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,18rem)_1fr]">
+        <Card className="h-fit">
+          <CardHeader className="gap-2">
+            <div className="flex items-center justify-between gap-2">
+              <CardTitle className="text-sm">Teams</CardTitle>
+              <Button size="sm" variant="outline" onClick={() => setAddingTeam(true)}>
+                <Plus aria-hidden />
+                Add
+              </Button>
+            </div>
+            <FilterField
+              value={filter}
+              onChange={setFilter}
+              label="Filter by team or player"
+              summary={
+                shown.length === teams.length ? `${teams.length}` : `${shown.length} of ${teams.length}`
+              }
+            />
+          </CardHeader>
 
-        <CardContent className="grid gap-1.5">
-          {shown.map((team) => {
-            const was = publishedTeams.get(team.teamId)
-            const entry = doc.teams?.[String(team.teamId)]
-            const roster = byTeam.get(team.teamId) ?? []
-            const noData = roster.filter((p) => !measured.has(p.playerId)).length
-            const isOpen = open === team.teamId
-            const touched =
-              Boolean(entry) || roster.some((p) => doc.players?.[String(p.playerId)])
+          <CardContent className="px-2">
+            {/* Scrolls inside itself, so sixteen teams do not set the height of
+                the page and the detail pane stays where it was. */}
+            <ul className="grid max-h-[28rem] gap-0.5 overflow-y-auto">
+              {shown.map((team) => {
+                const roster = byTeam.get(team.teamId) ?? []
+                const noData = roster.filter((p) => !measured.has(p.playerId)).length
+                const isSelected = selected?.teamId === team.teamId
+                return (
+                  <li key={team.teamId}>
+                    <button
+                      type="button"
+                      aria-current={isSelected ? "true" : undefined}
+                      onClick={() => setSelectedId(team.teamId)}
+                      className={cn(
+                        "focus-visible:ring-ring flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-sm focus-visible:ring-2 focus-visible:outline-none",
+                        isSelected ? "bg-muted font-medium" : "hover:bg-muted/50",
+                      )}
+                    >
+                      <span className="min-w-0 flex-1 truncate">{team.name}</span>
+                      {isTouched(team) ? (
+                        <span
+                          className="bg-primary size-1.5 shrink-0 rounded-full"
+                          title="Edited in this draft"
+                        />
+                      ) : null}
+                      {noData > 0 ? (
+                        <Badge variant="destructive" title={`${noData} with no sample matrix`}>
+                          {noData}
+                        </Badge>
+                      ) : null}
+                      <span className="text-muted-foreground shrink-0 text-2xs tabular-nums">
+                        {roster.length}
+                      </span>
+                    </button>
+                  </li>
+                )
+              })}
 
-            return (
-              <div
-                key={team.teamId}
-                className={cn("rounded-lg border", touched && "border-primary/40 bg-primary/5")}
-              >
-                {/* A real button, so Enter and Space work and the expanded state
-                    is announced. `<details>` would have been fewer lines and
-                    could not be closed from outside, which is what keeps one
-                    team open at a time. */}
-                <button
-                  type="button"
-                  aria-expanded={isOpen}
-                  onClick={() => setOpen(isOpen ? null : team.teamId)}
-                  className="hover:bg-muted/50 focus-visible:ring-ring flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left focus-visible:ring-2 focus-visible:outline-none"
+              {shown.length === 0 ? (
+                <li className="text-muted-foreground px-2 py-6 text-center text-sm">
+                  Nothing matches “{filter}”.
+                </li>
+              ) : null}
+            </ul>
+          </CardContent>
+        </Card>
+
+        {selected ? (
+          <Card>
+            <CardHeader className="gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <CardTitle className="mr-auto">{selected.name}</CardTitle>
+                <code className="text-muted-foreground text-2xs">{selected.teamId}</code>
+                {!publishedTeams.has(selected.teamId) ? (
+                  <Badge variant="secondary">new</Badge>
+                ) : null}
+                {!projected.has(selected.teamId) ? (
+                  <Badge variant="outline" title="No projection in this stage">
+                    not in stage
+                  </Badge>
+                ) : null}
+              </div>
+
+              <div className="grid gap-2 sm:grid-cols-2">
+                <LabelledField
+                  label="Name"
+                  changed={doc.teams?.[String(selected.teamId)]?.name !== undefined}
+                  was={publishedTeams.get(selected.teamId)?.name}
+                  onUndo={() => dropKey("teams", selected.teamId)}
                 >
-                  <ChevronRight
-                    aria-hidden
-                    className={cn("size-4 shrink-0 transition-transform", isOpen && "rotate-90")}
+                  <TextCell
+                    value={selected.name}
+                    changed={doc.teams?.[String(selected.teamId)]?.name !== undefined}
+                    onCommit={(v) => editTeam(selected.teamId, "name", v)}
                   />
-                  <span className="min-w-0 flex-1 truncate text-sm font-medium">{team.name}</span>
-                  <code className="text-muted-foreground shrink-0 text-2xs">{team.teamId}</code>
-                  {!was ? <Badge variant="secondary">new</Badge> : null}
-                  {!projected.has(team.teamId) ? (
-                    <Badge variant="outline" title="No projection in this stage">
-                      not in stage
-                    </Badge>
-                  ) : null}
-                  {noData > 0 ? (
-                    <Badge variant="destructive" title="No sample matrix in this run">
-                      {noData} no data
-                    </Badge>
-                  ) : null}
-                  <span className="text-muted-foreground shrink-0 text-2xs tabular-nums">
-                    {roster.length}
-                  </span>
-                </button>
+                </LabelledField>
 
-                {isOpen ? (
-                  <div className="grid gap-3 border-t px-3 py-3">
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      <Field
-                        label="Name"
-                        changed={entry?.name !== undefined}
-                        was={was?.name}
-                        onRevert={() => dropKey("teams", team.teamId)}
+                <LabelledField
+                  label="Also played under"
+                  hint="One org on two ids splits its evidence in half. Takes effect at the next crawl."
+                  changed={doc.teams?.[String(selected.teamId)]?.alsoTeamIds !== undefined}
+                  was={publishedTeams.get(selected.teamId)?.alsoTeamIds.join(", ") || "none"}
+                  onUndo={() => dropKey("teams", selected.teamId)}
+                >
+                  <TextCell
+                    value={selected.alsoTeamIds.join(", ")}
+                    changed={doc.teams?.[String(selected.teamId)]?.alsoTeamIds !== undefined}
+                    placeholder="10182357, 9824702"
+                    onCommit={(v) =>
+                      editTeam(
+                        selected.teamId,
+                        "alsoTeamIds",
+                        v
+                          .split(",")
+                          .map((part) => Number(part.trim()))
+                          .filter((n) => Number.isInteger(n) && n > 0),
+                      )
+                    }
+                  />
+                </LabelledField>
+              </div>
+            </CardHeader>
+
+            <CardContent className="grid gap-3 px-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="pl-6">Player</TableHead>
+                    <TableHead>Account id</TableHead>
+                    <TableHead>Lane</TableHead>
+                    <TableHead>Fantasy slot</TableHead>
+                    <TableHead className="w-0 pr-6 text-right">
+                      <span className="sr-only">Actions</span>
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {(byTeam.get(selected.teamId) ?? []).map((player) => {
+                    const entry = doc.players?.[String(player.playerId)]
+                    const was = publishedPlayers.get(player.playerId)
+                    return (
+                      <TableRow
+                        key={player.playerId}
+                        className={entry ? "bg-primary/5" : undefined}
                       >
-                        <TextCell
-                          value={team.name}
-                          changed={entry?.name !== undefined}
-                          onCommit={(v) => editTeam(team.teamId, "name", v)}
-                        />
-                      </Field>
+                        <TableCell className="pl-6">
+                          <Cell changed={entry?.nick !== undefined} was={was?.nick}>
+                            <TextCell
+                              value={player.nick}
+                              changed={entry?.nick !== undefined}
+                              className="w-36"
+                              onCommit={(v) => editPlayer(player.playerId, "nick", v)}
+                            />
+                          </Cell>
+                        </TableCell>
 
-                      <Field
-                        label="Also played under"
-                        hint="One org on two ids splits its evidence in half. Takes effect at the next crawl."
-                        changed={entry?.alsoTeamIds !== undefined}
-                        was={was?.alsoTeamIds.join(", ") || "none"}
-                        onRevert={() => dropKey("teams", team.teamId)}
-                      >
-                        <TextCell
-                          value={team.alsoTeamIds.join(", ")}
-                          changed={entry?.alsoTeamIds !== undefined}
-                          placeholder="10182357, 9824702"
-                          onCommit={(v) =>
-                            editTeam(
-                              team.teamId,
-                              "alsoTeamIds",
-                              v
-                                .split(",")
-                                .map((part) => Number(part.trim()))
-                                .filter((n) => Number.isInteger(n) && n > 0),
-                            )
-                          }
-                        />
-                      </Field>
-                    </div>
-
-                    <ul className="grid gap-1">
-                      {roster.map((player) => {
-                        const wasPlayer = publishedPlayers.get(player.playerId)
-                        const playerEntry = doc.players?.[String(player.playerId)]
-                        return (
-                          <li
-                            key={player.playerId}
-                            className={cn(
-                              "flex flex-wrap items-center gap-2 rounded-md border px-2 py-1.5",
-                              playerEntry && "border-primary/40 bg-primary/5",
-                            )}
-                          >
-                            <div className="min-w-0 flex-1">
-                              <Cell changed={playerEntry?.nick !== undefined} was={wasPlayer?.nick}>
-                                <TextCell
-                                  value={player.nick}
-                                  changed={playerEntry?.nick !== undefined}
-                                  className="w-36"
-                                  onCommit={(v) => editPlayer(player.playerId, "nick", v)}
-                                />
-                              </Cell>
-                            </div>
-
-                            <code className="text-muted-foreground shrink-0 text-2xs">
+                        <TableCell>
+                          <div className="flex items-center gap-1.5">
+                            <code className="text-muted-foreground text-2xs">
                               {player.playerId}
                             </code>
-
                             {!measured.has(player.playerId) ? (
                               <Badge variant="destructive" title="No sample matrix in this run">
                                 no data
                               </Badge>
                             ) : null}
+                          </div>
+                        </TableCell>
 
-                            <SelectCell
-                              label={`${player.nick} lane`}
-                              value={player.lane}
-                              options={LANE_OPTIONS}
-                              changed={playerEntry?.lane !== undefined}
-                              width="w-32"
-                              onChange={(v) => editPlayer(player.playerId, "lane", v)}
-                            />
-                            <SelectCell
-                              label={`${player.nick} fantasy slot`}
-                              value={player.fantasyRole}
-                              options={ROLE_OPTIONS}
-                              changed={playerEntry?.fantasyRole !== undefined}
-                              width="w-28"
-                              onChange={(v) => editPlayer(player.playerId, "fantasyRole", v)}
-                            />
+                        <TableCell>
+                          <SelectCell
+                            label={`${player.nick} lane`}
+                            value={player.lane}
+                            options={LANE_OPTIONS}
+                            changed={entry?.lane !== undefined}
+                            width="w-32"
+                            onChange={(v) => editPlayer(player.playerId, "lane", v)}
+                          />
+                        </TableCell>
 
-                            <div className="flex items-center gap-0.5">
-                              <UndoCell
-                                changed={Boolean(playerEntry)}
-                                what={player.nick}
-                                onRevert={() => dropKey("players", player.playerId)}
-                              />
-                              <Button
-                                size="icon-sm"
-                                variant="ghost"
-                                className="text-destructive size-7"
-                                aria-label={`Remove ${player.nick}`}
-                                onClick={() =>
-                                  onChange({
-                                    ...doc,
-                                    playersRemoved: [...playersRemoved, String(player.playerId)],
-                                  })
-                                }
-                              >
-                                <Trash2 aria-hidden />
-                              </Button>
-                            </div>
-                          </li>
-                        )
-                      })}
-                    </ul>
+                        <TableCell>
+                          <SelectCell
+                            label={`${player.nick} fantasy slot`}
+                            value={player.fantasyRole}
+                            options={ROLE_OPTIONS}
+                            changed={entry?.fantasyRole !== undefined}
+                            width="w-28"
+                            onChange={(v) => editPlayer(player.playerId, "fantasyRole", v)}
+                          />
+                        </TableCell>
 
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="text-xs"
-                        onClick={() => setAddingPlayerTo({ id: team.teamId, name: team.name })}
-                      >
-                        <Plus aria-hidden />
-                        Add player
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="text-destructive ml-auto text-xs"
-                        onClick={() =>
-                          onChange({
-                            ...doc,
-                            teamsRemoved: [...teamsRemoved, String(team.teamId)],
-                          })
-                        }
-                      >
-                        <Trash2 aria-hidden />
-                        Remove team
-                      </Button>
-                    </div>
-                  </div>
-                ) : null}
+                        <TableCell className="pr-6">
+                          <RowActions
+                            what={player.nick}
+                            changed={Boolean(entry)}
+                            onUndo={() => dropKey("players", player.playerId)}
+                            onRemove={() =>
+                              onChange({
+                                ...doc,
+                                playersRemoved: [...playersRemoved, String(player.playerId)],
+                              })
+                            }
+                          />
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+
+                  {(byTeam.get(selected.teamId) ?? []).length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-muted-foreground py-6 text-center">
+                        No players on this team.
+                      </TableCell>
+                    </TableRow>
+                  ) : null}
+                </TableBody>
+              </Table>
+
+              <div className="flex flex-wrap items-center gap-2 px-6">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-xs"
+                  onClick={() => setAddingPlayer(true)}
+                >
+                  <Plus aria-hidden />
+                  Add player
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-destructive ml-auto text-xs"
+                  onClick={() =>
+                    onChange({ ...doc, teamsRemoved: [...teamsRemoved, String(selected.teamId)] })
+                  }
+                >
+                  <Trash2 aria-hidden />
+                  Remove team
+                </Button>
               </div>
-            )
-          })}
+            </CardContent>
+          </Card>
+        ) : (
+          <Card>
+            <CardContent className="text-muted-foreground py-10 text-center text-sm">
+              No team selected.
+            </CardContent>
+          </Card>
+        )}
+      </div>
 
-          {shown.length === 0 ? (
-            <p className="text-muted-foreground py-6 text-center text-sm">
-              No team or player matches “{filter}”.
-            </p>
-          ) : null}
-
-          {teamsRemoved.size > 0 || playersRemoved.size > 0 ? (
-            <div className="grid gap-1.5 rounded-lg border border-dashed p-3">
-              <p className="text-sm font-medium">Removed</p>
-              <div className="flex flex-wrap gap-1.5">
-                {[...teamsRemoved].map((id) => (
-                  <Button
-                    key={`t${id}`}
-                    size="sm"
-                    variant="outline"
-                    className="h-7 text-xs"
-                    onClick={() =>
-                      onChange({
-                        ...doc,
-                        teamsRemoved: [...teamsRemoved].filter((k) => k !== id),
-                      })
-                    }
-                  >
-                    <Undo2 aria-hidden />
-                    {publishedTeams.get(Number(id))?.name ?? id}
-                  </Button>
-                ))}
-                {[...playersRemoved].map((id) => (
-                  <Button
-                    key={`p${id}`}
-                    size="sm"
-                    variant="outline"
-                    className="h-7 text-xs"
-                    onClick={() =>
-                      onChange({
-                        ...doc,
-                        playersRemoved: [...playersRemoved].filter((k) => k !== id),
-                      })
-                    }
-                  >
-                    <Undo2 aria-hidden />
-                    {publishedPlayers.get(Number(id))?.nick ?? id}
-                  </Button>
-                ))}
-              </div>
-            </div>
-          ) : null}
-        </CardContent>
-      </Card>
+      <RemovedChips
+        label="Removed"
+        entries={[
+          ...teamsRemoved.map((id) => ({
+            key: `team:${id}`,
+            label: `team ${publishedTeams.get(Number(id))?.name ?? id}`,
+          })),
+          ...playersRemoved.map((id) => ({
+            key: `player:${id}`,
+            label: publishedPlayers.get(Number(id))?.nick ?? id,
+          })),
+        ]}
+        onRestore={(key) => {
+          const [kind, id] = key.split(":")
+          if (kind === "team") {
+            onChange({ ...doc, teamsRemoved: teamsRemoved.filter((k) => k !== id) })
+          } else {
+            onChange({ ...doc, playersRemoved: playersRemoved.filter((k) => k !== id) })
+          }
+        }}
+      />
 
       <AddDialog
         open={addingTeam}
@@ -426,16 +450,14 @@ export function RosterEditor({ config, doc, onChange, effective }: Props) {
         submitLabel="Add team"
         onSubmit={({ teamId, name }) => {
           onChange({ ...doc, teams: { ...(doc.teams ?? {}), [teamId]: { name } } })
-          setOpen(Number(teamId))
+          setSelectedId(Number(teamId))
         }}
       />
 
       <AddDialog
-        open={addingPlayerTo !== null}
-        onOpenChange={(isOpen) => {
-          if (!isOpen) setAddingPlayerTo(null)
-        }}
-        title={`Add a player to ${addingPlayerTo?.name ?? ""}`}
+        open={addingPlayer}
+        onOpenChange={setAddingPlayer}
+        title={`Add a player to ${selected?.name ?? ""}`}
         description="They will have no sample matrix, so they are shown as having no data and cannot be ranked until the next crawl."
         fields={[
           {
@@ -450,7 +472,7 @@ export function RosterEditor({ config, doc, onChange, effective }: Props) {
         ]}
         submitLabel="Add player"
         onSubmit={({ playerId, nick }) => {
-          if (!addingPlayerTo) return
+          if (!selected) return
           onChange({
             ...doc,
             players: {
@@ -460,49 +482,11 @@ export function RosterEditor({ config, doc, onChange, effective }: Props) {
               // filling in a lane nobody chose. Carry and core are a starting
               // point to correct, not a guess presented as a fact -- both
               // controls sit on the row that appears.
-              [playerId]: {
-                nick,
-                teamId: addingPlayerTo.id,
-                fantasyRole: "core",
-                lane: "carry",
-              },
+              [playerId]: { nick, teamId: selected.teamId, fantasyRole: "core", lane: "carry" },
             },
           })
         }}
       />
-    </div>
-  )
-}
-
-/** A labelled control with a reserved line under it, so a row keeps its height
- * whether or not it has been edited. */
-function Field({
-  label,
-  hint,
-  changed,
-  was,
-  onRevert,
-  children,
-}: {
-  label: string
-  hint?: string
-  changed: boolean
-  was?: string
-  onRevert: () => void
-  children: React.ReactNode
-}) {
-  return (
-    <div className="grid gap-1">
-      <div className="flex items-end justify-between gap-2">
-        <label className="grid min-w-0 flex-1 gap-1">
-          <span className="text-xs font-medium">{label}</span>
-          {children}
-        </label>
-        <UndoCell changed={changed} what={label} onRevert={onRevert} />
-      </div>
-      <p className="text-muted-foreground min-h-4 text-2xs">
-        {changed && was ? `was ${was}` : hint}
-      </p>
     </div>
   )
 }

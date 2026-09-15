@@ -1,5 +1,5 @@
 import type { ReactNode } from "react"
-import { Undo2 } from "lucide-react"
+import { Search, Trash2, Undo2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -201,5 +201,161 @@ export function UndoCell({ changed, onRevert, what }: { changed: boolean; onReve
     >
       <Undo2 aria-hidden />
     </Button>
+  )
+}
+
+/**
+ * A filter over a list, with a live count.
+ *
+ * Both editors need one and they were the same control written twice -- a
+ * search box, a count, and a live region announcing what the count became.
+ * Two copies of that drift the moment one is edited, and the drift shows up as
+ * one list announcing its filtering to a screen reader and the other not.
+ */
+export function FilterField({
+  value,
+  onChange,
+  label,
+  /** Rendered as-is, e.g. "12 of 18" or "16 teams". The caller knows what it is
+   * counting; this only decides where it goes and that it is announced. */
+  summary,
+}: {
+  value: string
+  onChange: (next: string) => void
+  label: string
+  summary: string
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      <label className="relative min-w-0 flex-1 sm:max-w-xs">
+        <span className="sr-only">{label}</span>
+        <Search
+          aria-hidden
+          className="text-muted-foreground pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2"
+        />
+        <Input
+          value={value}
+          onChange={(event) => onChange(event.currentTarget.value)}
+          placeholder={label}
+          className="h-7 pl-7"
+        />
+      </label>
+      {/* Wraps only the count, not the list: a live region around the table
+          would re-read every row on each keystroke. */}
+      <span className="text-muted-foreground shrink-0 text-2xs tabular-nums" aria-live="polite">
+        {summary}
+      </span>
+    </div>
+  )
+}
+
+/** What was removed, and the way back. One chip per entry, because restoring is
+ * the only thing anyone does here and a chip is the smallest control that says
+ * both what it was and that it can come back. */
+export function RemovedChips({
+  label,
+  hint,
+  entries,
+  onRestore,
+}: {
+  label: string
+  hint?: string
+  entries: { key: string; label: string }[]
+  onRestore: (key: string) => void
+}) {
+  if (entries.length === 0) return null
+  return (
+    <div className="grid gap-1.5 rounded-lg border border-dashed p-3">
+      <p className="text-sm font-medium">{label}</p>
+      {hint ? <p className="text-muted-foreground max-w-prose text-xs">{hint}</p> : null}
+      <div className="flex flex-wrap gap-1.5">
+        {entries.map((entry) => (
+          <Button
+            key={entry.key}
+            size="sm"
+            variant="outline"
+            className="h-7 text-xs"
+            onClick={() => onRestore(entry.key)}
+          >
+            <Undo2 aria-hidden />
+            {entry.label}
+          </Button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * A labelled control that says what it was, and keeps its height.
+ *
+ * Used wherever a single value is edited outside a table -- a team's name, a
+ * banner's slot colours. The reserved line under it is the point: two
+ * conditional lines (the hint, and what the published run said) made every
+ * field a different height depending on whether it had been touched, so a
+ * column of them jumped as you worked down it.
+ */
+export function LabelledField({
+  label,
+  hint,
+  changed,
+  was,
+  onUndo,
+  children,
+}: {
+  label: string
+  hint?: string
+  changed: boolean
+  /** What the published run says. Shown in place of the hint once changed,
+   * because at that moment it is the more useful of the two. */
+  was?: string
+  onUndo: () => void
+  children: ReactNode
+}) {
+  return (
+    <div className="grid gap-1">
+      <div className="flex items-end justify-between gap-2">
+        {/* The control sits inside the label, which associates them without an
+            id. Undo stays outside: a button inside a label activates that
+            label's control, so undo would also focus what it just reset. */}
+        <label className="grid min-w-0 flex-1 gap-1">
+          <span className="text-xs font-medium">{label}</span>
+          {children}
+        </label>
+        <UndoCell changed={changed} what={label} onRevert={onUndo} />
+      </div>
+      <p className="text-muted-foreground min-h-4 text-2xs">
+        {changed && was ? `was ${was}` : hint}
+      </p>
+    </div>
+  )
+}
+
+/** Undo and remove, together and in this order, because every editable thing on
+ * this page offers exactly these two and they must not move between rows. */
+export function RowActions({
+  what,
+  changed,
+  onUndo,
+  onRemove,
+}: {
+  what: string
+  changed: boolean
+  onUndo: () => void
+  onRemove: () => void
+}) {
+  return (
+    <div className="flex items-center justify-end gap-0.5">
+      <UndoCell changed={changed} what={what} onRevert={onUndo} />
+      <Button
+        size="icon-sm"
+        variant="ghost"
+        className="text-destructive size-7"
+        aria-label={`Remove ${what}`}
+        onClick={onRemove}
+      >
+        <Trash2 aria-hidden />
+      </Button>
+    </div>
   )
 }
