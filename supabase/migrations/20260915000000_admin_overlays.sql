@@ -67,6 +67,14 @@ alter table public.admins enable row level security;
 -- re-asks the question with the secret key on every admin request. A user who
 -- forges this answer locally gets a menu item and a 403.
 --
+-- Policies are dropped before they are created, so this file is safe to run
+-- twice. `create policy` has no `if not exists`, and these migrations are
+-- applied by pasting them into a SQL editor -- so without this a re-run dies
+-- partway with "policy already exists", having already done half its work.
+-- Every other statement here is guarded the same way.
+
+drop policy if exists "admins: read own row" on public.admins;
+
 -- Read-only, and only ever for the caller's own id: there is no insert, update
 -- or delete policy here, so the admin list is not enumerable by anyone holding
 -- the publishable key, and no session can add itself.

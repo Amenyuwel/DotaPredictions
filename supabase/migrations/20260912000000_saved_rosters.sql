@@ -47,6 +47,17 @@ create index if not exists saved_rosters_owner_idx
 
 alter table public.saved_rosters enable row level security;
 
+-- Policies are dropped before they are created, so this file is safe to run
+-- twice. `create policy` has no `if not exists`, and these migrations are
+-- applied by pasting them into a SQL editor -- so without this a re-run dies
+-- partway with "policy already exists", having already done half its work.
+-- Every other statement here is guarded the same way.
+
+drop policy if exists "saved_rosters: read own" on public.saved_rosters;
+drop policy if exists "saved_rosters: insert own" on public.saved_rosters;
+drop policy if exists "saved_rosters: update own" on public.saved_rosters;
+drop policy if exists "saved_rosters: delete own" on public.saved_rosters;
+
 -- `to authenticated` is what makes "continue as guest" mean what it says: the
 -- anon role matches no policy here, so a guest cannot read or write a row even
 -- by accident. Nothing is silently discarded server-side -- the client knows it
