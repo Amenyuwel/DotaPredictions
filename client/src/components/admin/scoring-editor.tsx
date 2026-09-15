@@ -123,9 +123,12 @@ export function ScoringEditor({
 
   return (
     <Tabs value={pane} onValueChange={(next) => setPane(next as string)} className="gap-3">
-      <TabsList variant="line" className="w-full justify-start overflow-x-auto">
+      {/* The same segmented control the public tool uses for its two
+          directions -- default variant, full width, equal shares -- so a tab
+          strip means one thing across the whole application. */}
+      <TabsList className="w-full">
         {PANES.map((entry) => (
-          <TabsTrigger key={entry.value} value={entry.value} className="flex-none px-3">
+          <TabsTrigger key={entry.value} value={entry.value} className="flex-1">
             {entry.label}
           </TabsTrigger>
         ))}
@@ -147,13 +150,19 @@ export function ScoringEditor({
   )
 }
 
-/** The four tables, in the order they are read: what a stat pays, what a trait
- * does to it, what a tier adds, and which slots can hold the result. */
+/**
+ * The four tables, in the order they are read: what a stat pays, what a trait
+ * does to it, what a tier adds, and which slots can hold the result.
+ *
+ * One word each. The card below each tab already carries the full heading --
+ * "Emblem traits", "Colours and slots" -- and a tab repeating it is the same
+ * fact twice on one screen, at the width where four long labels stop fitting.
+ */
 const PANES = [
   { value: "stats", label: "Stats" },
-  { value: "traits", label: "Emblem traits" },
-  { value: "quality", label: "Emblem quality" },
-  { value: "colours", label: "Colours and slots" },
+  { value: "traits", label: "Traits" },
+  { value: "quality", label: "Quality" },
+  { value: "colours", label: "Colours" },
 ] as const
 
 // ---------------------------------------------------------------------------
