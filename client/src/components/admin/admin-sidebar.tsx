@@ -3,8 +3,8 @@ import { Download, Save, Send, Trash2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Loading } from "@/components/ui/spinner"
-import { TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { SECTIONS } from "@/lib/admin-ui"
+import { cn } from "@/lib/utils"
 import type { AdminConfig, OverlayPreview } from "@/types/admin"
 
 /**
@@ -25,6 +25,8 @@ import type { AdminConfig, OverlayPreview } from "@/types/admin"
 
 
 export function AdminSidebar({
+  section,
+  onSection,
   config,
   preview,
   dirty,
@@ -34,6 +36,8 @@ export function AdminSidebar({
   onDiscard,
   onExport,
 }: {
+  section: string
+  onSection: (next: string) => void
   config: AdminConfig
   preview: OverlayPreview | null
   dirty: boolean
@@ -51,14 +55,36 @@ export function AdminSidebar({
 
   return (
     <div className="grid gap-4 md:sticky md:top-4">
+      {/* Buttons, not a tablist. This was a vertical `Tabs` with the scoring
+          panes' horizontal `Tabs` nested inside it, and Tailwind's `group/tabs`
+          variants match ANY ancestor carrying that class -- so the inner strip
+          inherited `group-data-vertical/tabs:flex-col` from this one and
+          rendered stacked. Overriding that per-utility would have been a
+          specificity fight with a shared component; not nesting two tablists
+          removes the collision instead.
+
+          It is also the more honest markup: this is navigation between the
+          page's sections, which is what `nav` and `aria-current` say. */}
       <nav aria-label="Configuration sections">
-        <TabsList variant="line" className="w-full gap-0.5">
-          {SECTIONS.map((section) => (
-            <TabsTrigger key={section.value} value={section.value} className="justify-start">
-              {section.label}
-            </TabsTrigger>
+        <ul className="grid gap-0.5">
+          {SECTIONS.map((entry) => (
+            <li key={entry.value}>
+              <button
+                type="button"
+                aria-current={entry.value === section ? "page" : undefined}
+                onClick={() => onSection(entry.value)}
+                className={cn(
+                  "focus-visible:ring-ring w-full rounded-md px-2.5 py-1.5 text-left text-sm focus-visible:ring-2 focus-visible:outline-none",
+                  entry.value === section
+                    ? "bg-muted text-foreground font-medium"
+                    : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+                )}
+              >
+                {entry.label}
+              </button>
+            </li>
           ))}
-        </TabsList>
+        </ul>
       </nav>
 
       {/* A named region, so a screen reader hears what it is rather than

@@ -12,7 +12,6 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Loading } from "@/components/ui/spinner"
-import { Tabs, TabsContent } from "@/components/ui/tabs"
 import { useAdmin } from "@/hooks/use-admin"
 import { useDraft } from "@/hooks/use-draft"
 import { useSession } from "@/hooks/use-session"
@@ -164,14 +163,15 @@ export function AdminPage() {
             : undefined
       }
     >
-      <Tabs
-        orientation="vertical"
-        value={section}
-        onValueChange={(next) => setSection(next as string)}
-        className="items-start gap-6 md:flex-row"
-      >
+      {/* A plain two-column layout, not a vertical tablist. The sections are
+          navigation and say so with `nav` and `aria-current`; nesting a
+          tablist here also collided with the scoring panes' own strip, since
+          Tailwind's `group/tabs` variants match any ancestor. */}
+      <div className="flex flex-col items-start gap-6 md:flex-row">
         <div className="w-full shrink-0 md:w-64 xl:w-72">
           <AdminSidebar
+            section={section}
+            onSection={setSection}
             config={config}
             preview={preview}
             dirty={draft.dirty}
@@ -219,25 +219,25 @@ export function AdminPage() {
             </Alert>
           ) : null}
 
-          <TabsContent value="scoring" className="grid gap-4">
+          {section === "scoring" ? (
             <ScoringEditor
               config={config}
               doc={draft.doc}
               onChange={draft.setDoc}
               effective={effective?.scoring}
             />
-          </TabsContent>
+          ) : null}
 
-          <TabsContent value="roster" className="grid gap-4">
+          {section === "roster" ? (
             <RosterEditor
               config={config}
               doc={draft.doc}
               onChange={draft.setDoc}
               effective={effective}
             />
-          </TabsContent>
+          ) : null}
 
-          <TabsContent value="catalog">
+          {section === "catalog" ? (
             <Card>
               <CardHeader>
                 <CardTitle>Emblem catalog</CardTitle>
@@ -268,18 +268,18 @@ export function AdminPage() {
                 )}
               </CardContent>
             </Card>
-          </TabsContent>
+          ) : null}
 
-          <TabsContent value="history">
+          {section === "history" ? (
             <HistoryPanel
               tournamentId={config.scope.tournamentId}
               stage={config.scope.stage}
               currentVersion={config.live?.version ?? null}
               onLoad={draft.loadVersion}
             />
-          </TabsContent>
+          ) : null}
         </main>
-      </Tabs>
+      </div>
 
       <PublishDialog
         open={publishOpen}
