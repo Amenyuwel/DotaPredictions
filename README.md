@@ -324,6 +324,29 @@ cd server && npm install && npm run dev    # http://localhost:3000
 cd client && npm install && npm run dev    # http://localhost:5173, proxies /api
 ```
 
+Two ports is the arrangement that gets hot reload. It is not the only one: in
+production Express serves `client/dist` from its own origin, and that path works
+locally too, so everything can sit on **one** port.
+
+```bash
+cd server && npm run dev:solo    # builds client/dist, then serves it on :3000
+```
+
+Then `http://localhost:3000` is the tool, `/admin` is the editor and
+`/admin/login` the sign-in, all same-origin with the API. The trade is hot
+reload: `client/dist` is a static build, so a change to client source needs a
+rebuild. Leave one running beside it if you are editing the front end, and
+reload the page rather than waiting for HMR:
+
+```bash
+cd client && npm run build:watch
+```
+
+Which to use is a question about what you are changing, not about which is
+correct. Editing components, use two ports. Editing the engine, the server, or
+just *using* the tool, one port is fewer moving parts and is what a deployment
+actually looks like.
+
 `GET /api/health` reports which of three states the server booted into:
 `unconfigured` (no source of runs), `empty` (reachable, nothing published), or
 `ready`. A payload that fails schema validation is deliberately *not* a state -
