@@ -30,6 +30,34 @@ import type { AdminConfig, ConfigOverlay } from "@/types/admin"
 
 const EMPTY: ConfigOverlay = { schemaVersion: 1 }
 
+/**
+ * A document reduced to what it actually says, for comparing two of them.
+ *
+ * Undoing an edit does not restore the object it started from: removing the
+ * last stat from `scoring.stats` leaves `{ scoring: {} }` where there was
+ * nothing before, and key order follows whatever order the spreads happened in.
+ * Both are the same overlay -- they patch nothing -- so a plain `JSON.stringify`
+ * comparison would report unsaved edits that do not exist.
+ *
+ * Sorts keys, drops undefined, and drops empty objects and arrays, which is
+ * exactly the set of differences that carry no meaning here.
+ */
+function canonical(value: unknown): string {
+  return JSON.stringify(reduce(value))
+}
+
+function reduce(value: unknown): unknown {
+  if (Array.isArray(value)) return value.length > 0 ? value.map(reduce) : undefined
+  if (value === null || typeof value !== "object") return value
+
+  const out: Record<string, unknown> = {}
+  for (const key of Object.keys(value as Record<string, unknown>).sort()) {
+    const reduced = reduce((value as Record<string, unknown>)[key])
+    if (reduced !== undefined) out[key] = reduced
+  }
+  return Object.keys(out).length > 0 ? out : undefined
+}
+
 export interface DraftState {
   config: AdminConfig | undefined
   isLoading: boolean
@@ -67,8 +95,13 @@ export function useDraft(tournamentId?: string, stage?: string): DraftState {
 
   const [doc, setDocState] = useState<ConfigOverlay>(EMPTY)
   const [note, setNote] = useState("")
-  const [dirty, setDirty] = useState(false)
+  /** The document as the server last saw it. `dirty` is derived from this
+   * rather than latched, so undoing every change puts the editor back to clean
+   * instead of leaving a flag nothing can clear. */
+  const [savedDoc, setSavedDoc] = useState<ConfigOverlay>(EMPTY)
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null)
+
+  const dirty = canonical(doc) !== canonical(savedDoc)
 
   // Which scope the local document belongs to. Without this, switching stage
   // carries one stage's edits into the other's form -- and they would look like
@@ -81,15 +114,12 @@ export function useDraft(tournamentId?: string, stage?: string): DraftState {
     if (loadedScope.current === scopeKey) return
     loadedScope.current = scopeKey
     setDocState(query.data.draft?.doc ?? EMPTY)
+    setSavedDoc(query.data.draft?.doc ?? EMPTY)
     setNote(query.data.draft?.note ?? "")
-    setDirty(false)
     setLastSavedAt(query.data.draft?.updatedAt ?? null)
   }, [query.data, scopeKey])
 
-  const setDoc = useCallback((next: ConfigOverlay) => {
-    setDocState(next)
-    setDirty(true)
-  }, [])
+  const setDoc = useCallback((next: ConfigOverlay) => setDocState(next), [])
 
   const scope = useMemo(
     () => ({
@@ -102,7 +132,7 @@ export function useDraft(tournamentId?: string, stage?: string): DraftState {
   const saveMutation = useMutation({
     mutationFn: () => saveDraft({ ...scope, doc, note }),
     onSuccess: (result) => {
-      setDirty(false)
+      setSavedDoc(doc)
       setLastSavedAt(result.savedAt)
       // The preview comes back with the save and is the authoritative one, so
       // the cached config is patched rather than refetched: a second round trip
@@ -137,8 +167,8 @@ export function useDraft(tournamentId?: string, stage?: string): DraftState {
     mutationFn: () => discardDraft(scope),
     onSuccess: () => {
       setDocState(EMPTY)
+      setSavedDoc(EMPTY)
       setNote("")
-      setDirty(false)
       setLastSavedAt(null)
       void queryClient.invalidateQueries({ queryKey: ["admin-config"] })
     },
@@ -151,7 +181,6 @@ export function useDraft(tournamentId?: string, stage?: string): DraftState {
       // what makes it real, and that mints a new version with its own note.
       loadedScope.current = null
       setNote(`Loaded from version ${version}`)
-      setDirty(false)
       void queryClient.invalidateQueries({ queryKey: ["admin-config"] })
       void result
     },

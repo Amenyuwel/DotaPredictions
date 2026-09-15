@@ -48,10 +48,34 @@ export function AdminSidebar({
   onExport: () => void
 }) {
   const blocked = preview !== null && !preview.ok
+
+  /**
+   * What the saved draft actually contains, from the server's own count.
+   *
+   * Not whether a draft ROW exists, which is what this used to ask. Undo every
+   * change and save, and the row is still there holding nothing -- so the rail
+   * said "ready to publish" while the table showed no overrides at all, and
+   * publishing would have minted a version that changed nothing.
+   *
+   * Zero while there are unsaved edits, because the count comes from the last
+   * save and the screen has moved since. That case is reported as unsaved
+   * rather than as a number, so the stale figure is never shown.
+   */
+  const savedChanges = !dirty && preview?.ok ? preview.changeCount : 0
+
+  /**
+   * An empty draft is worth publishing in exactly one case: to clear overrides
+   * that are live. Then "nothing" IS the change -- it returns the run to what
+   * the engine published. With no overlay live there is nothing to clear, and
+   * publishing would be a version nobody can tell from its predecessor.
+   */
+  const clearsLiveOverrides = savedChanges === 0 && (config.live?.changeCount ?? 0) > 0
+
   // Publishing publishes the SAVED draft, never what is on screen. Validation
   // runs on the server when a draft is saved, so an unsaved document is one
   // nothing has checked -- and "publish" must not be able to mean that.
-  const canPublish = Boolean(config.draft) && !dirty && !blocked
+  const canPublish =
+    Boolean(config.draft) && !dirty && !blocked && (savedChanges > 0 || clearsLiveOverrides)
 
   return (
     <div className="grid gap-4 md:sticky md:top-4">
@@ -125,17 +149,23 @@ export function AdminSidebar({
           <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
             Draft
           </h2>
-          {/* One line, three states, never absent -- so the card keeps one
-              height and the buttons below it do not move as you type. */}
+          {/* One line, never absent -- so the card keeps one height and the
+              buttons below it do not move as you type. It reports what the
+              draft CONTAINS, not whether one exists: those differ the moment
+              every change in it is undone. */}
           <p className="text-sm">
             {dirty ? (
               <span className="text-destructive">Unsaved edits, not yet checked</span>
             ) : blocked ? (
               <span className="text-destructive">Saved, cannot be published</span>
-            ) : config.draft ? (
-              <span>Saved and ready to publish</span>
+            ) : savedChanges > 0 ? (
+              <span>
+                {savedChanges} override{savedChanges === 1 ? "" : "s"}, ready to publish
+              </span>
+            ) : clearsLiveOverrides ? (
+              <span>Empty — publishing clears what is live</span>
             ) : (
-              <span className="text-muted-foreground">Nothing drafted</span>
+              <span className="text-muted-foreground">Nothing to publish</span>
             )}
           </p>
         </div>

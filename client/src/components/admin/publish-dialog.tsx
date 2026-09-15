@@ -77,9 +77,15 @@ export function PublishDialog({
         <DialogHeader>
           <DialogTitle>Publish to {config.scope.stage}</DialogTitle>
           <DialogDescription>
-            {preview?.ok
-              ? `${preview.changeCount} override${preview.changeCount === 1 ? "" : "s"} will apply to every visitor's projections.`
-              : "This draft cannot be published yet."}
+            {!preview?.ok
+              ? "This draft cannot be published yet."
+              : preview.changeCount > 0
+                ? `${preview.changeCount} override${preview.changeCount === 1 ? "" : "s"} will apply to every visitor's projections.`
+                : // An empty draft published over a live overlay is not a
+                  // no-op: it is how overrides are taken back off, and saying
+                  // "0 overrides will apply" would describe the opposite of
+                  // what the reader is about to do.
+                  `Clears the ${config.live?.changeCount ?? 0} override${config.live?.changeCount === 1 ? "" : "s"} now live. Projections return to exactly what the engine published.`}
           </DialogDescription>
         </DialogHeader>
 
