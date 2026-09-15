@@ -15,8 +15,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Loading, Spinner } from "@/components/ui/spinner"
+import { Skeleton, SkeletonPanel } from "@/components/ui/skeleton"
+// Spinner only, and only for the overlay across an answer being recomputed --
+// there the layout is already drawn and skeletons would throw it away.
+import { Spinner } from "@/components/ui/spinner"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import type { EmblemCatalog } from "@/lib/emblem-catalog"
 import { cn } from "@/lib/utils"
@@ -66,10 +68,16 @@ export function SlotTargetCard({
   if (target.isPending) {
     return (
       <Card size="sm">
-        <CardContent className="space-y-2" aria-busy>
-          <Loading>{label}</Loading>
-          <Skeleton className="h-7 w-28" />
-          <Skeleton className="h-3 w-full" />
+        <CardContent className="space-y-2">
+          {/* The slot's name is not being waited for -- it is known before the
+              query starts -- so it is printed rather than greyed out, exactly
+              where the answered card puts it. Only the number below it is a
+              placeholder. */}
+          <p className="font-heading text-sm font-medium">{label}</p>
+          <SkeletonPanel label={`Working out the ${label.toLowerCase()} banner…`}>
+            <Skeleton className="h-7 w-28" />
+            <Skeleton className="h-3 w-full" />
+          </SkeletonPanel>
         </CardContent>
       </Card>
     )
@@ -237,12 +245,11 @@ function Answered({
         )}
 
         {shown.isPending ? (
-          <div className="space-y-3" aria-busy>
-            <Loading>Working out the banner to aim for…</Loading>
+          <SkeletonPanel label="Working out the banner to aim for…" className="space-y-3">
             <Skeleton className="h-64 w-full" />
             <Skeleton className="h-4 w-1/2" />
             <Skeleton className="h-20 w-full" />
-          </div>
+          </SkeletonPanel>
         ) : shown.error ? (
           <RunError error={shown.error} />
         ) : shown.data?.best ? (

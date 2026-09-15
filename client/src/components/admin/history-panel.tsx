@@ -12,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Loading } from "@/components/ui/spinner"
+import { Skeleton, SkeletonPanel } from "@/components/ui/skeleton"
 import { getHistory } from "@/lib/admin-api"
 
 /**
@@ -62,7 +62,14 @@ export function HistoryPanel({
       </CardHeader>
       <CardContent>
         {query.isLoading ? (
-          <Loading>Reading the version history…</Loading>
+          // Rows, because a table is what arrives. A single line here collapsed
+          // the card to nothing and then pushed the page down when the history
+          // landed -- on the one panel a reader opens to compare versions.
+          <SkeletonPanel label="Reading the version history…">
+            {Array.from({ length: 4 }, (_, i) => (
+              <Skeleton key={i} className="h-9 w-full" />
+            ))}
+          </SkeletonPanel>
         ) : query.error ? (
           <p className="text-destructive text-sm">Could not read the history.</p>
         ) : query.data && query.data.versions.length > 0 ? (

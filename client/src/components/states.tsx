@@ -1,6 +1,5 @@
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Loading } from "@/components/ui/spinner"
+import { Skeleton, SkeletonPanel } from "@/components/ui/skeleton"
 import { ApiError } from "@/lib/api"
 import { cn } from "@/lib/utils"
 
@@ -14,11 +13,10 @@ import { cn } from "@/lib/utils"
 
 export function LoadingRun() {
   return (
-    <div className="space-y-3" aria-busy>
-      <Loading>Loading the published run…</Loading>
+    <SkeletonPanel label="Loading the published run…" className="space-y-3">
       <Skeleton className="h-8 w-52" />
       <Skeleton className="h-32 w-full" />
-    </div>
+    </SkeletonPanel>
   )
 }
 
