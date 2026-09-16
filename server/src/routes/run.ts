@@ -100,6 +100,14 @@ runRouter.get("/run/current", (req, res) => {
     // the server will refuse, and a second copy of the number in the browser
     // would start refusing at the wrong place the day this one is tuned.
     limits: { maxInventory: config.search.maxInventory },
+    // The `max-age` set above, echoed into the body for the same reason
+    // `limits` is echoed: the browser's HTTP cache is not the only cache in
+    // front of this endpoint. A client query cache holding the response longer
+    // than this never revalidates, and the header expiring is never consulted
+    // -- so the staleness bound would be enforced in one of the two places that
+    // has to honour it. Sent rather than duplicated, so tuning
+    // `overlayCacheSeconds` moves both.
+    cacheSeconds: maxAge,
     available: runStore.available,
   })
 })

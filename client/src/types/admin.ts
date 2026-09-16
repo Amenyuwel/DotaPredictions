@@ -10,17 +10,10 @@
  * What IS declared here is the envelope -- the shape of the editor's requests
  * and answers, which the server computes per request and no schema describes.
  */
-export type { ConfigOverlay, PlayerPatch, StatPatch, TeamPatch, TraitPatch } from "@shared/overlay-types"
+export type { ConfigOverlay, PlayerPatch, StatPatch, TraitPatch } from "@shared/overlay-types"
 
 import type { ConfigOverlay } from "@shared/overlay-types"
 import type { AvailableRun, Player, RunMeta, Scoring, Team } from "@/types/run"
-
-/** Who the server thinks is asking. Re-asked on every admin request; this is
- * the answer to one of them, not a credential the client holds. */
-export interface AdminSession {
-  admin: { userId: string; email: string }
-  overlaysEnabled: boolean
-}
 
 /**
  * What a document would do if published, computed by the server with exactly

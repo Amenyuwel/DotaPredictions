@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react"
 import { ArrowLeft, ShieldAlert } from "lucide-react"
 
-import { AdminSidebar } from "@/components/admin/admin-sidebar"
+import { AdminNav, DraftStatus } from "@/components/admin/admin-sidebar"
 import { ConfirmDialog, type ConfirmRequest } from "@/components/admin/confirm-dialog"
 import { HistoryPanel } from "@/components/admin/history-panel"
 import { PublishDialog } from "@/components/admin/publish-dialog"
@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton, SkeletonPanel } from "@/components/ui/skeleton"
 import { useAdmin } from "@/hooks/use-admin"
+import { useMediaQuery } from "@/hooks/use-media-query"
 import { useDraft } from "@/hooks/use-draft"
 import { useSession } from "@/hooks/use-session"
 import { exportYaml } from "@/lib/admin-api"
@@ -55,6 +56,13 @@ export function AdminPage() {
   const [publishOpen, setPublishOpen] = useState(false)
   const [pending, setPending] = useState<ConfirmRequest | null>(null)
   const draft = useDraft(selected?.tournamentId, selected?.stage)
+  // Whether the rail sits beside the editor or the page is one column -- the
+  // same 48rem the flex direction below switches at. It decides WHERE the draft
+  // status is rendered, which CSS cannot do: `order` moves the box and leaves
+  // the tab order behind it, so a phone would tab into the editor from a card
+  // sitting visually after it. Read up here with the other hooks, because the
+  // loading and unauthorised states below return early.
+  const wide = useMediaQuery("(min-width: 48rem)")
 
   if (session.status === "loading" || admin.status === "loading") {
     return (
@@ -128,6 +136,37 @@ export function AdminPage() {
   const effective = !draft.dirty && preview?.ok ? preview : undefined
   const blocked = preview !== null && !preview.ok
 
+  // One element, placed in one of two slots. Built here rather than twice, so
+  // the two layouts cannot drift into two different status cards.
+  const status = (
+    <DraftStatus
+      config={config}
+      preview={preview}
+      dirty={draft.dirty}
+      saving={draft.saving}
+      onSave={draft.save}
+      onPublish={() => setPublishOpen(true)}
+      onDiscard={() =>
+        setPending({
+          title: "Discard this draft?",
+          detail:
+            "Every unpublished edit in it goes. What is live now is unaffected — the published version keeps serving.",
+          // A draft has no name of its own, so the stage it belongs to is what
+          // gets typed. It is still the thing being destroyed, and it is still
+          // on screen to be read off.
+          confirmText: config.scope.stage,
+          confirmLabel: "Discard draft",
+          // The one action here that writes through: it deletes the draft row
+          // rather than adding an entry to it, so the Removed list cannot bring
+          // it back.
+          reversible: false,
+          onConfirm: draft.discard,
+        })
+      }
+      onExport={() => void download(config.scope.tournamentId, config.scope.stage)}
+    />
+  )
+
   return (
     <Shell
       toolbar={
@@ -152,34 +191,14 @@ export function AdminPage() {
           Tailwind's `group/tabs` variants match any ancestor. */}
       <div className="flex flex-col items-start gap-6 md:flex-row">
         <div className="w-full shrink-0 md:w-64 xl:w-72">
-          <AdminSidebar
-            section={section}
-            onSection={setSection}
-            config={config}
-            preview={preview}
-            dirty={draft.dirty}
-            saving={draft.saving}
-            onSave={draft.save}
-            onPublish={() => setPublishOpen(true)}
-            onDiscard={() =>
-              setPending({
-                title: "Discard this draft?",
-                detail:
-                  "Every unpublished edit in it goes. What is live now is unaffected — the published version keeps serving.",
-                // A draft has no name of its own, so the stage it belongs to is
-                // what gets typed. It is still the thing being destroyed, and it
-                // is still on screen to be read off.
-                confirmText: config.scope.stage,
-                confirmLabel: "Discard draft",
-                // The one action here that writes through: it deletes the draft
-                // row rather than adding an entry to it, so the Removed list
-                // cannot bring it back.
-                reversible: false,
-                onConfirm: draft.discard,
-              })
-            }
-            onExport={() => void download(config.scope.tournamentId, config.scope.stage)}
-          />
+          {/* The nav sits directly on top of what it navigates at every width.
+              Beside the editor the status card follows it, the way a rail is
+              read: where you are, then what state the draft is in. In one
+              column it does not follow it at all -- see below. */}
+          <div className="grid gap-4 md:sticky md:top-4">
+            <AdminNav section={section} onSection={setSection} />
+            {wide ? status : null}
+          </div>
         </div>
 
         {/* `min-w-0`, or a wide table inside a flex child refuses to shrink and
@@ -287,6 +306,11 @@ export function AdminPage() {
             />
           ) : null}
         </main>
+
+        {/* Last in one column. Save and Publish are what you reach for once the
+            editing is done, and the live version is read once on arrival --
+            neither is worth a screenful above the form on a phone. */}
+        {wide ? null : <div className="w-full">{status}</div>}
       </div>
 
       <ConfirmDialog request={pending} onClose={() => setPending(null)} />

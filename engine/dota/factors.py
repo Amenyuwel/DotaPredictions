@@ -42,9 +42,11 @@ Kind = Literal["data", "assumption", "absent"]
 # adjusted numbers, not the ranking -- every game is moved to the same yardstick.
 REFERENCE_MINUTES = 40.0
 
-# Stats whose per-game value is already a rate or a one-off event. Regressing
-# them on duration is still done (it is cheap and it self-checks), but a near
-# zero elasticity is the expected and correct answer for these.
+# Guard for the denominator of a least-squares slope. A predictor with no
+# spread -- every game the same length, every opponent the same rating -- gives
+# a zero sum of squares, and dividing by it would produce an infinity that then
+# scales a whole stat line. The stat is skipped instead, which leaves it
+# uncorrected rather than corrected by garbage.
 _EPS = 1e-9
 
 
@@ -142,16 +144,28 @@ def normalise_duration(
 def build_opponent_index(
     matches: list[MatchResult], players: list[Player]
 ) -> dict[tuple[int, int], str]:
-    """(account_id, match_id) -> opposing team name, via the player's own team."""
-    by_match = {m.match_id: m for m in matches}
+    """(account_id, match_id) -> opposing team name, via the player's own team.
+
+    Indexed by team name first. The obvious spelling -- for each player, scan
+    every match -- is eighty players against six thousand matches, and all but a
+    handful of those comparisons are a name against a name it was never going to
+    equal. One pass to group the matches by side turns it into a lookup.
+    """
+    opponents: dict[str, list[tuple[int, str]]] = {}
+    for m in matches:
+        if not (m.radiant_name and m.dire_name):
+            continue
+        opponents.setdefault(m.radiant_name, []).append((m.match_id, m.dire_name))
+        opponents.setdefault(m.dire_name, []).append((m.match_id, m.radiant_name))
+
+    # Still keyed by account first, so one account listed twice resolves to one
+    # team exactly as it did before -- the last entry wins, and the index does
+    # not quietly gain the other team's games.
     team_of = {p.account_id: p.team for p in players if p.account_id}
     out: dict[tuple[int, int], str] = {}
     for acct, team in team_of.items():
-        for mid, m in by_match.items():
-            if m.radiant_name == team and m.dire_name:
-                out[(acct, mid)] = m.dire_name
-            elif m.dire_name == team and m.radiant_name:
-                out[(acct, mid)] = m.radiant_name
+        for mid, opponent in opponents.get(team, ()):
+            out[(acct, mid)] = opponent
     return out
 
 

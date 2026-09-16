@@ -58,9 +58,20 @@ export function createApp(): Express {
 
   serveClient(app)
 
+  // The message is logged in full and sent only off production. Everything
+  // reaching here is unhandled, which means it can be anything -- and the
+  // things it most often is are `RestError`s carrying a table name and three
+  // hundred characters of the database's own response. Those belong in the log,
+  // where the operator reads them, not in a reply to an anonymous caller on a
+  // route with no authentication. The routes that DO explain themselves to a
+  // requester are the admin ones, which say `describe(err)` deliberately and
+  // sit behind `requireAdmin`.
   app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
     console.error("[server]", err)
-    res.status(500).json({ error: "internal", reason: err.message })
+    res.status(500).json({
+      error: "internal",
+      reason: config.isProduction ? "unexpected server error" : err.message,
+    })
   })
 
   return app

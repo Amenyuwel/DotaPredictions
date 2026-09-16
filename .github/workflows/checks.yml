@@ -1,0 +1,127 @@
+# Every suite in the repository, on every push and pull request.
+#
+# Until this file existed the three suites passed only where somebody thought to
+# run them, which for a project whose whole premise is that a wrong number does
+# not raise is the wrong default: the tests here exist to make silent wrongness
+# loud, and a test nobody runs is silent too.
+#
+# Nothing here needs a secret. The engine tests are pure -- fixed seeds,
+# synthetic corpora, no network -- and the server tests stub `fetch` rather than
+# reaching Supabase. A job that needed credentials would not run on a fork's
+# pull request, which is exactly when a second pair of eyes is worth the most.
+
+name: Checks
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A newer push to the same branch makes the older run's answer irrelevant.
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  engine:
+    name: engine (pytest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: engine/requirements-dev.txt
+
+      - name: Install engine dependencies
+        working-directory: engine
+        run: pip install -r requirements-dev.txt
+
+      - name: Run the engine suite
+        working-directory: engine
+        run: python -m pytest tests -q
+
+      # Dead code, as a failure rather than as a report nobody opens. This is
+      # green as of the commit that added it, which is the only state worth
+      # gating from: a check that starts red teaches everyone to scroll past it.
+      # A genuine false positive goes in `vulture-allowlist.py` WITH ITS REASON,
+      # never behind a lowered confidence threshold.
+      - name: Dead code
+        working-directory: engine
+        run: python -m vulture dota scripts tests vulture-allowlist.py --min-confidence 60
+
+  server:
+    name: server (node:test + tsc)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install
+        working-directory: server
+        run: npm ci
+
+      # Before the tests: a type error is a failure the tests can hide, because
+      # tsx strips types rather than checking them.
+      - name: Typecheck
+        working-directory: server
+        run: npm run typecheck
+
+      - name: Run the server suite
+        working-directory: server
+        run: npm test
+
+      # Unused files, exports and dependencies. See the engine job for why this
+      # gates rather than reports.
+      - name: Dead code
+        working-directory: server
+        run: npm run check:dead
+
+  client:
+    name: client (tsc + lint + build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install
+        working-directory: client
+        run: npm ci
+
+      - name: Lint
+        working-directory: client
+        run: npm run lint
+
+      # `npm run build` is `tsc -b && vite build`, so this is the typecheck and
+      # the bundle in one step. The bundle is worth running in CI even though
+      # nothing here deploys it: a build that only ever succeeds on one laptop
+      # is a deploy that fails at the worst moment.
+      - name: Build
+        working-directory: client
+        run: npm run build
+
+      # Unused files, exports and dependencies. Runs after the build so a
+      # genuine compile error is reported as a compile error, not as knip
+      # failing to resolve half the imports.
+      - name: Dead code
+        working-directory: client
+        run: npm run check:dead

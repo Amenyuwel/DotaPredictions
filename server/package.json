@@ -1,8 +1,7 @@
 {
   "name": "server",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "The compute server: scores a published run, and serves the client in production.",
   "scripts": {
     "test": "tsx --test test/*.test.ts",
     "dev": "tsx watch src/index.ts",
@@ -11,7 +10,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "gen:types": "node scripts/gen-types.mjs",
     "check:payload": "tsx scripts/check-payload.ts",
-    "dev:solo": "npm --prefix ../client run build && tsx watch src/index.ts"
+    "dev:solo": "npm --prefix ../client run build && tsx watch src/index.ts",
+    "check:dead": "knip --no-config-hints"
   },
   "keywords": [],
   "author": "",
@@ -29,6 +29,7 @@
     "@types/express": "^5.0.6",
     "@types/node": "^26.4.0",
     "json-schema-to-typescript": "^16.0.0",
+    "knip": "^6.35.1",
     "tsx": "^4.23.12",
     "typescript": "^7.0.2"
   }

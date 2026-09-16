@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react"
-import { Plus } from "lucide-react"
+import { Plus, X } from "lucide-react"
 
 import { EmblemDialog } from "@/components/emblem-dialog"
 import { EmblemMeta } from "@/components/emblem-meta"
@@ -153,6 +153,26 @@ export function BannerBuilder({
                   </span>
                 )}
               </button>
+
+              {/* One press to empty a filled slot, beside the row rather than
+                  inside it: nested, its hit area would sit on top of the one
+                  that opens the emblem, and the two would be a slot emptied by
+                  a thumb aiming to change it. `Remove` inside the dialog stays
+                  -- that is the take-back for a reader who has already opened
+                  the slot -- but reaching it meant opening a four-field form to
+                  undo a mis-tap. */}
+              {current && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="text-muted-foreground hover:text-destructive shrink-0"
+                  aria-label={`Clear emblem ${i + 1}, ${current.displayName}`}
+                  onClick={() => setSlot(i, null)}
+                >
+                  <X aria-hidden />
+                </Button>
+              )}
 
               {current && !current.measurable && (
                 <Tooltip>

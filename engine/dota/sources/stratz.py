@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 import requests
 
 from .. import cache
-from .base import MatchResult, PlayerGame
+from .base import PlayerGame
 
 ENDPOINT = "https://api.stratz.com/graphql"
 
@@ -134,19 +134,12 @@ class Stratz:
                     )
         return out
 
-    # The remaining Source methods are intentionally not implemented: team and
-    # player resolution and Elo input come from OpenDota, which is keyless.
-    def resolve_player(self, nick: str):  # pragma: no cover - unused path
-        return None
-
-    def resolve_team(self, name: str):  # pragma: no cover - unused path
-        return None
-
-    def recent_pro_matches(self, since: datetime, limit: int) -> list[MatchResult]:
-        return []
-
-    def player_games(self, account_id: int, since: datetime, limit: int):
-        return []
+    # Team and player resolution and the Elo input come from OpenDota, which is
+    # keyless. There used to be four stubs here returning None and [] to satisfy
+    # a wider `Source` protocol; they are gone with it. A stub that answers
+    # "nothing found" to a question this source was never going to answer is
+    # worse than a missing method -- the missing method is an AttributeError at
+    # the call site, and the stub is an empty corpus nobody questions.
 
 
 __all__ = ["Stratz"]

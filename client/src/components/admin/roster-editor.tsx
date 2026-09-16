@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react"
-import { AlertTriangle, Pencil, Plus, Trash2, Undo2 } from "lucide-react"
+import { ChevronRight, Pencil, Plus, Trash2, Undo2 } from "lucide-react"
 
 import { AddDialog } from "@/components/admin/add-dialog"
 import { ConfirmDialog, type ConfirmRequest } from "@/components/admin/confirm-dialog"
@@ -13,10 +13,15 @@ import {
   TextCell,
   ValueCell,
 } from "@/components/admin/cells"
-import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import {
   Table,
   TableBody,
@@ -25,6 +30,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { useMediaQuery } from "@/hooks/use-media-query"
 import { validateId } from "@/lib/admin-ui"
 import { LANE_LABEL, LANE_ORDER, ROLE_LABEL, ROLE_ORDER } from "@/lib/labels"
 import { cn } from "@/lib/utils"
@@ -45,11 +51,25 @@ import type { FantasyRole, Lane, Player, Team } from "@/types/run"
  * them: no sample matrix means no distribution to draw from, and a player
  * scored from nothing looks like a weak player rather than an unknown one.
  *
+ * That boundary is stated once, in the rail's "What this page can and cannot
+ * change". It used to be repeated as a banner at the top of this form in the
+ * same words, which is a second copy to keep in step and a warning frame around
+ * something that is not a warning -- the per-row "no data" badges are where an
+ * unmeasured player is actually visible, and they are attached to the player.
+ *
  * A list beside a detail pane, rather than sixteen expanding panels. Expanding
  * panels made the page grow with every team opened, so reading two of them
  * meant scrolling past the first; here the list is fixed height and scrolls
  * inside itself, and the page never grows at all. It also matches the job: a
  * roster edit is one team, because that is the unit that changes.
+ *
+ * Below 1024px there is no width for two panes, and stacking them put the whole
+ * team list -- plus the rail, the draft controls and the caveat above it --
+ * between the top of the page and the roster being edited. Scrolling past a
+ * list to reach the thing it selects is the expanding-panel problem again in a
+ * different shape. So the pane opens over the page instead of under it, the
+ * same move the scoring tables make at their own breakpoint: one team, the
+ * width it has, and a way back that is not a scroll.
  */
 
 /** Built from `lib/labels`, not re-listed here. The lane order is board order
@@ -81,6 +101,16 @@ export function RosterEditor({
   const [editingTeam, setEditingTeam] = useState(false)
   const [undoingPlayer, setUndoingPlayer] = useState<number | null>(null)
   const [undoingTeam, setUndoingTeam] = useState(false)
+
+  // Whether the two panes have a page wide enough to sit side by side. Below
+  // this the detail pane opens in a dialog instead -- see the note above.
+  //
+  // 1024px, the width this component's own grid used to switch at, so there is
+  // no band where the layout says there is room for two columns and this says
+  // there is not. The scoring tables switch at 768px because that is where
+  // THEIR layout changes; a shared breakpoint would be wrong for one of them.
+  const wide = useMediaQuery("(min-width: 64rem)")
+  const [detailOpen, setDetailOpen] = useState(false)
 
   const teams = effective?.teams ?? config.published.teams
   const players = effective?.players ?? config.published.players
@@ -149,299 +179,334 @@ export function RosterEditor({
     onChange({ ...doc, [bucket]: Object.keys(next).length > 0 ? next : undefined })
   }
 
-  return (
-    <div className="grid gap-4">
-      <Alert>
-        <AlertTriangle aria-hidden />
-        <AlertDescription>
-          These are labels, not measurements. Per-game stat lines come from the crawler and
-          nothing here can write one, so a player added now is carried through the tool as
-          having no data and is absent from the pickers until the next{" "}
-          <code>python -m scripts.publish</code>.
-        </AlertDescription>
-      </Alert>
+  const teamList = (
+    <Card className="h-fit">
+      <CardHeader className="gap-2">
+        <div className="flex items-center justify-between gap-2">
+          <CardTitle className="text-sm">Teams</CardTitle>
+          <Button size="sm" variant="outline" onClick={() => setAddingTeam(true)}>
+            <Plus aria-hidden />
+            Add
+          </Button>
+        </div>
+        <FilterField
+          value={filter}
+          onChange={setFilter}
+          label="Filter by team or player"
+          summary={
+            shown.length === inStage.length
+              ? `${inStage.length}`
+              : `${shown.length} of ${inStage.length}`
+          }
+        />
+      </CardHeader>
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,18rem)_1fr]">
-        <Card className="h-fit">
-          <CardHeader className="gap-2">
-            <div className="flex items-center justify-between gap-2">
-              <CardTitle className="text-sm">Teams</CardTitle>
-              <Button size="sm" variant="outline" onClick={() => setAddingTeam(true)}>
-                <Plus aria-hidden />
-                Add
-              </Button>
+      <CardContent className="px-2">
+        {/* Beside the detail pane it scrolls inside itself, so sixteen
+            teams do not set the height of the page and the pane stays where
+            it was. Above the dialog there is no pane to hold still and
+            nothing else on the screen, so the cap would be a second
+            scrollbar inside a page that is already scrolling. */}
+        <ul className={cn("grid gap-0.5", wide && "max-h-[28rem] overflow-y-auto")}>
+          {shown.map((team) => {
+            const roster = byTeam.get(team.teamId) ?? []
+            const noData = roster.filter((p) => !measured.has(p.playerId)).length
+            const isSelected = selected?.teamId === team.teamId
+            return (
+              <li key={team.teamId}>
+                <button
+                  type="button"
+                  aria-current={wide && isSelected ? "true" : undefined}
+                  onClick={() => {
+                    setSelectedId(team.teamId)
+                    if (!wide) setDetailOpen(true)
+                  }}
+                  className={cn(
+                    "focus-visible:ring-ring flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-sm focus-visible:ring-2 focus-visible:outline-none",
+                    wide && isSelected ? "bg-muted font-medium" : "hover:bg-muted/50",
+                  )}
+                >
+                  <span className="min-w-0 flex-1 truncate">{team.name}</span>
+                  {isTouched(team) ? (
+                    <span
+                      className="bg-primary size-1.5 shrink-0 rounded-full"
+                      title="Edited in this draft"
+                    />
+                  ) : null}
+                  {noData > 0 ? (
+                    <Badge variant="destructive" title={`${noData} with no sample matrix`}>
+                      {noData}
+                    </Badge>
+                  ) : null}
+                  <span className="text-muted-foreground shrink-0 text-2xs tabular-nums">
+                    {roster.length}
+                  </span>
+                  {wide ? null : (
+                    <ChevronRight className="text-muted-foreground size-3.5 shrink-0" aria-hidden />
+                  )}
+                </button>
+              </li>
+            )
+          })}
+
+          {shown.length === 0 ? (
+            <li className="text-muted-foreground px-2 py-6 text-center text-sm">
+              Nothing matches “{filter}”.
+            </li>
+          ) : null}
+        </ul>
+
+        {/* Said rather than left to be noticed. A list that quietly drops
+            half its rows is one a reader checks against another source. */}
+        {hidden > 0 ? (
+          <p className="text-muted-foreground mt-2 px-1 text-2xs">
+            {hidden} team{hidden === 1 ? "" : "s"} not in this stage are hidden. An
+            overlay is per stage, and a team with no projection is absent from every
+            picker anyway.
+          </p>
+        ) : null}
+      </CardContent>
+    </Card>
+  )
+
+  const detail = (
+    selected ? (
+      <Card>
+        <CardHeader className="gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <CardTitle className="mr-auto">{selected.name}</CardTitle>
+            <code className="text-muted-foreground text-2xs">{selected.teamId}</code>
+            {!publishedTeams.has(selected.teamId) ? (
+              <Badge variant="secondary">new</Badge>
+            ) : null}
+            {!projected.has(selected.teamId) ? (
+              <Badge variant="outline" title="No projection in this stage">
+                no projection
+              </Badge>
+            ) : null}
+          </div>
+
+          {/* Name only. The other field a team carries -- the ids it also
+              played under -- is not printed here: it is the crawler's business
+              rather than the reader's, and "none" on every row of a field
+              nobody was asking about is noise above the roster they opened the
+              panel for. It is still edited in Edit team, which shows the
+              current value, and a change to it still appears in the change list
+              and in the publish diff, so nothing about it is hidden from the
+              person who changes it. */}
+          <dl className="grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
+            <div className="flex items-baseline gap-2">
+              <dt className="text-muted-foreground text-xs">Name</dt>
+              <dd>
+                <ValueCell
+                  value={doc.teams?.[String(selected.teamId)]?.name ?? selected.name}
+                  changed={doc.teams?.[String(selected.teamId)]?.name !== undefined}
+                />
+              </dd>
             </div>
-            <FilterField
-              value={filter}
-              onChange={setFilter}
-              label="Filter by team or player"
-              summary={
-                shown.length === inStage.length
-                  ? `${inStage.length}`
-                  : `${shown.length} of ${inStage.length}`
-              }
-            />
-          </CardHeader>
+          </dl>
 
-          <CardContent className="px-2">
-            {/* Scrolls inside itself, so sixteen teams do not set the height of
-                the page and the detail pane stays where it was. */}
-            <ul className="grid max-h-[28rem] gap-0.5 overflow-y-auto">
-              {shown.map((team) => {
-                const roster = byTeam.get(team.teamId) ?? []
-                const noData = roster.filter((p) => !measured.has(p.playerId)).length
-                const isSelected = selected?.teamId === team.teamId
+        </CardHeader>
+
+        <CardContent className="grid gap-3 px-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="pl-6">Player</TableHead>
+                <TableHead>Account id</TableHead>
+                <TableHead>Lane</TableHead>
+                <TableHead>Fantasy slot</TableHead>
+                <TableHead className="w-0 pr-6 text-right">
+                  <span className="sr-only">Actions</span>
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {(byTeam.get(selected.teamId) ?? []).map((player) => {
+                const entry = doc.players?.[String(player.playerId)]
                 return (
-                  <li key={team.teamId}>
-                    <button
-                      type="button"
-                      aria-current={isSelected ? "true" : undefined}
-                      onClick={() => setSelectedId(team.teamId)}
-                      className={cn(
-                        "focus-visible:ring-ring flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-sm focus-visible:ring-2 focus-visible:outline-none",
-                        isSelected ? "bg-muted font-medium" : "hover:bg-muted/50",
-                      )}
-                    >
-                      <span className="min-w-0 flex-1 truncate">{team.name}</span>
-                      {isTouched(team) ? (
-                        <span
-                          className="bg-primary size-1.5 shrink-0 rounded-full"
-                          title="Edited in this draft"
-                        />
-                      ) : null}
-                      {noData > 0 ? (
-                        <Badge variant="destructive" title={`${noData} with no sample matrix`}>
-                          {noData}
-                        </Badge>
-                      ) : null}
-                      <span className="text-muted-foreground shrink-0 text-2xs tabular-nums">
-                        {roster.length}
-                      </span>
-                    </button>
-                  </li>
+                  <TableRow
+                    key={player.playerId}
+                    className={entry ? "bg-primary/5" : undefined}
+                  >
+                    <TableCell className="pl-6">
+                      <ValueCell
+                        value={entry?.nick ?? player.nick}
+                        changed={entry?.nick !== undefined}
+                      />
+                    </TableCell>
+
+                    <TableCell>
+                      <div className="flex items-center gap-1.5">
+                        <code className="text-muted-foreground text-2xs">
+                          {player.playerId}
+                        </code>
+                        {!measured.has(player.playerId) ? (
+                          <Badge variant="destructive" title="No sample matrix in this run">
+                            no data
+                          </Badge>
+                        ) : null}
+                      </div>
+                    </TableCell>
+
+                    <TableCell>
+                      <ValueCell
+                        value={LANE_LABEL[entry?.lane ?? player.lane]}
+                        changed={entry?.lane !== undefined}
+                      />
+                    </TableCell>
+
+                    <TableCell>
+                      <ValueCell
+                        value={ROLE_LABEL[entry?.fantasyRole ?? player.fantasyRole]}
+                        changed={entry?.fantasyRole !== undefined}
+                      />
+                    </TableCell>
+
+                    <TableCell className="pr-6">
+                      <RowActions
+                        what={player.nick}
+                        changed={Boolean(entry)}
+                        onEdit={() => setEditingPlayer(player.playerId)}
+                        onUndo={() => setUndoingPlayer(player.playerId)}
+                        onRemove={() =>
+                          setPending({
+                            title: `Remove ${player.nick}?`,
+                            detail: `They leave ${selected.name} for this stage's overlay.`,
+                            confirmText: player.nick,
+                            confirmLabel: "Remove player",
+                            reversible: true,
+                            onConfirm: () =>
+                              onChange({
+                                ...doc,
+                                playersRemoved: [
+                                  ...playersRemoved,
+                                  String(player.playerId),
+                                ],
+                              }),
+                          })
+                        }
+                      />
+                    </TableCell>
+                  </TableRow>
                 )
               })}
 
-              {shown.length === 0 ? (
-                <li className="text-muted-foreground px-2 py-6 text-center text-sm">
-                  Nothing matches “{filter}”.
-                </li>
+              {(byTeam.get(selected.teamId) ?? []).length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-muted-foreground py-6 text-center">
+                    No players on this team.
+                  </TableCell>
+                </TableRow>
               ) : null}
-            </ul>
+            </TableBody>
+          </Table>
 
-            {/* Said rather than left to be noticed. A list that quietly drops
-                half its rows is one a reader checks against another source. */}
-            {hidden > 0 ? (
-              <p className="text-muted-foreground mt-2 px-1 text-2xs">
-                {hidden} team{hidden === 1 ? "" : "s"} not in this stage are hidden. An
-                overlay is per stage, and a team with no projection is absent from every
-                picker anyway.
-              </p>
+          <div className="flex flex-wrap items-center gap-2 px-6">
+            <Button
+              size="sm"
+              variant="outline"
+              className="text-xs"
+              onClick={() => setEditingTeam(true)}
+            >
+              <Pencil aria-hidden />
+              Edit team
+            </Button>
+            {doc.teams?.[String(selected.teamId)] ? (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-xs"
+                onClick={() => setUndoingTeam(true)}
+              >
+                <Undo2 aria-hidden />
+                Undo
+              </Button>
             ) : null}
-          </CardContent>
-        </Card>
-
-        {selected ? (
-          <Card>
-            <CardHeader className="gap-2">
-              <div className="flex flex-wrap items-center gap-2">
-                <CardTitle className="mr-auto">{selected.name}</CardTitle>
-                <code className="text-muted-foreground text-2xs">{selected.teamId}</code>
-                {!publishedTeams.has(selected.teamId) ? (
-                  <Badge variant="secondary">new</Badge>
-                ) : null}
-                {!projected.has(selected.teamId) ? (
-                  <Badge variant="outline" title="No projection in this stage">
-                    no projection
-                  </Badge>
-                ) : null}
-              </div>
-
-              <dl className="grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
-                <div className="flex items-baseline gap-2">
-                  <dt className="text-muted-foreground text-xs">Name</dt>
-                  <dd>
-                    <ValueCell
-                      value={doc.teams?.[String(selected.teamId)]?.name ?? selected.name}
-                      changed={doc.teams?.[String(selected.teamId)]?.name !== undefined}
-                    />
-                  </dd>
-                </div>
-                <div className="flex items-baseline gap-2">
-                  <dt className="text-muted-foreground text-xs">Also played under</dt>
-                  <dd>
-                    <ValueCell
-                      value={
-                        (
-                          doc.teams?.[String(selected.teamId)]?.alsoTeamIds ??
-                          selected.alsoTeamIds
-                        ).join(", ") || "none"
-                      }
-                      changed={doc.teams?.[String(selected.teamId)]?.alsoTeamIds !== undefined}
-                    />
-                  </dd>
-                </div>
-              </dl>
-
-            </CardHeader>
-
-            <CardContent className="grid gap-3 px-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="pl-6">Player</TableHead>
-                    <TableHead>Account id</TableHead>
-                    <TableHead>Lane</TableHead>
-                    <TableHead>Fantasy slot</TableHead>
-                    <TableHead className="w-0 pr-6 text-right">
-                      <span className="sr-only">Actions</span>
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {(byTeam.get(selected.teamId) ?? []).map((player) => {
-                    const entry = doc.players?.[String(player.playerId)]
-                    return (
-                      <TableRow
-                        key={player.playerId}
-                        className={entry ? "bg-primary/5" : undefined}
-                      >
-                        <TableCell className="pl-6">
-                          <ValueCell
-                            value={entry?.nick ?? player.nick}
-                            changed={entry?.nick !== undefined}
-                          />
-                        </TableCell>
-
-                        <TableCell>
-                          <div className="flex items-center gap-1.5">
-                            <code className="text-muted-foreground text-2xs">
-                              {player.playerId}
-                            </code>
-                            {!measured.has(player.playerId) ? (
-                              <Badge variant="destructive" title="No sample matrix in this run">
-                                no data
-                              </Badge>
-                            ) : null}
-                          </div>
-                        </TableCell>
-
-                        <TableCell>
-                          <ValueCell
-                            value={LANE_LABEL[entry?.lane ?? player.lane]}
-                            changed={entry?.lane !== undefined}
-                          />
-                        </TableCell>
-
-                        <TableCell>
-                          <ValueCell
-                            value={ROLE_LABEL[entry?.fantasyRole ?? player.fantasyRole]}
-                            changed={entry?.fantasyRole !== undefined}
-                          />
-                        </TableCell>
-
-                        <TableCell className="pr-6">
-                          <RowActions
-                            what={player.nick}
-                            changed={Boolean(entry)}
-                            onEdit={() => setEditingPlayer(player.playerId)}
-                            onUndo={() => setUndoingPlayer(player.playerId)}
-                            onRemove={() =>
-                              setPending({
-                                title: `Remove ${player.nick}?`,
-                                detail: `They leave ${selected.name} for this stage's overlay.`,
-                                confirmText: player.nick,
-                                confirmLabel: "Remove player",
-                                reversible: true,
-                                onConfirm: () =>
-                                  onChange({
-                                    ...doc,
-                                    playersRemoved: [
-                                      ...playersRemoved,
-                                      String(player.playerId),
-                                    ],
-                                  }),
-                              })
-                            }
-                          />
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })}
-
-                  {(byTeam.get(selected.teamId) ?? []).length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-muted-foreground py-6 text-center">
-                        No players on this team.
-                      </TableCell>
-                    </TableRow>
-                  ) : null}
-                </TableBody>
-              </Table>
-
-              <div className="flex flex-wrap items-center gap-2 px-6">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="text-xs"
-                  onClick={() => setEditingTeam(true)}
-                >
-                  <Pencil aria-hidden />
-                  Edit team
-                </Button>
-                {doc.teams?.[String(selected.teamId)] ? (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="text-xs"
-                    onClick={() => setUndoingTeam(true)}
-                  >
-                    <Undo2 aria-hidden />
-                    Undo
-                  </Button>
-                ) : null}
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="text-xs"
-                  onClick={() => setAddingPlayer(true)}
-                >
-                  <Plus aria-hidden />
-                  Add player
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="text-destructive ml-auto text-xs"
-                  onClick={() =>
-                    setPending({
-                      title: `Remove ${selected.name}?`,
-                      detail: `Its ${(byTeam.get(selected.teamId) ?? []).length} players go with it — a player on no team cannot be ranked at all.`,
-                      confirmText: selected.name,
-                      confirmLabel: "Remove team",
-                      reversible: true,
-                      onConfirm: () =>
-                        onChange({
-                          ...doc,
-                          teamsRemoved: [...teamsRemoved, String(selected.teamId)],
-                        }),
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-xs"
+              onClick={() => setAddingPlayer(true)}
+            >
+              <Plus aria-hidden />
+              Add player
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-destructive ml-auto text-xs"
+              onClick={() =>
+                setPending({
+                  title: `Remove ${selected.name}?`,
+                  detail: `Its ${(byTeam.get(selected.teamId) ?? []).length} players go with it — a player on no team cannot be ranked at all.`,
+                  confirmText: selected.name,
+                  confirmLabel: "Remove team",
+                  reversible: true,
+                  onConfirm: () => {
+                    onChange({
+                      ...doc,
+                      teamsRemoved: [...teamsRemoved, String(selected.teamId)],
                     })
-                  }
-                >
-                  <Trash2 aria-hidden />
-                  Remove team
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ) : (
-          <Card>
-            <CardContent className="text-muted-foreground py-10 text-center text-sm">
-              No team selected.
-            </CardContent>
-          </Card>
-        )}
-      </div>
+                    // The pane now describes a team that is gone. On the wide
+                    // layout the selection falls to the next team on its own;
+                    // a dialog has to be told, or it stays open over a list it
+                    // no longer points into.
+                    setDetailOpen(false)
+                  },
+                })
+              }
+            >
+              <Trash2 aria-hidden />
+              Remove team
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    ) : (
+      <Card>
+        <CardContent className="text-muted-foreground py-10 text-center text-sm">
+          No team selected.
+        </CardContent>
+      </Card>
+    )
+  )
+
+  return (
+    <div className="grid gap-4">
+      {wide ? (
+        <div className="grid grid-cols-[minmax(0,18rem)_1fr] gap-4">
+          {teamList}
+          {detail}
+        </div>
+      ) : (
+        <>
+          {teamList}
+
+          <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
+            {/* The same shell the scoring tables open in: the card is already a
+                surface with a heading and its own actions, so the dialog gives
+                up its padding, background, ring and cross, and "Done" below the
+                roster is the way out -- which is where a thumb already is after
+                scrolling one. Two rows, so that button is its own row rather
+                than the last thing at the end of the table's scroll. */}
+            <DialogContent
+              showCloseButton={false}
+              className="grid max-h-[85dvh] max-w-[calc(100%-1rem)] grid-rows-[minmax(0,1fr)_auto] gap-2 overflow-hidden bg-transparent p-0 ring-0 sm:max-w-3xl"
+            >
+              {/* The card states the team's name a line below. Kept for the
+                  accessible name, which a dialog is required to have. */}
+              <DialogTitle className="sr-only">{selected?.name ?? "Team"}</DialogTitle>
+
+              <div className="min-h-0 overflow-y-auto">{detail}</div>
+
+              <DialogClose render={<Button variant="outline" className="w-full" />}>
+                Done
+              </DialogClose>
+            </DialogContent>
+          </Dialog>
+        </>
+      )}
 
       <RemovedChips
         label="Removed"
@@ -485,6 +550,10 @@ export function RosterEditor({
         onSubmit={({ teamId, name }) => {
           onChange({ ...doc, teams: { ...(doc.teams ?? {}), [teamId]: { name } } })
           setSelectedId(Number(teamId))
+          // Where the pane is a dialog, selecting a team is not enough to show
+          // it: a team added and then not opened is one the form implies is
+          // ready to fill in and leaves nowhere in sight.
+          if (!wide) setDetailOpen(true)
         }}
       />
 

@@ -83,6 +83,19 @@ export interface CurrentRun {
    * will be rejected. `maxInventory` is a latency budget, not a rule of the
    * game: owned emblems in `run.bannerSlots` slots is a permutation count. */
   limits: { maxInventory: number }
+  /**
+   * How long this response may be treated as current, in seconds -- the same
+   * number the server put in its own `Cache-Control`.
+   *
+   * An hour where no overlay can exist, and `overlayCacheSeconds` where one
+   * can. See `useRun`: the query cache has to honour this too, because a query
+   * that stays fresh past it never revalidates and the header expiring is
+   * never consulted.
+   *
+   * Optional, because a browser can be replaying a cached response from a
+   * server that predates the field.
+   */
+  cacheSeconds?: number
   available: AvailableRun[]
 }
 
@@ -244,4 +257,4 @@ export interface BannerAnswer {
   caveats: string[]
 }
 
-export type { Emblem as EmblemOption }
+

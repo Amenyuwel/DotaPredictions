@@ -1,5 +1,5 @@
 import { useId, useState } from "react"
-import { Plus, UserRound } from "lucide-react"
+import { Plus, UserRound, X } from "lucide-react"
 
 import {
   Dialog,
@@ -9,7 +9,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
+import { Choice } from "@/components/ui/choice"
 import { LANE_LABEL, LANE_ORDER, ROLE_LABEL, unitName } from "@/lib/labels"
+import { unitOf } from "@/lib/units"
 import { cn } from "@/lib/utils"
 import type { FantasyRole, Player, Team } from "@/types/run"
 
@@ -53,6 +55,13 @@ import type { FantasyRole, Player, Team } from "@/types/run"
  * back a single `Player` (the pair's first member by lane order) because that
  * is all a caller needs to identify the unit; `value` is checked against
  * BOTH members so the card lights up no matter which half it was stored as.
+ *
+ * A pick can be taken back, from either side of the modal: an X beside the
+ * closed trigger, and choosing the chosen card again inside it. Both hand
+ * `null` to `onSelect`. Without them the first press on a slot was permanent --
+ * every other team could be reached from there, and an EMPTY slot could not --
+ * which on the roster tab meant a reader who mis-tapped a core had no way back
+ * to the three-empty-slots state the tab opens in.
  */
 export function UnitPicker({
   players,
@@ -71,7 +80,9 @@ export function UnitPicker({
   placeholder?: string
   /** The chosen player's id, or null before anything is chosen. */
   value: number | null
-  onSelect: (player: Player) => void
+  /** The pick, or null to empty the slot. Null is not a failure to choose --
+   * it is the reader taking a pick back, and the only way to do that. */
+  onSelect: (player: Player | null) => void
 }) {
   const [open, setOpen] = useState(false)
   // Three of these can be mounted at once (one full roster, three role
@@ -101,50 +112,65 @@ export function UnitPicker({
 
   const selected = value === null ? null : byId.get(value)
   const selectedTeam = selected ? teamById.get(selected.teamId) : undefined
-  const selectedPartner =
-    selected &&
-    players.find(
-      (p) =>
-        p.playerId !== selected.playerId &&
-        p.teamId === selected.teamId &&
-        p.fantasyRole === selected.fantasyRole
-    )
-  const selectedUnit = selected ? [selected, ...(selectedPartner ? [selectedPartner] : [])] : []
+  // Through `unitOf` rather than a partner lookup written here, so the trigger
+  // and the saved list name a unit the same way and in the same lane order.
+  const selectedUnit = selected ? unitOf(players, selected.playerId) : []
 
   return (
     <div className="space-y-2">
-      <Button
-        type="button"
-        variant="outline"
-        className={cn(
-          "h-auto min-h-11 w-full justify-start py-2",
-          // Empty reads as a space waiting to be filled rather than as a filled
-          // one reporting nothing -- the same rule, and the same dashed edge,
-          // as the banner trigger on the other tab.
-          !selected &&
-            "border-input/70 text-muted-foreground hover:border-input border-dashed",
-        )}
-        onClick={() => setOpen(true)}
-      >
-        {selected ? (
-          <span className="flex items-center gap-2.5">
-            <UnitAvatars unit={selectedUnit} />
-            <span className="flex flex-col items-start">
-              <span>
-                {selectedPartner ? `${selected.nick} + ${selectedPartner.nick}` : selected.nick}
-              </span>
-              <span className="text-muted-foreground text-xs">
-                {selectedTeam?.name ?? `team ${selected.teamId}`}
+      {/* The clear is a SIBLING of the trigger, not a control inside it. Nested
+          inside, its hit area would sit on top of the one that opens the list,
+          and the two would be a slot emptied by a thumb aiming to change it --
+          the one mistake a control that deletes work must not make. */}
+      <div className="flex items-center gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          className={cn(
+            "h-auto min-h-11 min-w-0 flex-1 justify-start py-2",
+            // Empty reads as a space waiting to be filled rather than as a
+            // filled one reporting nothing -- the same rule, and the same
+            // dashed edge, as the banner trigger on the other tab.
+            !selected &&
+              "border-input/70 text-muted-foreground hover:border-input border-dashed",
+          )}
+          onClick={() => setOpen(true)}
+        >
+          {selected ? (
+            <span className="flex min-w-0 items-center gap-2.5">
+              <UnitAvatars unit={selectedUnit} />
+              <span className="flex min-w-0 flex-col items-start">
+                <span className="w-full truncate">{unitName(selectedUnit)}</span>
+                <span className="text-muted-foreground w-full truncate text-xs">
+                  {selectedTeam?.name ?? `team ${selected.teamId}`}
+                </span>
               </span>
             </span>
-          </span>
-        ) : (
-          <>
-            <Plus aria-hidden />
-            {placeholder}
-          </>
+          ) : (
+            <>
+              <Plus aria-hidden />
+              {placeholder}
+            </>
+          )}
+        </Button>
+
+        {/* Only once there is something to take back. A control that is always
+            there and does nothing most of the time is a control a reader has to
+            decide about on every visit. `icon`, not `icon-sm`: it is a thumb
+            target next to a 44px row, and it deletes. */}
+        {selected && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="text-muted-foreground hover:text-destructive shrink-0"
+            aria-label={`Clear ${unitName(selectedUnit)}`}
+            onClick={() => onSelect(null)}
+          >
+            <X aria-hidden />
+          </Button>
         )}
-      </Button>
+      </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-2xl">
@@ -155,8 +181,14 @@ export function UnitPicker({
                 once in the roster tab, so outside it was the same sentence
                 three times over -- and it is not about the player you picked,
                 it is about the ones this list cannot offer. */}
+            {/* The take-back is said here rather than left to be discovered.
+                It is the only behaviour on this screen a reader has no way to
+                guess from looking, and it is only true once a card is chosen --
+                said unconditionally it would be an instruction about a state
+                the reader is not in. */}
             <DialogDescription>
               One team, one card, in stage order.
+              {selected && " Click the chosen card again to empty the slot."}
               {hidden > 0 &&
                 ` ${hidden} ${hidden === 1 ? "team is" : "teams are"} not in this stage and cannot be scored against it.`}
             </DialogDescription>
@@ -174,26 +206,29 @@ export function UnitPicker({
               const checked = unit.some((p) => p.playerId === value)
               const [first] = unit
               return (
-                <label
+                <Choice
                   key={`${team.teamId}:${first.playerId}`}
-                  className={cn(
-                    "group relative flex min-h-16 cursor-pointer items-center gap-3 overflow-hidden rounded-xl border p-3 text-sm transition-[color,background-color,border-color,box-shadow]",
-                    "hover:bg-accent has-[:focus-visible]:border-ring has-[:focus-visible]:ring-3 has-[:focus-visible]:ring-ring/50",
-                    checked
-                      ? "border-ring bg-secondary font-medium shadow-xs"
-                      : "border-input bg-linear-to-b from-transparent to-foreground/[0.02]"
-                  )}
+                  name={groupName}
+                  checked={checked}
+                  onSelect={() => {
+                    onSelect(first)
+                    setOpen(false)
+                  }}
+                  // Choosing the chosen card again empties the slot -- the same
+                  // take-back every emblem axis has, one gesture across both
+                  // tabs. Both paths close the box: one press, one outcome. A
+                  // reader wanting a different team clicks that team, and a
+                  // reader clicking this one again has said they want the slot
+                  // empty.
+                  onClear={() => {
+                    onSelect(null)
+                    setOpen(false)
+                  }}
+                  // Taller than a `Choice`'s default, because these hold two
+                  // faces over two lines, and `relative`/`overflow-hidden` for
+                  // the watermark that fills the right edge.
+                  className="group relative min-h-16 gap-3 overflow-hidden p-3"
                 >
-                  <input
-                    type="radio"
-                    name={groupName}
-                    checked={checked}
-                    onChange={() => {
-                      onSelect(first)
-                      setOpen(false)
-                    }}
-                    className="sr-only"
-                  />
                   <TeamWatermark teamId={team.teamId} />
                   <span className="relative z-10 shrink-0">
                     <UnitAvatars unit={unit} />
@@ -208,7 +243,7 @@ export function UnitPicker({
                       {roleFilter === undefined && ` · ${ROLE_LABEL[first.fantasyRole]}`}
                     </span>
                   </span>
-                </label>
+                </Choice>
               )
             })}
           </fieldset>

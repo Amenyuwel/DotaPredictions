@@ -72,12 +72,3 @@ def scan(namespace: str, prefix: str = "") -> Iterator[tuple[str, Any]]:
             yield key, blob.get("payload")
 
 
-def clear(namespace: str | None = None) -> int:
-    target = CACHE_DIR / namespace if namespace else CACHE_DIR
-    if not target.exists():
-        return 0
-    n = 0
-    for f in target.rglob("*.json"):
-        f.unlink()
-        n += 1
-    return n

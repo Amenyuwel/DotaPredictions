@@ -16,7 +16,6 @@ import { ApiError } from "@/lib/api"
 import { supabase } from "@/lib/supabase"
 import type {
   AdminConfig,
-  AdminSession,
   ConfigOverlay,
   OverlayPreview,
   OverlayVersion,
@@ -98,10 +97,6 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 const scoped = (tournamentId: string, stage: string) =>
   `?${new URLSearchParams({ tournamentId, stage })}`
-
-export function getAdminSession() {
-  return request<AdminSession>("/api/admin/session")
-}
 
 export function getAdminConfig(tournamentId?: string, stage?: string) {
   const q = new URLSearchParams()

@@ -16,8 +16,6 @@ CACHE_DIR = DATA_DIR / "cache"
 OUT_DIR = ROOT / "out"
 
 ROLES = ("carry", "mid", "offlane", "soft_support", "hard_support")
-CORE_DUO_ROLES = ("carry", "offlane")
-SUPPORT_DUO_ROLES = ("soft_support", "hard_support")
 
 # Config that belongs to the GAME, not to an event, and is therefore shared by
 # every tournament. Hero appearance flags come out of Valve's VPK

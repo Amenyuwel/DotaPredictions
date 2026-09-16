@@ -118,7 +118,7 @@ export const overlayStore = {
  * would take the whole public tool down because an admin's configuration table
  * was briefly unreachable, which is a worse answer than a slightly stale one.
  */
-export async function ensureFreshOverlays(): Promise<void> {
+async function ensureFreshOverlays(): Promise<void> {
   if (!overlayStore.enabled) return
   if (Date.now() - fetchedAtMs < config.overlayPollSeconds * 1000) return
 

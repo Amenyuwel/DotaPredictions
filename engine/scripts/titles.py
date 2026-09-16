@@ -222,7 +222,7 @@ def main() -> int:
         f"[bold]roster:[/bold] cores {escape(args.core)}, mid {escape(args.mid)}, "
         f"supports {escape(args.support)}"
     )
-    baseline, base_slots = total(None, None)
+    baseline, _slots = total(None, None)
     console.print(f"[bold]no titles:[/bold] {baseline:,.0f}")
 
     titles_cfg = cfg.scoring.coach_titles or {}
@@ -289,7 +289,7 @@ def main() -> int:
     for name, row in suffixes.items():
         probe = Titles.load(cfg.scoring, {"prefix": None, "suffix": name})
         if name == DECIDER_SUFFIX:
-            flags = [f for _s, sh, dec in prepared.values() for f in dec]
+            flags = [f for _s, _sh, dec in prepared.values() for f in dec]
             rate = (
                 sum(sum(f) for f in flags) / max(sum(len(f) for f in flags), 1)
                 if flags

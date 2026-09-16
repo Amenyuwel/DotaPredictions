@@ -116,34 +116,6 @@ class OpenDota:
     def _teams(self) -> list[dict]:
         return self._get("/teams")  # type: ignore[return-value]
 
-    def resolve_player(self, nick: str) -> tuple[int, str] | None:
-        want = _norm(nick)
-        rows = self._pro_players()
-        exact = [r for r in rows if _norm(r.get("name") or "") == want]
-        if not exact:
-            exact = [r for r in rows if _norm(r.get("personaname") or "") == want]
-        if not exact:
-            # last resort: unique substring hit on the pro alias
-            hits = [r for r in rows if want and want in _norm(r.get("name") or "")]
-            if len(hits) == 1:
-                exact = hits
-        if not exact:
-            return None
-        # Prefer the most recently active account when a nick is reused.
-        best = max(exact, key=lambda r: r.get("last_match_time") or "")
-        return int(best["account_id"]), str(best.get("name") or best["personaname"])
-
-    def resolve_team(self, name: str) -> tuple[int, str] | None:
-        want = _norm(name)
-        rows = self._teams()
-        for r in rows:
-            if _norm(r.get("name") or "") == want or _norm(r.get("tag") or "") == want:
-                return int(r["team_id"]), str(r.get("name") or name)
-        hits = [r for r in rows if want and want in _norm(r.get("name") or "")]
-        if len(hits) == 1:
-            return int(hits[0]["team_id"]), str(hits[0]["name"])
-        return None
-
     # -- match data ------------------------------------------------------
     def recent_pro_matches(self, since: datetime, limit: int = 4000) -> list[MatchResult]:
         """Walk /proMatches backwards until we pass `since`."""
@@ -372,10 +344,6 @@ def cached_pro_matches(league_id: int | None = None) -> list[MatchResult]:
                 continue
             seen.setdefault(int(r["match_id"]), _match_from_row(r))
     return sorted(seen.values(), key=lambda m: m.start_time, reverse=True)
-
-
-def _norm(s: str) -> str:
-    return "".join(ch for ch in s.lower() if ch.isalnum())
 
 
 __all__ = ["OpenDota", "cached_pro_matches", "utcnow"]

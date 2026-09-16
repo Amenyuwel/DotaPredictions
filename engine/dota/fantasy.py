@@ -180,7 +180,6 @@ class SeriesPlan:
     """
 
     n_sims: int
-    sim_of_series: np.ndarray      # which simulated period each series belongs to
     games_in_series: np.ndarray    # games played in that series
     is_decider: np.ndarray         # did it go the full distance
     starts: np.ndarray             # reduceat offsets, one per period
@@ -215,23 +214,20 @@ def plan_series(
         else np.asarray(indices, dtype=np.int64)
     )
 
-    sim_of: list[int] = []
     games: list[int] = []
     decider: list[bool] = []
     starts: list[int] = []
-    for out_i, i in enumerate(picks):
+    for i in picks:
         shape = series_samples[i]
         flags = decider_samples[i] if decider_samples else ()
         starts.append(len(games))
         for j, n in enumerate(shape):
-            sim_of.append(out_i)
             games.append(int(n))
             decider.append(bool(flags[j]) if j < len(flags) else False)
     if not games:
         return None
     return SeriesPlan(
         n_sims=len(picks),
-        sim_of_series=np.asarray(sim_of, dtype=np.int64),
         games_in_series=np.asarray(games, dtype=np.int64),
         is_decider=np.asarray(decider, dtype=bool),
         starts=np.asarray(starts, dtype=np.int64),

@@ -81,23 +81,36 @@ class PlayerGame:
 
 
 class Source(Protocol):
-    """Minimal contract so STRATZ can be swapped in for OpenDota."""
+    """What `build_corpus` may ask of a source before it has fetched anything.
+
+    Two members, and the shortness is the point. This used to carry five --
+    `resolve_player`, `resolve_team`, `recent_pro_matches` and `player_games`
+    alongside these -- and STRATZ satisfied four of them with stubs returning
+    `None` or `[]`. Nothing ever called them, so nothing ever noticed; a caller
+    that had would have received an empty corpus and no error, which is this
+    project's worst failure mode wearing a type annotation.
+
+    The fetch methods are deliberately absent rather than forgotten. The two
+    sources do not fetch in the same SHAPE: OpenDota answers one match at a
+    time (`player_games_from_match`) and STRATZ answers in bulk
+    (`player_games_for_matches`), and `build_corpus` uses both of them for what
+    each is good at rather than picking one behind a common name. Flattening
+    that into one signature would mean a per-match loop against an endpoint
+    built for batches, or a batch call faked by looping -- an abstraction that
+    costs a real fetch strategy to buy a uniformity nobody uses.
+
+    So a third source implements this much to be recognised, and exports
+    whatever fetch methods it can actually serve. `build_corpus` is the one
+    place that knows which is which, and it already is.
+    """
 
     name: str
 
-    def available(self) -> bool: ...
-
-    def resolve_player(self, nick: str) -> tuple[int, str] | None:
-        """Nickname -> (account_id, canonical_name)."""
-
-    def resolve_team(self, name: str) -> tuple[int, str] | None:
-        """Team name -> (team_id, canonical_name)."""
-
-    def recent_pro_matches(self, since: datetime, limit: int) -> list[MatchResult]: ...
-
-    def player_games(
-        self, account_id: int, since: datetime, limit: int
-    ) -> list[PlayerGame]: ...
+    def available(self) -> bool:
+        """Whether this source has what it needs -- a token, usually -- to be
+        asked anything at all. Must never raise: a source that cannot answer is
+        a smaller corpus, not a failed run."""
+        ...
 
 
 def utcnow() -> datetime:

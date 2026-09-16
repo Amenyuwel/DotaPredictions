@@ -56,11 +56,16 @@ export function createMemo(limit: number): Memo {
     },
 
     remember<T>(key: string, compute: () => T): T {
-      const hit = entries.get(key)
-      if (hit !== undefined) {
+      // `has`, not a truthiness or undefined check on the value: a memo whose
+      // computed answer is `undefined` would otherwise never register as a hit
+      // and would be recomputed on every request forever -- a cache that looks
+      // present, costs a map entry, and saves nothing. Every caller here
+      // returns an object today, which is exactly why this would go unnoticed.
+      if (entries.has(key)) {
+        const hit = entries.get(key) as T
         entries.delete(key) // re-insert to make it most-recently-used
         entries.set(key, hit)
-        return hit as T
+        return hit
       }
       const value = compute()
       entries.set(key, value)

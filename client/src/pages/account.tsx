@@ -1,3 +1,4 @@
+import { useState } from "react"
 import { useQueries } from "@tanstack/react-query"
 import {
   ArrowLeft,
@@ -9,6 +10,7 @@ import {
   Users,
 } from "lucide-react"
 
+import { DeleteDialog, type DeleteRequest } from "@/components/delete-dialog"
 import { ThemeMenu } from "@/components/theme-menu"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
@@ -21,8 +23,9 @@ import { useAllSavedBanners, useDeleteBanner } from "@/hooks/use-saved-banners"
 import { useAllSavedRosters, useDeleteRoster } from "@/hooks/use-saved-rosters"
 import { displayName, useSession, type AuthState } from "@/hooks/use-session"
 import { timestamp } from "@/lib/format"
-import { ROLE_LABEL, ROLE_ORDER, STAGE_LABEL, tournamentLabel } from "@/lib/labels"
+import { ROLE_LABEL, ROLE_ORDER, STAGE_LABEL, tournamentLabel, unitName } from "@/lib/labels"
 import { signOut, type SavedBanner, type SavedRoster } from "@/lib/supabase"
+import { unitOf } from "@/lib/units"
 import type { CurrentRun, Stage } from "@/types/run"
 
 /**
@@ -227,6 +230,7 @@ interface Group {
 function GroupCard({ group, run }: { group: Group; run: CurrentRun | undefined }) {
   const removeBanner = useDeleteBanner()
   const removeRoster = useDeleteRoster()
+  const [pending, setPending] = useState<DeleteRequest | null>(null)
 
   // Both maps are built from the run when there is one. When there is not --
   // the stage is no longer published, or the fetch failed -- the id is printed
@@ -234,7 +238,15 @@ function GroupCard({ group, run }: { group: Group; run: CurrentRun | undefined }
   // still has to be deletable, which is most of why this page exists, so a
   // missing run costs the words and never the row.
   const emblemName = new Map((run?.emblems ?? []).map((e) => [e.emblemId, e.displayName]))
-  const playerName = new Map((run?.players ?? []).map((p) => [p.playerId, p.nick]))
+  // A saved slot names the whole unit, not the one id that was stored: core
+  // and support are duos, and half a duo is a row the reader cannot check
+  // against the roster in their client before deleting it. Loosely, without a
+  // role -- these lines say what was SAVED, and a player this run carries in
+  // another slot still has a name here.
+  const unitFor = (playerId: number) => {
+    const unit = unitOf(run?.players ?? [], playerId)
+    return unit.length > 0 ? unitName(unit) : null
+  }
 
   const stageLabel = STAGE_LABEL[group.stage as Stage] ?? group.stage
   const removalError = removeBanner.error ?? removeRoster.error
@@ -285,9 +297,25 @@ function GroupCard({ group, run }: { group: Group; run: CurrentRun | undefined }
                   <Button
                     variant="ghost"
                     size="icon-sm"
-                    aria-label={`Delete ${banner.label || "saved banner"}`}
+                    className="text-muted-foreground hover:text-destructive"
+                    aria-label={`Delete ${banner.label || `${ROLE_LABEL[banner.role]} banner`}`}
                     disabled={removeBanner.isPending}
-                    onClick={() => removeBanner.mutate(banner.id)}
+                    onClick={() =>
+                      setPending({
+                        title: `Delete ${banner.label || `this ${ROLE_LABEL[banner.role].toLowerCase()} banner`}?`,
+                        detail: (
+                          <ol className="grid gap-0.5">
+                            {banner.emblemIds.map((emblemId, slot) => (
+                              <li key={`${emblemId}-${slot}`} className="truncate">
+                                {slot + 1}. {emblemName.get(emblemId) ?? <code>{emblemId}</code>}
+                              </li>
+                            ))}
+                          </ol>
+                        ),
+                        confirmLabel: "Delete banner",
+                        onConfirm: () => removeBanner.mutate(banner.id),
+                      })
+                    }
                   >
                     <Trash2 aria-hidden />
                   </Button>
@@ -315,7 +343,7 @@ function GroupCard({ group, run }: { group: Group; run: CurrentRun | undefined }
                         <div key={role} className="truncate">
                           <dt className="inline">{ROLE_LABEL[role]}: </dt>
                           <dd className="inline">
-                            {playerName.get(roster.players[role]) ?? (
+                            {unitFor(roster.players[role]) ?? (
                               <code>#{roster.players[role]}</code>
                             )}
                           </dd>
@@ -329,9 +357,30 @@ function GroupCard({ group, run }: { group: Group; run: CurrentRun | undefined }
                   <Button
                     variant="ghost"
                     size="icon-sm"
-                    aria-label={`Delete ${roster.label || "saved roster"}`}
+                    className="text-muted-foreground hover:text-destructive"
+                    aria-label={`Delete ${roster.label || "this roster"}`}
                     disabled={removeRoster.isPending}
-                    onClick={() => removeRoster.mutate(roster.id)}
+                    onClick={() =>
+                      setPending({
+                        title: `Delete ${roster.label || "this roster"}?`,
+                        detail: (
+                          <dl className="grid gap-0.5">
+                            {ROLE_ORDER.map((role) => (
+                              <div key={role}>
+                                <dt className="inline">{ROLE_LABEL[role]}: </dt>
+                                <dd className="text-foreground inline">
+                                  {unitFor(roster.players[role]) ?? (
+                                    <code>#{roster.players[role]}</code>
+                                  )}
+                                </dd>
+                              </div>
+                            ))}
+                          </dl>
+                        ),
+                        confirmLabel: "Delete roster",
+                        onConfirm: () => removeRoster.mutate(roster.id),
+                      })
+                    }
                   >
                     <Trash2 aria-hidden />
                   </Button>
@@ -347,6 +396,11 @@ function GroupCard({ group, run }: { group: Group; run: CurrentRun | undefined }
           </p>
         ) : null}
       </CardContent>
+
+      {/* One dialog per group card rather than per row: only one request can be
+          open at a time, and a dialog mounted beside every trash icon is a
+          hundred of them on a page with a season of saved work on it. */}
+      <DeleteDialog request={pending} onClose={() => setPending(null)} />
     </Card>
   )
 }

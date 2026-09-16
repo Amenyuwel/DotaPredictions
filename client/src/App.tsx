@@ -7,8 +7,8 @@ import { BannerDialog } from "@/components/banner-dialog"
 import { FaqButton, FaqDialog } from "@/components/faq"
 import { ResultPanel } from "@/components/result-panel"
 import { RoleTabs } from "@/components/role-tabs"
+import { RosterAnswer } from "@/components/roster-answer"
 import { RunHeader } from "@/components/run-header"
-import { SlotTargetCard } from "@/components/slot-target-card"
 import { SavedBanners } from "@/components/saved-banners"
 import { SavedRosters } from "@/components/saved-rosters"
 import { SiteFooter } from "@/components/site-footer"
@@ -26,19 +26,16 @@ import {
 } from "@/components/ui/dialog"
 import { Skeleton, SkeletonPanel } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { buildCatalog, type EmblemCatalog } from "@/lib/emblem-catalog"
+import { buildCatalog } from "@/lib/emblem-catalog"
 import { points } from "@/lib/format"
 import { ROLE_DETAIL, ROLE_LABEL, ROLE_ORDER } from "@/lib/labels"
+import { rosterTotal, type Roster } from "@/lib/roster"
 import { useMediaQuery } from "@/hooks/use-media-query"
 import { useTarget } from "@/hooks/use-target"
 import { useRank } from "@/hooks/use-rank"
 import { useRun } from "@/hooks/use-run"
 import { useSession } from "@/hooks/use-session"
 import type { Emblem, FantasyRole, Player, Stage } from "@/types/run"
-
-/** A fantasy roster is three units, one per slot. Null is a slot nobody has
- * been picked for yet, which is the state the tab opens in. */
-type Roster = Record<FantasyRole, Player | null>
 
 const EMPTY_ROSTER: Roster = { core: null, mid: null, support: null }
 
@@ -61,24 +58,6 @@ const EMPTY_BANNERS: Record<FantasyRole, (Emblem | null)[]> = {
  */
 const sized = (banner: (Emblem | null)[], slots: number): (Emblem | null)[] =>
   banner.length === slots ? banner : Array.from({ length: slots }, (_, i) => banner[i] ?? null)
-
-/** What a banner answer arrives as, for the panel that draws it. */
-type BannerQuery = ReturnType<typeof useTarget>
-
-/**
- * The roster's three best scores added, or null until all three have one.
- *
- * One definition rather than one per place it is shown. The card and the
- * narrow-screen bar are two renderings of a single number, and two sums written
- * separately are two sums that can come to disagree -- which on this page reads
- * as the tool being uncertain about its own arithmetic rather than as a bug.
- */
-function rosterTotal(targets: Record<FantasyRole, BannerQuery>): number | null {
-  const bests = ROLE_ORDER.map((r) => targets[r].data?.best ?? null)
-  return bests.every((b) => b !== null)
-    ? bests.reduce((sum, b) => sum + b!.score, 0)
-    : null
-}
 
 /**
  * Two mirrored entry paths, one column of answers.
@@ -275,43 +254,6 @@ export default function App() {
     setRoster(EMPTY_ROSTER)
   }
 
-  /**
-   * Load a saved banner back into the builder.
-   *
-   * Emblem ids are resolved against THIS run's catalog rather than trusted: a
-   * banner saved against an earlier run can name an emblem the current one does
-   * not generate. An unresolved id becomes an empty slot, so the banner comes
-   * back visibly incomplete instead of silently scoring four emblems as five.
-   */
-  function loadSaved(savedRole: FantasyRole, emblemIds: string[]) {
-    const rows = data?.emblems ?? []
-    const resolved = emblemIds.map((id) => rows.find((e) => e.emblemId === id) ?? null)
-    // Into the card for the role it was SAVED under, never the one on screen: a
-    // support banner loaded into the core slot would be scored against the
-    // wrong unit and look like a finding.
-    setBanner(savedRole, Array.from({ length: slots }, (_, i) => resolved[i] ?? null))
-  }
-
-  /**
-   * Load a saved roster back into the three pickers.
-   *
-   * Player ids are resolved against THIS run rather than trusted, the same way
-   * a saved banner's emblems are: a roster saved against the Group Stage can
-   * name a player whose team did not make the Main Event. An id the run does
-   * not carry becomes an empty slot, so the roster comes back visibly short
-   * instead of scoring two units as three.
-   */
-  function loadRoster(players: { core: number; mid: number; support: number }) {
-    const rows = data?.players ?? []
-    const find = (playerId: number, slotRole: FantasyRole) =>
-      rows.find((p) => p.playerId === playerId && p.fantasyRole === slotRole) ?? null
-    setRoster({
-      core: find(players.core, "core"),
-      mid: find(players.mid, "mid"),
-      support: find(players.support, "support"),
-    })
-  }
-
   if (isPending) {
     return (
       <PreRun>
@@ -420,9 +362,13 @@ export default function App() {
             <SavedBanners
               run={data.run}
               auth={auth}
+              emblems={data.emblems}
               banners={banners}
               slots={slots}
-              onLoad={loadSaved}
+              // Kept now, so the builder starts the next banner rather than
+              // holding one that is already in the list below. Only the slot
+              // that was saved -- the other two are still being built.
+              onSaved={(savedRole) => setBanner(savedRole, [])}
             />
           </TabsContent>
 
@@ -449,7 +395,21 @@ export default function App() {
               </Card>
             ))}
 
-            <SavedRosters run={data.run} auth={auth} roster={roster} onLoad={loadRoster} />
+            <SavedRosters
+              run={data.run}
+              auth={auth}
+              players={data.players}
+              roster={roster}
+              // Kept now, so the pickers start the next one rather than
+              // holding a roster that is already in the list below.
+              onSaved={() => setRoster(EMPTY_ROSTER)}
+              // The saved list answers for itself, in its own dialog. It never
+              // writes back into these three pickers: a reader opening a row to
+              // check a number they saved last week has not asked for the
+              // roster they are building now to be thrown away.
+              slots={slots}
+              catalog={catalog}
+            />
           </TabsContent>
         </Tabs>
 
@@ -615,93 +575,5 @@ function BannerAnswers({
         return <ResultPanel answer={query.data} />
       }}
     />
-  )
-}
-
-/**
- * The roster's three answers as three cards, with their total on top once all
- * three have one.
- *
- * The total is a plain sum of each slot's best score, not a re-optimisation
- * across them -- `enumerate_fantasy_rosters` in the engine treats the three
- * slots the same way, because the client scores core, mid and support as
- * separate averages and adds them. No interval is shown on the total: summing
- * the three point estimates is exact, but summing their confidence intervals
- * would overstate the combined uncertainty, and understating it is worse than
- * leaving it off.
- *
- * What it sums is the REALISTIC rung of each slot, not the ceiling. Quality
- * cannot be rerolled -- the client rolls stats and traits and nothing else --
- * so a total built from five Tier V emblems per slot is a number no run of luck
- * can be planned towards. It is still one tab along on every card, because the
- * ceiling is what a real goal is measured against.
- */
-function RosterAnswer({
-  roster,
-  targets,
-  run,
-  slots,
-  catalog,
-}: {
-  roster: Roster
-  targets: Record<FantasyRole, BannerQuery>
-  run: { tournamentId: string; stage: Stage } | undefined
-  slots: number
-  catalog: EmblemCatalog
-}) {
-  const total = rosterTotal(targets)
-
-  // Before the first player is picked the three slots have nothing to say
-  // apart from each other, and saying it three times fills the whole answer
-  // column with a paragraph repeated with one word changed. One sentence until
-  // there is something to be specific about.
-  if (ROLE_ORDER.every((r) => roster[r] === null)) {
-    return (
-      <AwaitingInput>
-        Pick a core, a mid and a support. Each one gets the {slots} emblems that score
-        best for it out of the whole catalog -- the banner to go and roll for -- and the
-        three are added up.
-      </AwaitingInput>
-    )
-  }
-
-  return (
-    <div className="space-y-4">
-      {total !== null && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">Projected roster total</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-semibold tabular-nums">{points(total)}</p>
-            <p className="text-muted-foreground mt-1 text-xs">
-              Sum of each slot's realistic target, so it is what this roster is worth on a
-              hand of emblems an ordinary set of crafts leaves you with - not the ceiling.
-              Quality cannot be rerolled, so the perfect banner is a number to measure
-              against rather than one to plan for; each card opens on the whole ladder.
-              The game scores core, mid and support as separate averages, so there is
-              nothing for the slots to trade off against each other.
-            </p>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Three cards rather than three stacked answers, and rather than one
-          answer behind a tab: the three numbers the ceiling is the sum of are
-          then on the page together, which is the comparison a reader came for.
-          The emblems are what they act on one slot at a time, so those open. */}
-      <div className="grid auto-rows-fr gap-3 sm:grid-cols-3">
-        {ROLE_ORDER.map((slotRole) => (
-          <SlotTargetCard
-            key={slotRole}
-            role={slotRole}
-            player={roster[slotRole]}
-            run={run}
-            target={targets[slotRole]}
-            catalog={catalog}
-          />
-        ))}
-      </div>
-    </div>
   )
 }
