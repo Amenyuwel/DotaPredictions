@@ -149,6 +149,60 @@
 }
 
 /* ---------------------------------------------------------------------------
+   Compendium gold: the answer's colour
+   ---------------------------------------------------------------------------
+   The one hue outside the emblem weaves and the alarm red, and it is spent on
+   exactly one thing: the cards that ARE the answer (the lead unit on the
+   banner tab, the roster total on the roster tab). Filled, never outlined: the
+   fill is the signal. Gold because it is the compendium's and the
+   Aegis's colour, and because it collides with none of red, green or blue --
+   an answer card in an emblem hue would read as "this is a red emblem".
+
+   Every pair below was measured, not eyeballed: text on fill clears 13:1 in
+   both themes and the secondary ink 6.3:1. `--answer-border` now only tints
+   dividers inside the card. Re-measure if any lightness moves.
+
+   `[data-answer]` re-points the shared tokens inside the card rather than
+   restyling its children one by one: the figure, the range, the tie badge and
+   the hover fill all follow the card because they already read `--foreground`,
+   `--muted-foreground` and `--secondary`. A dialog opened from inside one is
+   portalled out of this scope, so it stays on the neutral palette. */
+:root {
+    --answer: oklch(0.955 0.045 88);
+    --answer-foreground: oklch(0.24 0.04 70);
+    --answer-muted: oklch(0.46 0.07 70);
+    --answer-hover: oklch(0.915 0.06 86);
+    --answer-border: oklch(0.62 0.12 75);
+}
+
+.dark {
+    --answer: oklch(0.29 0.05 75);
+    --answer-foreground: oklch(0.97 0.025 90);
+    --answer-muted: oklch(0.83 0.06 85);
+    --answer-hover: oklch(0.35 0.06 75);
+    --answer-border: oklch(0.8 0.13 85);
+}
+
+@layer base {
+  [data-answer] {
+    --card: var(--answer);
+    --card-foreground: var(--answer-foreground);
+    --foreground: var(--answer-foreground);
+    --muted-foreground: var(--answer-muted);
+    --muted: var(--answer-hover);
+    --secondary: var(--answer-hover);
+    --secondary-foreground: var(--answer-foreground);
+    --border: color-mix(in oklab, var(--answer-border) 40%, transparent);
+    background-color: var(--answer);
+    /* A faint lift at the top edge, white in both themes, so the fill reads as
+       a surface rather than a flat swatch. Kept under the contrast budget: it
+       only ever lightens the fill the ink was measured on by a few percent. */
+    background-image: linear-gradient(180deg, oklch(1 0 0 / 0.06), transparent 70%);
+    color: var(--answer-foreground);
+  }
+}
+
+/* ---------------------------------------------------------------------------
    Emblem colour
    ---------------------------------------------------------------------------
    A colour chip is an ordinary button until it is hovered or picked. At rest it

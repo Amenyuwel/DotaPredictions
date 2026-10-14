@@ -103,29 +103,54 @@ export function EmblemDialog({
         // Cancel sits in the footer and says what leaving means, so the
         // corner X would be the same exit offered twice.
         showCloseButton={false}
-        className="max-h-[85dvh] overflow-y-auto sm:max-w-lg"
+        // A column that does not scroll, with only the form inside it
+        // scrolling. The footer used to be `sticky` inside a scrolling popup,
+        // and sticky stops at the popup's padding edge -- so the popup's 16px
+        // bottom padding showed as a dark band under Save. Header and footer
+        // are now outside the scroller and sit flush where they belong.
+        className="flex max-h-[85dvh] flex-col sm:max-w-lg"
       >
         <DialogHeader>
-          <DialogTitle>Emblem {slot + 1}</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            {/* A locked slot's colour is a fact about the slot, not a choice,
+                so it is stated beside the title rather than offered as a
+                greyed-out control in the form. It took a whole row at 50%
+                opacity and read as broken; here it is the weave and the word,
+                the same pair the builder row shows. */}
+            {lockedColor && (
+              <span
+                aria-hidden
+                {...colorStyle(lockedColor).attrs}
+                className={cn("size-6 shrink-0 rounded-md", colorStyle(lockedColor).swatch)}
+              />
+            )}
+            Emblem {slot + 1}
+            {lockedColor && (
+              <span className="text-muted-foreground font-sans text-sm font-normal">
+                · {lockedColor}
+              </span>
+            )}
+          </DialogTitle>
           <DialogDescription>
             {lockedColor ? (
               <>
-                This slot is <strong>{lockedColor}</strong>, fixed by the role - that is
-                what decides which stats can sit here. Stat, quality and trait are all
-                needed before the emblem scores anything.
+                Pick a stat, a quality and a trait.
               </>
             ) : (
               <>
-                Colour picks which stats are on offer. All three of stat, quality and
-                trait are needed before this emblem scores anything.
+                Colour sets which stats are on offer.
               </>
             )}
           </DialogDescription>
         </DialogHeader>
 
+        {/* -mx/px: the scrollbar sits at the popup's edge, not inside the
+            padding, and focus rings on the outer choices are not clipped. */}
+        <div className="-mx-4 min-h-0 flex-1 space-y-6 overflow-y-auto px-4 py-1">
+        {!lockedColor && (
         <Field label="Colour">
           <div className="grid grid-cols-3 gap-2">
-            {(lockedColor ? [lockedColor] : catalog.colors).map((color) => {
+            {catalog.colors.map((color) => {
               const style = colorStyle(color)
               const on = axes.color === color
               return (
@@ -133,10 +158,6 @@ export function EmblemDialog({
                   key={color}
                   name={`emblem-${slot}-color`}
                   checked={on}
-                  // A locked colour is the slot's, not a selection: it cannot be
-                  // chosen because it is already true, and it cannot be cleared
-                  // because there is nothing to clear it to.
-                  disabled={lockedColor !== null}
                   onSelect={() => change({ color })}
                   onClear={() => change({ color: null })}
                   // The hue lives on the element, the recipe in the class names.
@@ -153,6 +174,7 @@ export function EmblemDialog({
             })}
           </div>
         </Field>
+        )}
 
         <Field label="Stat">
           {/* auto-rows-fr: one option carrying a second line must not make its row
@@ -185,7 +207,7 @@ export function EmblemDialog({
                   <span>{option.label}</span>
                   {!option.measurable && (
                     <span className="text-muted-foreground text-xs">
-                      no data - this tool can't value it
+                      no data
                     </span>
                   )}
                 </span>
@@ -220,7 +242,9 @@ export function EmblemDialog({
         </Field>
 
         <Field label="Trait">
-          <div className="grid auto-rows-fr gap-2">
+          {/* Two up from 640px: six full-width rows put Save two screens below
+              the first choice. */}
+          <div className="grid auto-rows-fr gap-2 sm:grid-cols-2">
             {catalog.traits.map((trait) => (
               <Choice
                 key={trait}
@@ -228,6 +252,9 @@ export function EmblemDialog({
                 checked={axes.trait === trait}
                 onSelect={() => change({ trait })}
                 onClear={() => change({ trait: null })}
+                // Top-aligned: a one-line description centred beside a
+                // two-line one put the two trait names at different heights.
+                className="items-start"
               >
                 <span className="flex min-w-0 flex-col items-start text-left">
                   <span className="text-xs font-semibold tracking-[0.12em] uppercase">
@@ -241,8 +268,13 @@ export function EmblemDialog({
             ))}
           </div>
         </Field>
+        </div>
 
-        <DialogFooter className="sm:justify-between">
+        {/* Outside the scroller, so it is always on screen: on a phone the form
+            is longer than the screen, and Save sat below six traits. One row at
+            every width, because three stacked buttons pinned to a phone screen
+            would cover the form they commit. */}
+        <DialogFooter className="flex-row items-center justify-between">
           {initial.stat ? (
             <Button variant="ghost" onClick={onRemove}>
               Remove
@@ -250,10 +282,16 @@ export function EmblemDialog({
           ) : (
             <span />
           )}
-          <div className="flex flex-col-reverse gap-2 sm:flex-row">
+          <div className="flex min-w-0 gap-2">
             <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
-            <Button disabled={!resolved} onClick={() => resolved && onSave(resolved)}>
-              {resolved ? `Save ${resolved.displayName}` : "Save emblem"}
+            <Button
+              disabled={!resolved}
+              onClick={() => resolved && onSave(resolved)}
+              className="min-w-0"
+            >
+              <span className="truncate">
+                {resolved ? `Save ${resolved.displayName}` : "Save emblem"}
+              </span>
             </Button>
           </div>
         </DialogFooter>
@@ -267,7 +305,7 @@ export function EmblemDialog({
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <fieldset className="space-y-2">
-      <legend className="text-muted-foreground mb-2 text-2xs font-semibold tracking-[0.14em] uppercase">
+      <legend className="text-muted-foreground mb-2 text-2xs font-semibold tracking-[0.12em] uppercase">
         {label}
       </legend>
       {children}

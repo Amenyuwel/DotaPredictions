@@ -115,16 +115,14 @@ export function SavedRosters({
 
   if (!signedIn) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm">Saved rosters</CardTitle>
-        </CardHeader>
-        <CardContent className="text-muted-foreground text-xs">
-          {auth.status === "unavailable"
-            ? "This deployment has no sign-in configured, so nothing can be saved."
-            : "You are using the tool as a guest. Targets work exactly the same; nothing is kept when you close the tab."}
-        </CardContent>
-      </Card>
+      // One caption line rather than a card: a full card saying "nothing is
+      // kept" sat at the weight of the three questions above it, and was the
+      // largest thing on a guest's screen that asked nothing of them.
+      <p className="text-muted-foreground px-1 text-xs text-pretty">
+        {auth.status === "unavailable"
+          ? "Saving isn't available here."
+          : "Guest mode: everything works, nothing is saved."}
+      </p>
     )
   }
 
@@ -234,7 +232,17 @@ export function SavedRosters({
             Could not load your saved rosters: {saved.error.message}
           </p>
         ) : saved.data && saved.data.length > 0 ? (
-          <ul className="grid gap-2">
+          <ul className="grid grid-cols-1 gap-2">
+            {/* `grid-cols-1`, not a bare `grid`. An `auto` track is floored at
+                the min-content of its widest item, and every row here holds a
+                `truncate` span -- which is `whitespace-nowrap`, so its
+                min-content is the WHOLE name. The track then grows past the
+                card, `min-w-0` on the row does nothing about it (it lifts the
+                automatic minimum, it does not cap an intrinsic contribution),
+                and the card's `overflow-hidden` clips what is left over: a
+                saved roster with its right-hand half simply gone. `grid-cols-1`
+                is `minmax(0,1fr)`, which floors the track at zero and lets the
+                truncation do the job it was asked to do. */}
             {saved.data.map((item) => (
               <li key={item.id} className="flex items-center gap-2">
                 {/* Outlined rather than ghost. A ghost row reads as a
@@ -269,7 +277,7 @@ export function SavedRosters({
                     setPending({
                       title: `Delete ${item.label || "this roster"}?`,
                       detail: (
-                        <dl className="grid gap-0.5">
+                        <dl className="grid grid-cols-1 gap-0.5">
                           {ROLE_ORDER.map((r) => (
                             <div key={r}>
                               <dt className="inline">{ROLE_LABEL[r]}: </dt>
@@ -426,9 +434,7 @@ function RosterDialog({
             <DialogHeader>
               <DialogTitle>{item.label || namesOf(item, players)}</DialogTitle>
               <DialogDescription>
-                {showing
-                  ? `Saved ${timestamp(item.createdAt)}. Nothing on this page has changed -- the three pickers are as you left them.`
-                  : `Saved ${timestamp(item.createdAt)}.`}
+                Saved {timestamp(item.createdAt)}
               </DialogDescription>
             </DialogHeader>
 
@@ -466,10 +472,10 @@ function RosterDialog({
 
                 <p className="text-muted-foreground text-xs">
                   {nothing
-                    ? "No slot can be filled from this run, so there is nothing to score."
-                    : missing === 0
-                      ? "Scored here, on its own. Your three pickers are left alone."
-                      : `Scored here, on its own -- your three pickers are left alone. ${missing} of the slots is not in this run, so there is no roster total, only the slots that filled.`}
+                    ? "None of these players are in this run."
+                    : missing > 0
+                      ? `${missing} ${missing === 1 ? "slot isn't" : "slots aren't"} in this run, so there's no total.`
+                      : null}
                 </p>
               </>
             )}

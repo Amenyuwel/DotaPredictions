@@ -53,8 +53,7 @@ export function AuthDialog({
         <DialogHeader>
           <DialogTitle>Save your banners</DialogTitle>
           <DialogDescription>
-            Sign in to keep the banners you build. Rankings are the same either way - an
-            account only decides whether they are still here tomorrow.
+            Sign in to keep what you build. Answers are the same either way.
           </DialogDescription>
         </DialogHeader>
 
@@ -102,7 +101,7 @@ export function AuthDialog({
             Continue as guest
           </Button>
           <p className="text-muted-foreground text-center text-xs">
-            As a guest nothing is saved. Close the tab and the banner is gone.
+            As a guest, nothing is saved.
           </p>
         </DialogFooter>
       </DialogContent>

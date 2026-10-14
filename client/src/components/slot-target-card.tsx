@@ -22,7 +22,7 @@ import { Spinner } from "@/components/ui/spinner"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import type { EmblemCatalog } from "@/lib/emblem-catalog"
 import { cn } from "@/lib/utils"
-import { points } from "@/lib/format"
+import { interval, points } from "@/lib/format"
 import { ROLE_LABEL, unitName } from "@/lib/labels"
 import type { BannerAnswer, FantasyRole, Player, Stage } from "@/types/run"
 
@@ -194,7 +194,7 @@ function Answered({
             {points(best.score)}
           </p>
           <p className="text-muted-foreground text-2xs tabular-nums">
-            {points(best.ci.lo)} - {points(best.ci.hi)} at 90%
+            {interval(best.ci)}
           </p>
           <Button
             variant="ghost"
@@ -210,11 +210,15 @@ function Answered({
 
       <DialogContent
         showCloseButton={false}
-        className="max-h-[85dvh] overflow-y-auto sm:max-w-2xl"
+        // Title, rungs and Done stay put; only the answer scrolls. Scrolling
+        // the whole popup sent Done a screen below the fold on a phone, and
+        // the rung tabs -- the control a reader switches between while
+        // comparing -- scrolled away with it. Same shape as the emblem dialog.
+        className="flex max-h-[85dvh] flex-col sm:max-w-2xl"
       >
         <DialogHeader>
           <DialogTitle>
-            {label} target banner - {unitName(answer.unit.players)}
+            {label} banner · {unitName(answer.unit.players)}
           </DialogTitle>
         </DialogHeader>
 
@@ -226,9 +230,13 @@ function Answered({
             copy up here was the one with nothing to qualify. */}
         {ladder.length > 0 && (
           <Tabs value={goalId} onValueChange={(next) => setGoalId(next as string)}>
-            <TabsList className="w-full">
+            <TabsList className="w-full justify-start overflow-x-auto [scrollbar-width:none]">
               {ladder.map((rung) => (
-                <TabsTrigger key={rung.id} value={rung.id} className="flex-1">
+                <TabsTrigger
+                  key={rung.id}
+                  value={rung.id}
+                  className="min-w-fit flex-1 px-1.5 text-xs sm:text-sm"
+                >
                   {rung.label}
                 </TabsTrigger>
               ))}
@@ -236,11 +244,20 @@ function Answered({
           </Tabs>
         )}
 
+        {/* Focusable, named, and ringed on focus: on every rung but Custom the
+            answer has no control inside it, so without a tab stop of its own a
+            keyboard user could not scroll to the second banner or the limits
+            (WCAG 2.1.1). The ring is inset so the popup edge does not clip it. */}
+        <div
+          role="region"
+          aria-label={`${label} banner details`}
+          tabIndex={0}
+          className="focus-visible:ring-ring/50 -mx-4 min-h-0 flex-1 space-y-4 overflow-y-auto rounded-md px-4 py-1 outline-none focus-visible:ring-3 focus-visible:ring-inset"
+        >
         {/* Said once, above the banners whose stamps are now the control. */}
         {custom && (
           <p className="text-muted-foreground text-xs">
-            Click a tier to change it. Tiers stay on their row; the stat and trait on each
-            are chosen for you.
+            Tap a tier to change it.
           </p>
         )}
 
@@ -286,8 +303,8 @@ function Answered({
             >
           <BannerResultPanel
             answer={shown.data}
+            stage={run?.stage}
             catalog={catalog}
-            compact
             // One banner while the hand is being edited, so a tier change
             // cannot swap the card out from under the chip that was clicked.
             single={custom}
@@ -311,6 +328,7 @@ function Answered({
             {shown.data?.reason ?? "No banner could be built for this goal."}
           </AwaitingInput>
         )}
+        </div>
 
         <DialogFooter>
           <DialogClose render={<Button />}>Done</DialogClose>

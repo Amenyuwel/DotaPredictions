@@ -119,6 +119,52 @@ function Question({ question, children }: { question: string; children: ReactNod
  */
 const items = (slots: number) => [
   {
+    // First, because most readers arrive from a link with no idea what the
+    // page is. Every answer below assumes this one.
+    q: "What is this, and how do I use it?",
+    a: (
+      <>
+        <p>
+          A helper for The International's fantasy game. It answers two questions, one per
+          fantasy slot (core, mid and support):
+        </p>
+        <ul className="list-disc space-y-1 pl-5">
+          <li>
+            <strong>My roster</strong>: pick the players you are fielding and it names the{" "}
+            {slots}-emblem banner each one should roll for, with what that banner is worth.
+          </li>
+          <li>
+            <strong>I have a banner</strong>: enter the emblems you rolled, in order, and it
+            ranks which players score best wearing them.
+          </li>
+        </ul>
+        <p>
+          Every figure is a projection with a 90% range under it. When two ranges overlap
+          the tool calls them tied rather than pick a winner.
+        </p>
+      </>
+    ),
+  },
+  {
+    q: "How is the roster total worked out?",
+    a: (
+      <>
+        <p>
+          It adds up each slot's <strong>realistic</strong> target: what the slot is worth
+          on a hand of emblems an ordinary set of crafts leaves you with, not the ceiling.
+          Quality cannot be rerolled, so the perfect banner is a number to measure against
+          rather than one to plan for; each slot's card opens on the whole ladder.
+        </p>
+        <p>
+          The game scores core, mid and support separately, so there is nothing for the
+          slots to trade off against each other. The total has no range of its own: adding
+          up three ranges would overstate how unsure it is, and each slot already shows
+          its own.
+        </p>
+      </>
+    ),
+  },
+  {
     q: "Where do these numbers come from?",
     a: (
       <>

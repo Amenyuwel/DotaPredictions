@@ -70,7 +70,10 @@ export function AnswerBar({
             </Button>
           </>
         ) : (
-          <p className="text-muted-foreground text-xs">{hint}</p>
+          // Full-strength body type, not a caption: on a phone this line is
+          // the only thing on screen that says what the page is for, and a
+          // stranger reads a dim 12px line as a footnote to skip.
+          <p className="text-foreground text-sm text-pretty">{hint}</p>
         )}
       </div>
     </div>

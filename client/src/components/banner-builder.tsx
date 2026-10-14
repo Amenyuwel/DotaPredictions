@@ -1,11 +1,10 @@
 import { useMemo, useState } from "react"
-import { Plus, X } from "lucide-react"
+import { Plus, Undo2, X } from "lucide-react"
 
 import { EmblemDialog } from "@/components/emblem-dialog"
 import { EmblemMeta } from "@/components/emblem-meta"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import {
   axesOf,
   buildCatalog,
@@ -57,12 +56,25 @@ export function BannerBuilder({
 }) {
   const catalog = useMemo(() => buildCatalog(emblems, scoring), [emblems, scoring])
   const [editing, setEditing] = useState<number | null>(null)
+  // The banner as it was before the last removal, and what to call it. One
+  // press empties a slot (or all of them), so one press puts it back: undo
+  // rather than a confirmation, because clearing is safe to reverse and a
+  // "are you sure?" on every X is a tax on the reader who meant it.
+  const [undo, setUndo] = useState<{ before: (Emblem | null)[]; label: string } | null>(
+    null,
+  )
 
   const setSlot = (index: number, emblem: Emblem | null) => {
     const next = [...value]
     next[index] = emblem
     onChange(next)
     setEditing(null)
+    setUndo(null)
+  }
+
+  const remove = (next: (Emblem | null)[], label: string) => {
+    setUndo({ before: value, label })
+    onChange(next)
   }
 
   /** What the dialog opens on. A filled slot reopens on its own emblem; an empty
@@ -98,6 +110,13 @@ export function BannerBuilder({
               <span className="text-muted-foreground w-3 text-xs tabular-nums">
                 {i + 1}
               </span>
+              {/* The remove control sits INSIDE the row's outline but is not
+                  inside its button: a sibling laid over the right edge, with
+                  the button padded clear of it so their hit areas never
+                  overlap. Beside the row it made every filled slot narrower
+                  than the empty ones, so the right edge of the banner jumped
+                  each time an emblem was placed. */}
+              <div className="relative flex min-w-0 flex-1">
               <button
                 type="button"
                 onClick={() => setEditing(i)}
@@ -106,9 +125,9 @@ export function BannerBuilder({
                 // disagree.
                 {...(style?.attrs ?? {})}
                 className={cn(
-                  "focus-visible:border-ring focus-visible:ring-ring/50 group relative flex min-h-14 flex-1 items-center gap-3 overflow-hidden rounded-xl border px-3 text-left transition-colors focus-visible:ring-3",
+                  "focus-visible:border-ring focus-visible:ring-ring/50 group relative flex min-h-14 flex-1 items-center gap-3 overflow-hidden rounded-xl border px-3 text-left transition-[color,background-color,border-color,transform] focus-visible:ring-3 active:translate-y-px",
                   current
-                    ? "border-input bg-card hover:bg-accent/50"
+                    ? "border-input bg-card hover:bg-accent/50 pr-12 pointer-coarse:pr-14"
                     : "border-input/70 text-muted-foreground hover:border-input hover:bg-accent/40 border-dashed",
                 )}
               >
@@ -132,16 +151,30 @@ export function BannerBuilder({
                 {current ? (
                   <>
                     <span className="min-w-0 flex-1 py-2">
-                      <span className="block truncate text-sm font-medium">
-                        {catalog.statLabels.get(current.stat) ?? current.stat}
+                      <span className="flex items-center gap-2 text-sm font-medium">
+                        <span className="truncate">
+                          {catalog.statLabels.get(current.stat) ?? current.stat}
+                        </span>
+                        {/* Inside the row, beside the stat it describes. The
+                            full sentence -- scored 0 here, still pays in the
+                            client -- is in the answer's Limits, which is where
+                            it qualifies a number. */}
+                        {!current.measurable && (
+                          <Badge variant="outline" title="No data: scored 0 here">
+                            no data
+                          </Badge>
+                        )}
                       </span>
                       <EmblemMeta color={color!} trait={current.trait} />
                     </span>
 
-                    {/* The quality, stamped the way the client stamps it. */}
+                    {/* The quality, stamped the way the client stamps it. A bare
+                        numeral, not a bordered square: boxed, it was the same
+                        shape as the clear button beside the row and read as a
+                        second control that did nothing. */}
                     <span
                       aria-label={tierLabel(current.tier)}
-                      className="bg-muted/60 text-foreground/80 grid size-8 shrink-0 place-items-center rounded-lg border text-xs font-semibold tabular-nums"
+                      className="font-heading text-foreground/80 w-8 shrink-0 text-center text-sm font-semibold tabular-nums"
                     >
                       {tierNumeral(current.tier)}
                     </span>
@@ -154,42 +187,28 @@ export function BannerBuilder({
                 )}
               </button>
 
-              {/* One press to empty a filled slot, beside the row rather than
-                  inside it: nested, its hit area would sit on top of the one
-                  that opens the emblem, and the two would be a slot emptied by
-                  a thumb aiming to change it. `Remove` inside the dialog stays
-                  -- that is the take-back for a reader who has already opened
-                  the slot -- but reaching it meant opening a four-field form to
-                  undo a mis-tap. */}
               {current && (
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="text-muted-foreground hover:text-destructive shrink-0"
-                  aria-label={`Clear emblem ${i + 1}, ${current.displayName}`}
-                  onClick={() => setSlot(i, null)}
+                  // Quiet at rest and on hover: removing is undoable, so it is
+                  // not an alarm and does not wear the alarm colour.
+                  className="text-muted-foreground hover:text-foreground absolute top-1/2 right-2 -translate-y-1/2"
+                  aria-label={`Remove emblem ${i + 1}, ${current.displayName}`}
+                  onClick={() => {
+                    const next = [...value]
+                    next[i] = null
+                    remove(
+                      next,
+                      `${catalog.statLabels.get(current.stat) ?? current.stat} removed`,
+                    )
+                  }}
                 >
                   <X aria-hidden />
                 </Button>
               )}
-
-              {current && !current.measurable && (
-                <Tooltip>
-                  {/* Base UI composes through `render`, not `asChild`. */}
-                  <TooltipTrigger render={<Badge variant="outline">no data</Badge>} />
-                  <TooltipContent>
-                    {/* This used to say the emblem scores nothing and to reroll it.
-                        That was false and it was advice: the client's own scoring
-                        list pays Lotuses Grabbed 176 per lotus. What is true is
-                        narrower and less useful, which is why it has to be said
-                        plainly rather than rounded up into a recommendation. */}
-                    No match-data source publishes {current.stat}, so this tool scores it
-                    as 0 and every banner carrying it is understated. It still pays in
-                    the client - the number here is a floor, not a verdict on the emblem.
-                  </TooltipContent>
-                </Tooltip>
-              )}
+              </div>
             </li>
           )
         })}
@@ -202,13 +221,38 @@ export function BannerBuilder({
           the moment it offers six stats instead of eighteen. Both were already
           where a reader can act on them, and a second copy is the one they
           compare against the first. */}
-      {value.some(Boolean) && (
-        <div className="flex justify-end">
-          <Button variant="ghost" size="sm" onClick={() => onChange(Array(slots).fill(null))}>
-            Clear
+      {/* One line under the banner: what was just removed, with its undo, on
+          the left; clearing everything on the right. Indented to the rows so
+          it reads as part of the banner rather than as the dialog's footer.
+          Reserved height, so the undo appearing does not move the footer. */}
+      <div className="flex min-h-8 items-center gap-2 pl-5">
+        <p aria-live="polite" className="text-muted-foreground min-w-0 flex-1 truncate text-xs">
+          {undo?.label}
+        </p>
+        {undo && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              onChange(undo.before)
+              setUndo(null)
+            }}
+          >
+            <Undo2 aria-hidden />
+            Undo
           </Button>
-        </div>
-      )}
+        )}
+        {value.some(Boolean) && !undo && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground"
+            onClick={() => remove(Array(slots).fill(null), "Banner cleared")}
+          >
+            Clear all
+          </Button>
+        )}
+      </div>
 
       {editing !== null && (
         <EmblemDialog

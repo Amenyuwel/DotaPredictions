@@ -126,16 +126,13 @@ export function SavedBanners({
 
   if (!signedIn) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm">Saved banners</CardTitle>
-        </CardHeader>
-        <CardContent className="text-muted-foreground text-xs">
-          {auth.status === "unavailable"
-            ? "This deployment has no sign-in configured, so nothing can be saved."
-            : "You are using the tool as a guest. Rankings work exactly the same; nothing is kept when you close the tab."}
-        </CardContent>
-      </Card>
+      // One caption line rather than a card, for the reason `SavedRosters`
+      // gives: a whole card to say "nothing is kept" outweighed the questions.
+      <p className="text-muted-foreground px-1 text-xs text-pretty">
+        {auth.status === "unavailable"
+          ? "Saving isn't available here."
+          : "Guest mode: everything works, nothing is saved."}
+      </p>
     )
   }
 
@@ -240,7 +237,7 @@ export function SavedBanners({
               aria-live="polite"
             >
               {!complete
-                ? `Finish a banner - ${slots} emblems on any one slot - before saving.`
+                ? `Finish a ${slots}-emblem banner to save it.`
                 : save.error
                   ? `Could not save: ${save.error.message}`
                   : ""}
@@ -282,7 +279,10 @@ export function SavedBanners({
             Could not load your saved banners: {saved.error.message}
           </p>
         ) : saved.data && saved.data.length > 0 ? (
-          <ul className="grid gap-2">
+          <ul className="grid grid-cols-1 gap-2">
+            {/* `grid-cols-1` for the reason the roster card next door gives: a
+                bare `grid` track is floored at the min-content of a `truncate`
+                span, which is its whole text. */}
             {saved.data.map((item) => (
               <li key={item.id} className="flex items-center gap-2">
                 {/* Outlined, for the reason the roster rows are: a ghost row
@@ -317,7 +317,7 @@ export function SavedBanners({
                       // emblems in another order are a different one, and the
                       // order is how two similar rows are told apart.
                       detail: (
-                        <ol className="grid gap-0.5">
+                        <ol className="grid grid-cols-1 gap-0.5">
                           {item.emblemIds.map((emblemId, slot) => (
                             <li key={`${emblemId}-${slot}`} className="truncate">
                               {slot + 1}. {nameOf(emblemId)}
@@ -452,9 +452,7 @@ function BannerRowDialog({
             <DialogHeader>
               <DialogTitle>{title}</DialogTitle>
               <DialogDescription>
-                {ROLE_LABEL[item.role]} · saved {timestamp(item.createdAt)}.
-                {showing &&
-                  " Nothing on this page has changed -- the three builders are as you left them."}
+                {ROLE_LABEL[item.role]} · saved {timestamp(item.createdAt)}
               </DialogDescription>
             </DialogHeader>
 
@@ -471,7 +469,7 @@ function BannerRowDialog({
               ) : ranked.error ? (
                 <RunError error={ranked.error} />
               ) : ranked.data?.best ? (
-                <ResultPanel answer={ranked.data} />
+                <ResultPanel answer={ranked.data} stage={run.stage} />
               ) : (
                 <AwaitingInput compact>
                   No unit in this stage has a joint sample to score through this banner.
@@ -504,11 +502,12 @@ function BannerRowDialog({
                   ))}
                 </ol>
 
-                <p className="text-muted-foreground text-xs">
-                  {missing === 0
-                    ? "Ranked here, on its own. Your three builders are left alone."
-                    : `${missing} of these ${missing === 1 ? "emblem is" : "emblems are"} not in this run, and a banner short an emblem is a different banner rather than a rougher version of this one. There is nothing to rank.`}
-                </p>
+                {missing > 0 && (
+                  <p className="text-muted-foreground text-xs">
+                    {missing} {missing === 1 ? "emblem isn't" : "emblems aren't"} in this run,
+                    so this banner can't be ranked.
+                  </p>
+                )}
               </>
             )}
 

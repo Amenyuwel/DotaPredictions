@@ -1,30 +1,30 @@
 import { Caveats } from "@/components/caveats"
 import { EmblemCard } from "@/components/emblem-card"
 import { TournamentContext } from "@/components/tournament-context"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 import type { EmblemCatalog } from "@/lib/emblem-catalog"
-import { points } from "@/lib/format"
-import { cn } from "@/lib/utils"
-import { unitName } from "@/lib/labels"
-import type { BannerAnswer, RankedBanner } from "@/types/run"
+import { interval, points, range } from "@/lib/format"
+import { verdictFor } from "@/lib/ranking"
+import type { BannerAnswer, RankedBanner, Stage } from "@/types/run"
 
 /**
  * The other direction's answer: banners for a player, not players for a banner.
  *
- * What the model cannot see travels with the number rather than under it, the
- * same rule the unit list follows. The other rule it used to share is gone: the
- * unit list still marks an overlapping interval as tied, and this one no longer
- * does. Rows here are numbered by position either way, and the intervals are
- * printed, so the overlap is there to be read rather than said. What it adds is
- * the two facts that are specific to choosing a banner:
+ * Drawn inside the slot dialog, which already names the slot and the unit, so
+ * nothing here repeats them. What the model cannot see travels with the number,
+ * and an overlapping interval is marked tied -- the same two rules the unit
+ * list follows. What it adds is two facts specific to choosing a banner, each
+ * one line:
  *
  *  - **What the ORDER is worth.** Two emblem traits are positional, so the same
- *    five emblems have a best and a worst arrangement. The gap between them is
- *    the only part of this answer a user can act on without owning anything
- *    else, so it is stated as a measured number and not as advice.
+ *    five emblems have a best and a worst arrangement. The gap is the one part
+ *    of the answer a reader can act on without owning anything else.
  *  - **What was actually searched.** An exhaustive comparison and a screened one
- *    are different claims about the same list, and the reader is the only one
- *    who can decide whether the difference matters to them.
+ *    are different claims about the same list, so the counts stay.
+ *
+ * A wide, headed version of this panel (a title, a "what the order is worth"
+ * card with the losing banner drawn out, a paragraph on the search) was cut:
+ * nothing rendered it, and every fact it carried is in the two lines below.
  */
 /** How many banners the list shows. */
 const SHOWN = 2
@@ -32,23 +32,14 @@ const SHOWN = 2
 export function BannerResultPanel({
   answer,
   catalog,
-  compact = false,
   onTierChange,
   single = false,
+  stage,
 }: {
   answer: BannerAnswer
   catalog: EmblemCatalog
-  /**
-   * Drawn inside a dialog that already names the slot and the unit.
-   *
-   * Only the things that were being SAID TWICE go away: the heading repeats the
-   * dialog's title, and the worst order is a measured gap that does not need
-   * the losing banner drawn under it to be believed. The two banners sit side
-   * by side instead of stacked. Nothing that qualifies the number moves --
-   * the tie, the sample, the caveats are all still here, because a limit that
-   * only appears when a reader scrolls is a limit that does not appear.
-   */
-  compact?: boolean
+  /** Which stage the run is, so the team outlook can name its probabilities. */
+  stage: Stage | undefined
   /** Given only on the custom goal: the reader is naming the emblems they hold,
    * so every tier on screen is an input. The banner it happened on travels with
    * the change because the hand is that banner's five qualities -- which of
@@ -58,18 +49,13 @@ export function BannerResultPanel({
    * One banner, unnumbered.
    *
    * For the custom goal, where the list is being edited rather than read. Two
-   * banners a few points apart swap places the moment a tier changes -- the
-   * numbers are honest, but the card under the reader's cursor becomes a
-   * different banner between one click and the next, and the chip they just set
-   * has moved. A single answer cannot do that. Nothing is lost that the tie
-   * note does not already say: on this evidence the top of the list is a tie,
-   * so the second banner was never a runner-up to begin with.
+   * banners a few points apart swap places the moment a tier changes, and the
+   * chip the reader just set would move under the cursor. A single answer
+   * cannot do that.
    */
   single?: boolean
 }) {
   const best = answer.best
-  const unit = answer.unit
-  const nicks = unitName(unit.players)
 
   if (!best) {
     return (
@@ -81,43 +67,22 @@ export function BannerResultPanel({
 
   // Two rows, not ten. The top of this list is usually a tie, and a long column
   // of banners a reader cannot choose between reads as a ranking it is not.
-  //
-  // Nothing now says a tie happened at all on this panel: the sentence that
-  // carried the count is gone and so is the per-row badge. The intervals are
-  // still printed, so the overlap is readable, but it is not stated. Worth
-  // knowing if these rows ever start reading as "the two that won".
   const banners = [best, ...answer.alternatives].slice(0, single ? 1 : SHOWN)
   const orderGap = answer.worstOrder ? best.score - answer.worstOrder.score : null
+  const search = answer.search
 
   return (
-    <div className="space-y-4">
-      <div>
-        {!compact && (
-          <h2 className="font-heading text-base font-medium">
-            {answer.search.kind === "catalog"
-              ? `Aim for this banner for ${nicks}`
-              : `Best banners for ${nicks}`}
-          </h2>
-        )}
-        <p className={cn("text-muted-foreground text-sm", compact && "sr-only")}>
-          Scored on {answer.search.nGames} matches
-          {unit.players.length > 1
-            ? " where both of them played, using their combined score in each"
-            : " they played"}
-          .
-          {answer.search.kind === "catalog" &&
-            ` Every emblem in the game was considered - this does not assume you own anything.`}
-        </p>
-      </div>
-
-
-      <ul className={compact && !single ? "grid gap-2 sm:grid-cols-2" : "space-y-2"}>
+    <div className="space-y-3">
+      <ul className={single ? "space-y-2" : "grid grid-cols-1 gap-2 sm:grid-cols-2"}>
         {banners.map((banner, i) => (
           <BannerRow
             key={banner.bannerId}
             banner={banner}
             catalog={catalog}
             rank={i + 1}
+            // Off for the single custom banner: with nothing beside it, "tied"
+            // names a row the reader cannot see.
+            tied={!single && verdictFor(banner.bannerId, best.bannerId, answer.tied) === "tied"}
             numbered={!single}
             onTierChange={
               onTierChange && ((index, tier) => onTierChange(banner, index, tier))
@@ -126,84 +91,24 @@ export function BannerResultPanel({
         ))}
       </ul>
 
-      {answer.worstOrder && orderGap !== null && compact && (
+      {orderGap !== null && (
         <p className="text-muted-foreground text-xs">
-          Order matters: the same {answer.search.slots} emblems in the worst arrangement
-          score{" "}
-          <span className="text-foreground font-medium tabular-nums">
-            {points(answer.worstOrder.score)}
-          </span>
-          , so putting them in this order is worth{" "}
+          This order adds{" "}
           <span className="text-foreground font-medium tabular-nums">{points(orderGap)}</span>{" "}
-          and costs nothing.
+          over the worst one.
         </p>
       )}
 
-      {answer.worstOrder && orderGap !== null && !compact && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">What the order is worth</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <p className="text-muted-foreground text-sm">
-              The same {answer.search.slots} emblems in their worst order score{" "}
-              <span className="text-foreground font-medium tabular-nums">
-                {points(answer.worstOrder.score)}
-              </span>
-              , so arranging them is worth{" "}
-              <span className="text-foreground font-medium tabular-nums">
-                {points(orderGap)}
-              </span>{" "}
-              and costs nothing. Vampiric takes 10% from each neighbour and Benevolent pays
-              each 20%.
-            </p>
-            <Banner banner={answer.worstOrder} catalog={catalog} />
-          </CardContent>
-        </Card>
-      )}
+      <TournamentContext {...answer.tournamentContext} stage={stage} />
 
-      <TournamentContext {...answer.tournamentContext} />
-
-      {/* How much was actually compared, in counts rather than in the
-          vocabulary of the search. The two directions compare different things,
-          so neither sentence stands in for the other -- but a reader only needs
-          to know how wide the net was and how carefully the finalists were
-          checked. */}
-      {/* In a dialog this is one line of counts. The prose version above it is
-          still rendered for a screen reader, because "what was compared" is not
-          decoration -- it is the difference between an exhaustive answer and a
-          screened one, and a sighted reader gets it here in numbers. */}
-      {compact ? (
-        <p className="text-muted-foreground text-xs">
-          {answer.search.nGames} matches ·{" "}
-          {answer.search.kind === "catalog"
-            ? `${answer.search.candidates.toLocaleString()} banners compared · top ${answer.search.statsConsidered} of ${answer.search.statsTotal} stats`
-            : `${answer.search.arrangements.toLocaleString()} arrangements compared`}{" "}
-          · mirrored pairs shown once
-        </p>
-      ) : (
-      <p className="text-muted-foreground text-xs">
-        {answer.search.kind === "inventory" ? (
-          <>
-            Checked every one of the {answer.search.arrangements.toLocaleString()} ways to
-            arrange your {answer.search.inventory} emblems.
-            {answer.search.rescored < answer.search.arrangements
-              ? ` The best ${answer.search.rescored} were then re-checked much more carefully.`
-              : ""}
-          </>
-        ) : (
-          <>
-            Compared {answer.search.candidates.toLocaleString()} possible banners built from
-            the {answer.search.catalog} emblems this stage can make, then re-checked the top{" "}
-            {answer.search.rescored} in much more detail. To stay fast, only the{" "}
-            {answer.search.statsConsidered} most valuable stats of {answer.search.statsTotal}{" "}
-            went into that comparison.
-          </>
-        )}{" "}
-        Flipping a banner upside down scores the same, so only one of each mirrored pair is
-        shown.
+      {/* The search in counts. "Top N of M stats" stays because it is the
+          difference between an exhaustive answer and a screened one. */}
+      <p className="text-muted-foreground text-xs tabular-nums">
+        {search.nGames} matches ·{" "}
+        {search.kind === "catalog"
+          ? `${search.candidates.toLocaleString()} banners compared · top ${search.statsConsidered} of ${search.statsTotal} stats`
+          : `${search.arrangements.toLocaleString()} orders compared`}
       </p>
-      )}
 
       <Caveats items={answer.caveats} />
     </div>
@@ -215,41 +120,47 @@ export function BannerResultPanel({
  * point estimate and are numbered that way, because a reader needs to say "the
  * second one" out loud.
  *
- * Nothing on the row says whether the interval separates it from the one above.
- * A `tied` badge sat between the interval and the score and said exactly that;
- * it is gone, and with it the last tie marker on this panel. What is left is the
- * interval itself -- two rows whose ranges overlap are not ordered by this
- * evidence, and a reader now has to read the numbers to see it.
+ * The number stays on a tied row, unlike the unit list, because the two rows are
+ * drawn side by side and "the second one" is how a reader points at one. The
+ * `tied` badge is what says the order between them is not evidence.
  */
 function BannerRow({
   banner,
   catalog,
   rank,
+  tied,
   numbered = true,
   onTierChange,
 }: {
   banner: RankedBanner
   catalog: EmblemCatalog
   rank: number
+  /** The server's overlap verdict against the first banner, via `verdictFor`. */
+  tied: boolean
   /** Off where there is only one banner: a lone "1" ranks nothing. */
   numbered?: boolean
   onTierChange?: (index: number, tier: string) => void
 }) {
   return (
     <li className="rounded-lg border p-3">
-      <div className="mb-2 flex items-center gap-3">
+      {/* Score first, its interval directly under it -- the same shape as every
+          other figure in the tool. On one line beside the rank, the interval
+          and the tie badge were squeezed until the range itself was clipped. */}
+      <div className="mb-2 flex items-start gap-3">
         {numbered && (
-          <span className="font-heading w-6 shrink-0 text-center text-lg leading-none font-semibold tabular-nums">
+          <span className="font-heading w-6 shrink-0 text-center text-lg leading-tight font-semibold tabular-nums">
             {rank}
           </span>
         )}
-        {/* One line, never two. The interval is the row's only qualifier now,
-            and broken over two lines in a two-column grid it stops reading as
-            one range and starts reading as a stray "90%" under a number. */}
-        <p className="text-muted-foreground min-w-0 flex-1 text-xs whitespace-nowrap">
-          {points(banner.ci.lo)} - {points(banner.ci.hi)} at 90%
-        </p>
-        <span className="text-sm font-semibold tabular-nums">{points(banner.score)}</span>
+        <div className="min-w-0 flex-1">
+          <p className="flex items-center gap-2 text-sm font-semibold tabular-nums">
+            {points(banner.score)}
+            {tied && <Badge variant="secondary">tied</Badge>}
+          </p>
+          <p className="text-muted-foreground text-xs tabular-nums">
+            {rank === 1 ? interval(banner.ci) : range(banner.ci)}
+          </p>
+        </div>
       </div>
       <Banner banner={banner} catalog={catalog} onTierChange={onTierChange} />
     </li>

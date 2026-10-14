@@ -62,7 +62,10 @@ export function Choice({
     <label
       {...rest}
       className={cn(
-        "flex min-h-11 flex-1 cursor-pointer items-center gap-2 rounded-xl border px-3 py-2 text-sm transition-[color,background-color,border-color,box-shadow]",
+        // The same 1px press as `Button`: these are the pieces a reader picks
+        // up and places, and a chip that does not move under a finger reads as
+        // a label rather than as something that was just chosen.
+        "flex min-h-11 flex-1 cursor-pointer items-center gap-2 rounded-xl border px-3 py-2 text-sm transition-[color,background-color,border-color,box-shadow,transform] active:translate-y-px",
         "hover:bg-accent has-[:focus-visible]:border-ring has-[:focus-visible]:ring-ring/50 has-[:focus-visible]:ring-3",
         checked
           ? "border-ring bg-secondary font-medium shadow-xs"

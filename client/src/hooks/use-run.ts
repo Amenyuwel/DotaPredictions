@@ -27,8 +27,8 @@ const FALLBACK_CACHE_SECONDS = 30
  * Retries are off for 404 because "nothing published yet" is a state to
  * render, not a failure to retry.
  */
-export function useRun(tournamentId?: string, stage?: Stage) {
-  return useQuery(runQueryOptions(tournamentId, stage))
+export function useRun(tournamentId?: string, stage?: Stage, enabled = true) {
+  return useQuery({ ...runQueryOptions(tournamentId, stage), enabled })
 }
 
 /**

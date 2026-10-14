@@ -69,12 +69,24 @@ export function RunHeader({
             rather than an overflow. From `md` up the wrapper is `w-auto` and
             these sit inline again, exactly as before. */}
         <div className="flex w-full items-center gap-2 md:w-auto md:gap-3">
-          <h1 className="font-heading text-base font-semibold tracking-tight">
+          {/* One step above a dialog title (16px), so the page's name is not
+              the same size as the box that opens over it. */}
+          <h1 className="font-heading text-xl font-semibold tracking-tight">
             DotaPredictions
           </h1>
-          <Badge variant="secondary">{tournamentLabel(run.tournamentId)}</Badge>
+          {/* Plain text, not a pill: a chip beside the stage menu read as a
+              second control, and it does nothing. */}
+          <span className="text-muted-foreground text-sm font-medium">
+            {tournamentLabel(run.tournamentId)}
+          </span>
 
-          <div className="ml-auto md:hidden">{menu}</div>
+          {/* Help rides beside the menu on a phone rather than inside it: the
+              FAQ is where a stranger finds out what the page is, and one more
+              tap behind a hamburger is where nobody looks. */}
+          <div className="ml-auto flex items-center gap-1 md:hidden">
+            {help}
+            {menu}
+          </div>
         </div>
 
         {stages}

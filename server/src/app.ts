@@ -87,7 +87,16 @@ function serveClient(app: Express): void {
   if (!existsSync(dist)) return
 
   app.use(express.static(dist))
-  app.get(/^(?!\/api\/).*/, (_req, res) => {
+  // The SPA shell for routes only. A path ending in a file extension that
+  // static did not find is a missing FILE, and answering it with index.html
+  // and a 200 hid that: every <img> for an absent player photo downloaded the
+  // HTML page, failed to decode, and was asked for again on the next render.
+  // A 404 says what happened, and is what an image's onError expects.
+  app.get(/^(?!\/api\/).*/, (req, res) => {
+    if (/\.[a-z0-9]+$/i.test(req.path)) {
+      res.status(404).end()
+      return
+    }
     res.sendFile(`${dist}/index.html`)
   })
 }

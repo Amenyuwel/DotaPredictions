@@ -64,6 +64,11 @@ export function AccountPage() {
         <ThemeMenu />
       </header>
 
+      {/* A main landmark and an h1, so a screen-reader user can jump to the
+          content and knows which page they are on. */}
+      <main className="grid gap-4">
+      <h1 className="font-heading text-xl font-semibold">Your account</h1>
+
       {auth.status === "loading" ? (
         // The identity card is what resolves into this space, so that is the
         // shape held open. The page has nothing else above the fold.
@@ -85,9 +90,8 @@ export function AccountPage() {
           <ShieldAlert aria-hidden />
           <AlertTitle>You are not signed in</AlertTitle>
           <AlertDescription>
-            Rankings work exactly the same as a guest - the model does not know or care who
-            is asking. Signing in buys one thing: banners and rosters that survive closing
-            the tab. Use the sign-in button on{" "}
+            Answers are the same as a guest. Sign in to keep saved banners and rosters,
+            using the button on{" "}
             <a className="underline" href="/">
               the tool
             </a>
@@ -97,6 +101,7 @@ export function AccountPage() {
       ) : (
         <SignedIn auth={auth} />
       )}
+      </main>
     </div>
   )
 }
@@ -304,7 +309,7 @@ function GroupCard({ group, run }: { group: Group; run: CurrentRun | undefined }
                       setPending({
                         title: `Delete ${banner.label || `this ${ROLE_LABEL[banner.role].toLowerCase()} banner`}?`,
                         detail: (
-                          <ol className="grid gap-0.5">
+                          <ol className="grid grid-cols-1 gap-0.5">
                             {banner.emblemIds.map((emblemId, slot) => (
                               <li key={`${emblemId}-${slot}`} className="truncate">
                                 {slot + 1}. {emblemName.get(emblemId) ?? <code>{emblemId}</code>}
@@ -338,7 +343,7 @@ function GroupCard({ group, run }: { group: Group; run: CurrentRun | undefined }
                 <li key={roster.id} className="flex items-start gap-2">
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm">{roster.label || "Roster"}</p>
-                    <dl className="text-muted-foreground mt-0.5 grid gap-x-3 text-xs sm:grid-cols-3">
+                    <dl className="text-muted-foreground mt-0.5 grid grid-cols-1 gap-x-3 text-xs sm:grid-cols-3">
                       {ROLE_ORDER.map((role) => (
                         <div key={role} className="truncate">
                           <dt className="inline">{ROLE_LABEL[role]}: </dt>
@@ -364,7 +369,7 @@ function GroupCard({ group, run }: { group: Group; run: CurrentRun | undefined }
                       setPending({
                         title: `Delete ${roster.label || "this roster"}?`,
                         detail: (
-                          <dl className="grid gap-0.5">
+                          <dl className="grid grid-cols-1 gap-0.5">
                             {ROLE_ORDER.map((role) => (
                               <div key={role}>
                                 <dt className="inline">{ROLE_LABEL[role]}: </dt>

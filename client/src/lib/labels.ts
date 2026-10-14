@@ -28,8 +28,18 @@ export const ROLE_LABEL: Record<FantasyRole, string> = {
  * Three components drew this string and each joined it by hand; the separator
  * is a decision, so it is made once. `routes/optimize.ts` spells the same pair
  * into an error sentence server-side and is the one copy outside this file.
+ *
+ * In lane order, whatever order the players arrived in. The picker lists a duo
+ * carry first and the server's answers did not, so one pair was "Yatoro &
+ * Collapse" on the card a reader tapped and "Collapse & Yatoro" on the answer
+ * it produced -- close enough to look like the same unit, far enough to make a
+ * reader check.
  */
-export const unitName = (players: Player[]) => players.map((p) => p.nick).join(" & ")
+export const unitName = (players: Player[]) =>
+  [...players]
+    .sort((a, b) => LANE_ORDER.indexOf(a.lane) - LANE_ORDER.indexOf(b.lane))
+    .map((p) => p.nick)
+    .join(" & ")
 
 /** Stage key -> the words a reader sees. Three places showed this pair -- the
  * header, the switcher and the saved list -- and a hand-typed "Main Event" in

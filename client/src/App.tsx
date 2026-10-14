@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react"
+import { useMemo, useRef, useState, type ReactNode } from "react"
 
 import { AccountMenu } from "@/components/account-menu"
 import { AnswerBar, type AnswerSummary } from "@/components/answer-bar"
@@ -26,8 +26,16 @@ import {
 } from "@/components/ui/dialog"
 import { Skeleton, SkeletonPanel } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { ApiError } from "@/lib/api"
 import { buildCatalog } from "@/lib/emblem-catalog"
-import { points } from "@/lib/format"
+import {
+  clearStageChoice,
+  isStale,
+  readStageChoice,
+  storeStageChoice,
+  type StageChoice,
+} from "@/lib/stage-choice"
+import { day, matchCount, points, timestamp } from "@/lib/format"
 import { ROLE_DETAIL, ROLE_LABEL, ROLE_ORDER } from "@/lib/labels"
 import { rosterTotal, type Roster } from "@/lib/roster"
 import { useMediaQuery } from "@/hooks/use-media-query"
@@ -35,9 +43,13 @@ import { useTarget } from "@/hooks/use-target"
 import { useRank } from "@/hooks/use-rank"
 import { useRun } from "@/hooks/use-run"
 import { useSession } from "@/hooks/use-session"
-import type { Emblem, FantasyRole, Player, Stage } from "@/types/run"
+import type { Emblem, FantasyRole, Player, Stage, Team } from "@/types/run"
 
 const EMPTY_ROSTER: Roster = { core: null, mid: null, support: null }
+
+/** The stage a cold load opens on when nothing is remembered on this device,
+ * or what was remembered has gone stale. See the `useRun` call in `App`. */
+const DEFAULT_STAGE: Stage = "group"
 
 /** Both tabs ask their question three times, once per fantasy slot, so the
  * empty state is the same shape on either side. */
@@ -83,14 +95,44 @@ const sized = (banner: (Emblem | null)[], slots: number): (Emblem | null)[] =>
  * number.
  */
 export default function App() {
-  // Null means "whatever the server considers newest", which is what a cold
-  // load asks. It becomes concrete the moment the reader picks a stage.
-  const [selected, setSelected] = useState<{ tournamentId: string; stage: Stage } | null>(
-    null,
-  )
-  const { data, isPending, error } = useRun(selected?.tournamentId, selected?.stage)
+  // The stage last picked on this device, or null for the default (below).
+  // `restored` marks a choice read back from storage rather than made in this
+  // visit: only a restored choice can be stale, and only it is dropped for
+  // being so.
+  const [selected, setSelected] = useState<StageChoice | null>(readStageChoice)
+  const [restored, setRestored] = useState(() => selected !== null)
+  // A cold load opens on the Group Stage, not on whatever was published last.
+  // The tool's first question of an event is the group roster, and landing a
+  // reader on the Main Event before it has been drawn for them -- or after
+  // they came for the group answer -- meant a stage switch before anything
+  // else. The newest run of any stage is the fallback only when no Group Stage
+  // run exists at all; asking for one that is missing must not end on an error
+  // page when another stage could answer.
+  const preferred = useRun(selected?.tournamentId, selected?.stage ?? DEFAULT_STAGE)
+  const noDefault =
+    selected === null && preferred.error instanceof ApiError && preferred.error.status === 404
+  const fallback = useRun(undefined, undefined, noDefault)
+  const { data, isPending, error } = noDefault ? fallback : preferred
+
+  // A remembered stage that no longer answers -- its run is gone, or a newer
+  // tournament has been published since -- is forgotten, and the page falls
+  // back to the default. Adjusted during render rather than in an effect, so
+  // the stale stage is never painted first.
+  if (
+    restored &&
+    selected &&
+    ((preferred.error instanceof ApiError && preferred.error.status === 404) ||
+      isStale(selected, preferred.data?.available))
+  ) {
+    clearStageChoice()
+    setSelected(null)
+    setRestored(false)
+  }
   const auth = useSession()
-  const [tab, setTab] = useState("banner")
+  // The roster tab is the front door: three taps to a figure, against
+  // twenty-odd for a banner, and a visitor who has not rolled anything yet
+  // has no banner to bring. The banner question is one tap along.
+  const [tab, setTab] = useState("roster")
 
   // The FAQ's open state, held here rather than inside the header button:
   // the dialog is a sibling of the page rather than a child of a control in
@@ -110,6 +152,7 @@ export default function App() {
   // once and put in one of two places.
   const wide = useMediaQuery("(min-width: 64rem)")
   const [answerOpen, setAnswerOpen] = useState(false)
+  const answerTitleRef = useRef<HTMLHeadingElement>(null)
 
   // One banner per fantasy slot, each an ORDERED array with a null for every
   // slot not filled yet. Nulls are held in place rather than closed up: an
@@ -187,8 +230,8 @@ export default function App() {
    * the one line that fits above a thumb. */
   const answerHint =
     tab === "banner"
-      ? "Build a banner for any slot to see which units score best through it."
-      : "Pick a core, a mid and a support to see what the roster is worth."
+      ? "Enter a banner to see who should wear it."
+      : "Pick a core, a mid and a support."
 
   /**
    * The answer itself, written once.
@@ -200,7 +243,13 @@ export default function App() {
    */
   const answer =
     tab === "banner" ? (
-      <BannerAnswers banners={banners} ranks={ranks} slots={slots} />
+      <BannerAnswers
+        banners={banners}
+        ranks={ranks}
+        slots={slots}
+        teams={data?.teams}
+        stage={data?.run.stage}
+      />
     ) : (
       <RosterAnswer
         roster={roster}
@@ -208,6 +257,7 @@ export default function App() {
         run={run}
         slots={slots}
         catalog={catalog}
+        onAskBanner={() => setTab("banner")}
       />
     )
 
@@ -248,8 +298,10 @@ export default function App() {
    * team in the group stage is not necessarily in the main event, and one that
    * is not would be a selection that cannot be scored.
    */
-  function selectRun(next: { tournamentId: string; stage: Stage }) {
+  function selectRun(next: StageChoice) {
     setSelected(next)
+    setRestored(false)
+    storeStageChoice(next)
     setBanners(EMPTY_BANNERS)
     setRoster(EMPTY_ROSTER)
   }
@@ -315,12 +367,20 @@ export default function App() {
 
       <main className="mx-auto grid w-full max-w-6xl grow gap-6 px-4 py-6 content-start sm:px-6 sm:py-8 lg:grid-cols-[minmax(0,24rem)_1fr]">
         <Tabs value={tab} onValueChange={(next) => setTab(next as string)} className="flex flex-col gap-4">
+          {/* The wide layout's answer column opens on an orientation panel;
+              a phone has no column, so the one sentence that says what the
+              page is for goes above the question instead. */}
+          {!wide && (
+            <p className="text-muted-foreground text-sm text-pretty">
+              See which banner each of your fantasy slots should roll for.
+            </p>
+          )}
           <TabsList className="w-full">
-            <TabsTrigger value="banner" className="flex-1">
-              I have a banner
-            </TabsTrigger>
             <TabsTrigger value="roster" className="flex-1">
               My roster
+            </TabsTrigger>
+            <TabsTrigger value="banner" className="flex-1">
+              I have a banner
             </TabsTrigger>
           </TabsList>
 
@@ -451,12 +511,31 @@ export default function App() {
             {/* Capped against the viewport rather than given a height, and
                 scrolled inside: a roster answer is a total and three cards, and
                 the ranked list is longer still. */}
-            <DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-2xl">
+            {/* Focus lands on the title, not on the first card. Base UI's
+                default is the first tabbable element, which here is the Core
+                card -- and its focus ring, drawn the moment the dialog opened,
+                read as Core having been selected. The title is also what a
+                screen reader should announce first. */}
+            <DialogContent
+              initialFocus={answerTitleRef}
+              className="max-h-[85dvh] overflow-y-auto sm:max-w-2xl"
+            >
               <DialogHeader>
-                <DialogTitle>{answerHeading}</DialogTitle>
+                <DialogTitle ref={answerTitleRef} tabIndex={-1} className="outline-none">
+                  {answerHeading}
+                </DialogTitle>
               </DialogHeader>
 
               {answer}
+
+              {/* The footer's date is under this dialog, so the dialog carries
+                  its own: an answer read with no date on screen is
+                  indistinguishable from a stale one. */}
+              <p className="text-muted-foreground border-t pt-3 text-xs">
+                {day(data.run.dataWindow.from)} – {day(data.run.dataWindow.to)},{" "}
+                {matchCount(data.run.dataWindow.matchCount)} · Published{" "}
+                {timestamp(data.run.createdAt)}
+              </p>
             </DialogContent>
           </Dialog>
         </>
@@ -524,19 +603,21 @@ function BannerAnswers({
   banners,
   ranks,
   slots,
+  teams,
+  stage,
 }: {
   banners: Record<FantasyRole, (Emblem | null)[]>
   ranks: Record<FantasyRole, ReturnType<typeof useRank>>
   slots: number
+  teams: Team[] | undefined
+  stage: Stage | undefined
 }) {
   const placed = (r: FantasyRole) => banners[r].filter(Boolean).length
 
   if (ROLE_ORDER.every((r) => placed(r) === 0)) {
     return (
       <AwaitingInput>
-        Build a banner for any of the three slots to see which units score best through
-        it. Each is {slots} emblems and each is scored on its own - core and support are
-        duos, mid is one player.
+        Enter a banner for any slot to see who scores best wearing it.
       </AwaitingInput>
     )
   }
@@ -568,11 +649,11 @@ function BannerAnswers({
         if (!query.data?.best) {
           return (
             <AwaitingInput compact>
-              No unit in this stage has a joint sample to score through this banner.
+              No unit has enough games to score this banner.
             </AwaitingInput>
           )
         }
-        return <ResultPanel answer={query.data} />
+        return <ResultPanel answer={query.data} teams={teams} stage={stage} />
       }}
     />
   )

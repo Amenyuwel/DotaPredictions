@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 
-import { supabase } from "@/lib/supabase"
+import { authConfigured, getSupabase } from "@/lib/supabase"
 import type { AuthState } from "@/hooks/use-session"
 
 /**
@@ -41,10 +41,12 @@ export function useAdmin(session: AuthState): AdminState {
   const userId = session.status === "user" ? session.session.user.id : null
 
   useEffect(() => {
-    if (!userId || !supabase) return
+    if (!userId) return
 
     let live = true
-    void supabase
+    void getSupabase().then((supabase) => {
+      if (!supabase) return
+      return supabase
       .from("admins")
       .select("user_id")
       .eq("user_id", userId)
@@ -56,6 +58,7 @@ export function useAdmin(session: AuthState): AdminState {
         // leads to a 403 is worse than no link.
         setResolved({ userId, isAdmin: !error && Boolean(data) })
       })
+    })
 
     return () => {
       live = false
@@ -71,7 +74,7 @@ export function useAdmin(session: AuthState): AdminState {
   // the four answers follow from the session alone and need no round trip, and
   // routing them through `setState` would render "loading" first and then the
   // answer -- a flicker on every page load, for a question already answered.
-  if (session.status === "unavailable" || !supabase) return { status: "unavailable" }
+  if (session.status === "unavailable" || !authConfigured) return { status: "unavailable" }
   if (session.status === "loading") return { status: "loading" }
   if (!userId) return { status: "not-admin" }
   if (resolved?.userId !== userId) return { status: "loading" }

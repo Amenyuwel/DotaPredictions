@@ -44,15 +44,30 @@ export function RunError({ error }: { error: unknown }) {
     <Alert variant={notPublished ? "default" : "destructive"}>
       <AlertTitle>
         {notPublished
-          ? "No run published yet"
+          ? "No projections published for this stage yet"
           : unreachable
-            ? "Cannot reach the compute server"
-            : "The server rejected the request"}
+            ? "Projections are unavailable right now"
+            : "That request could not be answered"}
       </AlertTitle>
       <AlertDescription className="space-y-2">
+        {/* A visitor gets the situation and what to expect; nothing here is
+            theirs to fix, so a shell command would read as the site being
+            broken AND being their problem. The fix is printed for whoever
+            runs the dev server, because they are the one person who can act on
+            it. */}
         {notPublished && (
           <p>
-            The engine has not published a snapshot for this tournament and stage. Run{" "}
+            Numbers appear once this stage is published.
+          </p>
+        )}
+        {unreachable && (
+          <p>
+            The server isn't answering. Try again in a minute.
+          </p>
+        )}
+        {import.meta.env.DEV && notPublished && (
+          <p>
+            Dev: run{" "}
             <code className="bg-muted rounded px-1 py-0.5 text-xs">
               python -m scripts.publish
             </code>{" "}
@@ -60,17 +75,17 @@ export function RunError({ error }: { error: unknown }) {
             reload.
           </p>
         )}
-        {unreachable && (
+        {import.meta.env.DEV && unreachable && (
           <p>
-            Start it with <code className="bg-muted rounded px-1 py-0.5 text-xs">npm run dev</code>{" "}
-            in <code className="bg-muted rounded px-1 py-0.5 text-xs">server/</code>. Nothing is
-            shown until it answers, because a guessed number is worse than none.
+            Dev: start it with{" "}
+            <code className="bg-muted rounded px-1 py-0.5 text-xs">npm run dev</code> in{" "}
+            <code className="bg-muted rounded px-1 py-0.5 text-xs">server/</code>.
           </p>
         )}
         {/* The server's sentence, not one written here. It is the side that
             knows which of its own rules the request broke. */}
         {!notPublished && api?.reason && <p>{api.reason}</p>}
-        {error instanceof Error && (
+        {import.meta.env.DEV && error instanceof Error && (
           <p className="text-muted-foreground font-mono text-xs">{error.message}</p>
         )}
       </AlertDescription>
@@ -98,7 +113,7 @@ export function AwaitingInput({
   return (
     <div
       className={cn(
-        "text-muted-foreground rounded-lg border border-dashed text-center",
+        "text-muted-foreground rounded-lg border border-dashed text-center text-balance",
         compact ? "px-4 py-4 text-xs" : "p-6 text-sm",
       )}
     >

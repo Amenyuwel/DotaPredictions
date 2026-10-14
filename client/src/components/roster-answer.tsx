@@ -1,6 +1,8 @@
+import { ArrowRight } from "lucide-react"
+
 import { SlotTargetCard } from "@/components/slot-target-card"
-import { AwaitingInput } from "@/components/states"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
 import type { EmblemCatalog } from "@/lib/emblem-catalog"
 import { points } from "@/lib/format"
 import { ROLE_ORDER } from "@/lib/labels"
@@ -36,12 +38,16 @@ export function RosterAnswer({
   run,
   slots,
   catalog,
+  onAskBanner,
 }: {
   roster: Roster
   targets: Record<FantasyRole, BannerQuery>
   run: { tournamentId: string; stage: Stage } | undefined
   slots: number
   catalog: EmblemCatalog
+  /** Switches to the banner tab. Only the live page has one to switch to; the
+   * saved-roster dialog never shows the empty state, so it passes nothing. */
+  onAskBanner?: () => void
 }) {
   const total = rosterTotal(targets)
 
@@ -50,31 +56,29 @@ export function RosterAnswer({
   // column with a paragraph repeated with one word changed. One sentence until
   // there is something to be specific about.
   if (ROLE_ORDER.every((r) => roster[r] === null)) {
-    return (
-      <AwaitingInput>
-        Pick a core, a mid and a support. Each one gets the {slots} emblems that score
-        best for it out of the whole catalog -- the banner to go and roll for -- and the
-        three are added up.
-      </AwaitingInput>
-    )
+    return <Orientation slots={slots} onAskBanner={onAskBanner} />
   }
 
   return (
     <div className="space-y-4">
       {total !== null && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">Projected roster total</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-semibold tabular-nums">{points(total)}</p>
-            <p className="text-muted-foreground mt-1 text-xs">
-              Sum of each slot's realistic target, so it is what this roster is worth on a
-              hand of emblems an ordinary set of crafts leaves you with - not the ceiling.
-              Quality cannot be rerolled, so the perfect banner is a number to measure
-              against rather than one to plan for; each card opens on the whole ladder.
-              The game scores core, mid and support as separate averages, so there is
-              nothing for the slots to trade off against each other.
+        // Compendium gold, the answer's colour, and the only gold on this tab:
+        // the total is the output; the slot cards under it are its parts.
+        // Fill, no outline -- the fill is the signal.
+        <Card size="sm" data-answer className="ring-0">
+          <CardContent className="flex flex-col gap-1">
+            <p className="font-heading text-sm font-medium">Projected roster total</p>
+            <p className="mt-1 text-4xl leading-none font-semibold tracking-tight tabular-nums">
+              {points(total)}
+            </p>
+            {/* Where every other figure prints its interval, this one says why
+                it has none -- in the same caption slot, so the gap reads as a
+                stated limit rather than a missing line. The paragraph that used
+                to sit here (realistic rung, no quality rerolls, no trade-off
+                between slots) is the FAQ's "How is the roster total worked
+                out?", a tap away instead of 70 words under the number. */}
+            <p className="text-muted-foreground text-xs text-pretty">
+              Realistic targets, added up. Each slot shows its own range.
             </p>
           </CardContent>
         </Card>
@@ -97,5 +101,60 @@ export function RosterAnswer({
         ))}
       </div>
     </div>
+  )
+}
+
+/**
+ * The answer column before anything is picked, for a reader who arrived cold.
+ *
+ * This is the first thing a stranger from a Reddit link sees beside the
+ * pickers, and it used to be one dashed box repeating the instruction the
+ * pickers already gave. It now says what the tool answers, how to read the
+ * number it will print, and where the other question lives -- the three things
+ * the first answer assumes. No sample figure: an illustrative number on this
+ * page is indistinguishable from a real one, which is the one thing the tool
+ * promises never to print.
+ */
+function Orientation({ slots, onAskBanner }: { slots: number; onAskBanner?: () => void }) {
+  return (
+    <section
+      aria-labelledby="orientation-heading"
+      className="ring-foreground/10 space-y-5 rounded-xl p-5 ring-1 sm:p-6"
+    >
+      <div className="space-y-2">
+        <h3
+          id="orientation-heading"
+          className="font-heading text-lg leading-snug font-medium text-balance"
+        >
+          Which banner should each of your fantasy slots roll for?
+        </h3>
+        <p className="text-muted-foreground max-w-[30rem] text-sm text-pretty">
+          Pick a core, a mid and a support. Each gets the {slots}-emblem banner worth most
+          to it, from recent pro games and how far its team should go.
+        </p>
+      </div>
+
+      {/* Two terms, not three: the run date is already on every screen. */}
+      <dl className="grid max-w-[30rem] gap-3 text-sm sm:grid-cols-2 sm:gap-4">
+        <div>
+          <dt className="font-medium">The figure</dt>
+          <dd className="text-muted-foreground">Expected best series.</dd>
+        </div>
+        <div>
+          <dt className="font-medium">The range</dt>
+          <dd className="text-muted-foreground">90% likely. Overlapping ranges are tied.</dd>
+        </div>
+      </dl>
+
+      {onAskBanner && (
+        <div className="border-t pt-4">
+          <p className="text-muted-foreground text-sm">Already rolled a banner?</p>
+          <Button variant="outline" className="mt-2" onClick={onAskBanner}>
+            Rank who should wear it
+            <ArrowRight aria-hidden />
+          </Button>
+        </div>
+      )}
+    </section>
   )
 }

@@ -13,7 +13,7 @@
  * it has what it needs to answer.
  */
 import { ApiError } from "@/lib/api"
-import { supabase } from "@/lib/supabase"
+import { getSupabase } from "@/lib/supabase"
 import type {
   AdminConfig,
   ConfigOverlay,
@@ -47,6 +47,7 @@ export class AdminError extends ApiError {
  * hour later with no visible cause.
  */
 async function bearer(): Promise<string> {
+  const supabase = await getSupabase()
   if (!supabase) {
     throw new AdminError(
       "No sign-in is configured in this deployment",

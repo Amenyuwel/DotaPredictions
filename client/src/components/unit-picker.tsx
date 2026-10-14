@@ -1,5 +1,5 @@
 import { useId, useState } from "react"
-import { Plus, UserRound, X } from "lucide-react"
+import { Plus, Undo2, UserRound, X } from "lucide-react"
 
 import {
   Dialog,
@@ -85,6 +85,10 @@ export function UnitPicker({
   onSelect: (player: Player | null) => void
 }) {
   const [open, setOpen] = useState(false)
+  // The player the X just took out, so one press can put them back. Undo
+  // rather than a confirmation, the same trade as the banner builder: clearing
+  // is safe to reverse, and asking every time taxes the reader who meant it.
+  const [removed, setRemoved] = useState<Player | null>(null)
   // Three of these can be mounted at once (one full roster, three role
   // slots), and a bare string name would put all three radio groups' checks
   // into one group -- picking a mid would visually uncheck the chosen core.
@@ -118,16 +122,21 @@ export function UnitPicker({
 
   return (
     <div className="space-y-2">
-      {/* The clear is a SIBLING of the trigger, not a control inside it. Nested
-          inside, its hit area would sit on top of the one that opens the list,
-          and the two would be a slot emptied by a thumb aiming to change it --
-          the one mistake a control that deletes work must not make. */}
-      <div className="flex items-center gap-2">
+      {/* The clear sits INSIDE the row's outline but is not inside its button:
+          a sibling laid over the right edge, with the button padded clear of it
+          so their hit areas never overlap. Beside the row it made every filled
+          slot narrower than an empty one, so the column's right edge moved each
+          time a player was picked -- the same fix as the banner builder's X. */}
+      <div className="relative flex">
         <Button
           type="button"
           variant="outline"
           className={cn(
             "h-auto min-h-11 min-w-0 flex-1 justify-start py-2",
+            // Room for the overlaid control, whichever one is showing: the X
+            // (32px, 44px under a finger) or the wider Undo.
+            selected && "pr-12 pointer-coarse:pr-14",
+            !selected && removed && "pr-24",
             // Empty reads as a space waiting to be filled rather than as a
             // filled one reporting nothing -- the same rule, and the same
             // dashed edge, as the banner trigger on the other tab.
@@ -139,7 +148,10 @@ export function UnitPicker({
           {selected ? (
             <span className="flex min-w-0 items-center gap-2.5">
               <UnitAvatars unit={selectedUnit} />
-              <span className="flex min-w-0 flex-col items-start">
+              {/* `text-left`: a <button> centres its text, and these two lines
+                  are full-width so they can truncate -- so without it a short
+                  name floated in the middle of its row, off the avatars. */}
+              <span className="flex min-w-0 flex-col items-start text-left">
                 <span className="w-full truncate">{unitName(selectedUnit)}</span>
                 <span className="text-muted-foreground w-full truncate text-xs">
                   {selectedTeam?.name ?? `team ${selected.teamId}`}
@@ -154,20 +166,40 @@ export function UnitPicker({
           )}
         </Button>
 
-        {/* Only once there is something to take back. A control that is always
-            there and does nothing most of the time is a control a reader has to
-            decide about on every visit. `icon`, not `icon-sm`: it is a thumb
-            target next to a 44px row, and it deletes. */}
+        {/* Only once there is something to take back. Quiet, not red: the
+            removal is undoable, so it is not an alarm. */}
         {selected && (
           <Button
             type="button"
             variant="ghost"
             size="icon"
-            className="text-muted-foreground hover:text-destructive shrink-0"
-            aria-label={`Clear ${unitName(selectedUnit)}`}
-            onClick={() => onSelect(null)}
+            className="text-muted-foreground hover:text-foreground absolute top-1/2 right-2 -translate-y-1/2"
+            aria-label={`Remove ${unitName(selectedUnit)}`}
+            onClick={() => {
+              setRemoved(selected)
+              onSelect(null)
+            }}
           >
             <X aria-hidden />
+          </Button>
+        )}
+
+        {/* The undo takes the X's place in the now-empty row, so the card does
+            not grow a line to offer it. Gone the moment anything is picked. */}
+        {!selected && removed && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="absolute top-1/2 right-2 -translate-y-1/2"
+            aria-label={`Undo removing ${unitName(unitOf(players, removed.playerId))}`}
+            onClick={() => {
+              onSelect(removed)
+              setRemoved(null)
+            }}
+          >
+            <Undo2 aria-hidden />
+            Undo
           </Button>
         )}
       </div>
@@ -187,10 +219,9 @@ export function UnitPicker({
                 said unconditionally it would be an instruction about a state
                 the reader is not in. */}
             <DialogDescription>
-              One team, one card, in stage order.
-              {selected && " Click the chosen card again to empty the slot."}
+              {selected && "Tap the chosen card again to clear it. "}
               {hidden > 0 &&
-                ` ${hidden} ${hidden === 1 ? "team is" : "teams are"} not in this stage and cannot be scored against it.`}
+                `${hidden} ${hidden === 1 ? "team isn't" : "teams aren't"} in this stage.`}
             </DialogDescription>
           </DialogHeader>
 
@@ -211,6 +242,7 @@ export function UnitPicker({
                   name={groupName}
                   checked={checked}
                   onSelect={() => {
+                    setRemoved(null)
                     onSelect(first)
                     setOpen(false)
                   }}
@@ -221,6 +253,7 @@ export function UnitPicker({
                   // reader clicking this one again has said they want the slot
                   // empty.
                   onClear={() => {
+                    setRemoved(null)
                     onSelect(null)
                     setOpen(false)
                   }}
@@ -234,7 +267,7 @@ export function UnitPicker({
                     <UnitAvatars unit={unit} />
                   </span>
                   <span className="relative z-10 flex min-w-0 flex-col items-start gap-0.5">
-                    <span className="text-muted-foreground truncate text-2xs font-semibold tracking-[0.1em] uppercase">
+                    <span className="text-muted-foreground truncate text-2xs font-semibold tracking-[0.12em] uppercase">
                       {team.name}
                     </span>
                     <span className="w-full truncate">{unitName(unit)}</span>
@@ -309,15 +342,20 @@ function UnitAvatars({ unit }: { unit: Player[] }) {
  * border radius for free.
  */
 function TeamWatermark({ teamId }: { teamId: number }) {
-  const [failed, setFailed] = useState(false)
+  const src = `/teams/${teamId}.jpg`
+  const [failed, setFailed] = useState(() => MISSING_IMAGES.has(src))
   if (failed) return null
 
   return (
     <img
       aria-hidden
-      src={`/teams/${teamId}.jpg`}
+      src={src}
       alt=""
-      onError={() => setFailed(true)}
+      loading="lazy"
+      onError={() => {
+        MISSING_IMAGES.add(src)
+        setFailed(true)
+      }}
       className={cn(
         "pointer-events-none absolute inset-y-0 right-0 z-0 w-3/5 object-cover opacity-0",
         "transition-opacity duration-200 group-hover:opacity-100 group-has-[:focus-visible]:opacity-100 group-has-[:checked]:opacity-100",
@@ -326,6 +364,16 @@ function TeamWatermark({ teamId }: { teamId: number }) {
     />
   )
 }
+
+/**
+ * Image URLs that have already failed this session.
+ *
+ * Shared across every picker card and every open of the dialog: each face and
+ * team watermark remounts when the list reopens, and with only per-component
+ * state a missing photo was requested again every time -- dozens of requests
+ * per open for files that are not there. One failure is enough to know.
+ */
+const MISSING_IMAGES = new Set<string>()
 
 /**
  * One face: a real photo at `src` when it loads, a glyph in a circle
@@ -346,7 +394,7 @@ function Face({
   size: number
   fallback: React.ReactNode
 }) {
-  const [failed, setFailed] = useState(false)
+  const [failed, setFailed] = useState(() => src !== undefined && MISSING_IMAGES.has(src))
   const box = { width: size, height: size }
 
   if (!src || failed) {
@@ -369,7 +417,10 @@ function Face({
       loading="lazy"
       className="shrink-0 rounded-full object-cover object-top ring-1 ring-foreground/10"
       style={box}
-      onError={() => setFailed(true)}
+      onError={() => {
+        MISSING_IMAGES.add(src)
+        setFailed(true)
+      }}
     />
   )
 }
