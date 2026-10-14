@@ -1,8 +1,5 @@
-// Set before importing config.js, which resolves the environment once at
-// import time. dotenv does not overwrite a name already present, so these win
-// over the repo's own .env and this file does not depend on what is in it.
-process.env.SUPABASE_URL = "https://project-ref.supabase.co"
-process.env.SUPABASE_SECRET_KEY = "sb_secret_test"
+// First, before config.js resolves the environment -- see the module for why.
+import "./support/admin-env.js"
 
 import assert from "node:assert/strict"
 import { afterEach, test } from "node:test"
