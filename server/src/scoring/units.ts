@@ -14,7 +14,7 @@ import type { FantasyRole, Lane, Player, RunPayload } from "../validate.js"
 
 /** Which lanes make up each slot. The lane is the roster fact; `fantasyRole` is
  * the label the client puts on it, and the lane is what the samples carry. */
-export const LANES: Record<FantasyRole, Lane[]> = {
+const LANES: Record<FantasyRole, Lane[]> = {
   core: ["carry", "offlane"],
   mid: ["mid"],
   support: ["soft_support", "hard_support"],

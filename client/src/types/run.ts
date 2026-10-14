@@ -22,6 +22,8 @@ export type {
   Team,
 } from "@shared/run-types"
 
+import type { OverlayStatus } from "@/types/admin"
+
 import type {
   FantasyRole,
   Emblem,
@@ -63,10 +65,37 @@ export interface CurrentRun {
    * a picker built from `teams` would offer eight sides that were knocked out.
    * Same rule as the stage switcher: what cannot be answered is absent. */
   stageTeamIds: number[]
+  /**
+   * What an administrator has changed about this run since it was published,
+   * or null when it is being served exactly as the engine made it.
+   *
+   * On the wire rather than inferred, for the same reason `gatesForced` is:
+   * a reader acting on a projection is entitled to know that one of the numbers
+   * behind it was typed this afternoon and has not been through a crawl. An
+   * override that only the person who made it can see is the failure this whole
+   * stack is built against, wearing a friendlier face.
+   *
+   * Optional, because a browser can be replaying a cached response from a
+   * server that predates the field.
+   */
+  overlay?: OverlayStatus | null
   /** The server's own bounds, shipped so the client cannot offer a choice that
    * will be rejected. `maxInventory` is a latency budget, not a rule of the
    * game: owned emblems in `run.bannerSlots` slots is a permutation count. */
   limits: { maxInventory: number }
+  /**
+   * How long this response may be treated as current, in seconds -- the same
+   * number the server put in its own `Cache-Control`.
+   *
+   * An hour where no overlay can exist, and `overlayCacheSeconds` where one
+   * can. See `useRun`: the query cache has to honour this too, because a query
+   * that stays fresh past it never revalidates and the header expiring is
+   * never consulted.
+   *
+   * Optional, because a browser can be replaying a cached response from a
+   * server that predates the field.
+   */
+  cacheSeconds?: number
   available: AvailableRun[]
 }
 
@@ -228,4 +257,4 @@ export interface BannerAnswer {
   caveats: string[]
 }
 
-export type { Emblem as EmblemOption }
+

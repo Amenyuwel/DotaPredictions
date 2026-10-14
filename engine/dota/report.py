@@ -208,7 +208,7 @@ def print_roster_banners(analysis: Analysis, roster: FantasyRoster) -> None:
         console.print()
 
 
-def print_fantasy(analysis: Analysis, top_players: int = 12, variants: int = 5) -> None:
+def print_fantasy(analysis: Analysis, variants: int = 5) -> None:
     t = Table(title="Top fantasy rosters (sum of each player's E[best game])")
     t.add_column("#", justify="right")
     t.add_column("Supports (duo)")

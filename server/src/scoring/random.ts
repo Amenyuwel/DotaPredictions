@@ -59,7 +59,7 @@ export function sampleIndex(cdf: Float64Array, u: number): number {
  * has no Dirichlet. Shapes below 1 use the standard boost, though every call
  * here passes shape 1.
  */
-export function gamma(rng: () => number, shape: number): number {
+function gamma(rng: () => number, shape: number): number {
   if (shape < 1) return gamma(rng, shape + 1) * Math.pow(rng(), 1 / shape)
   const d = shape - 1 / 3
   const c = 1 / Math.sqrt(9 * d)

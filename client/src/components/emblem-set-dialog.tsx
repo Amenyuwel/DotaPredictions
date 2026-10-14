@@ -42,6 +42,7 @@ export function EmblemSetDialog({
   empty,
   title,
   description,
+  preview,
   children,
 }: {
   /** The trigger's whole label. Written by the caller, because "3 of 5 emblems"
@@ -52,6 +53,9 @@ export function EmblemSetDialog({
   title: string
   /** Optional: a set whose title says enough takes none. */
   description?: ReactNode
+  /** Drawn at the trigger's far end: what is in the set, at a glance. The
+   * summary still carries the count, so this is never the only signal. */
+  preview?: ReactNode
   /** The builder. Mounted only while open, so a dialog that is shut costs
    * nothing and reopens on the current value rather than on a stale draft. */
   children: ReactNode
@@ -73,6 +77,7 @@ export function EmblemSetDialog({
       >
         {empty ? <Plus aria-hidden /> : <Pencil aria-hidden />}
         {summary}
+        {preview && <span className="ml-auto flex items-center gap-1 pl-2">{preview}</span>}
       </Button>
 
       <DialogContent

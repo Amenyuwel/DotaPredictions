@@ -59,6 +59,7 @@ from dota.fantasy import (
 )
 from dota.optimize import enumerate_fantasy_rosters
 from dota.pipeline import SLOT_ROLES
+from dota.ratings import Ratings
 from dota.sources.base import PlayerGame
 from dota.titles import Titles
 from scripts.fixed_banner import _Shim, fixed_plan, load_banners
@@ -102,7 +103,7 @@ class Fit:
     reference_rating: float = 0.0
 
     @classmethod
-    def from_reports(cls, reports) -> "Fit":
+    def from_reports(cls, reports: list[factors_mod.FactorReport]) -> "Fit":
         out = cls()
         for r in reports:
             if r.name == "duration" and r.enabled:
@@ -118,7 +119,27 @@ class Fit:
         return out
 
 
-def event_minutes(corpus, league_name: str) -> float | None:
+@dataclass(frozen=True)
+class Draws:
+    """How hard to sample, and from where -- the knobs, separated from the data.
+
+    These five travel together everywhere and mean nothing apart: `seed` without
+    `n_sims` sets up a reproducible nothing, and `n_boot` without `seed` makes an
+    interval that moves between runs of the same command. Passing them as one
+    frozen value is also what stops the reproducibility from being accidental --
+    `score_slot` derives every generator it needs from `seed`, so two runs with
+    the same `Draws` give the same table and two with different ones differ for
+    a reason that is written down.
+    """
+
+    half_life: float
+    n_sims: int
+    n_boot: int
+    seed: int
+    variants: bool
+
+
+def event_minutes(corpus: pipeline.Corpus, league_name: str) -> float | None:
     """Median game length at the event itself, or None if it has not started."""
     lengths = [
         m.duration_seconds / 60.0
@@ -128,7 +149,9 @@ def event_minutes(corpus, league_name: str) -> float | None:
     return statistics.median(lengths) if len(lengths) >= 20 else None
 
 
-def expected_opponent_rating(outcome, ratings, team: str) -> float:
+def expected_opponent_rating(
+    outcome: bracket.BracketOutcome, ratings: Ratings, team: str
+) -> float:
     """Strength of the field this team expects to face, weighted by series."""
     faced = outcome.opponent_series.get(team) or {}
     total = sum(faced.values())
@@ -186,18 +209,26 @@ def score_slot(
     spec: dict[str, float],
     games: dict[int, list[PlayerGame]],
     gw: dict[int, float],
-    outcome,
-    ratings,
+    outcome: bracket.BracketOutcome,
+    ratings: Ratings,
     titles: Titles,
     fit: Fit,
     minutes_to: float | None,
-    *,
-    half_life: float,
-    n_sims: int,
-    n_boot: int,
-    seed: int,
-    variants: bool,
+    draws: Draws,
 ) -> SlotRow | None:
+    """E[best series] for one slot on one team, over the drawn bracket.
+
+    Returns None when the pair never appears in a game together, which is a
+    thing that happens -- a mid-season roster move leaves a duo with no joint
+    sample -- and is reported by the caller rather than scored as zero.
+
+    `outcome` supplies the series shapes this team can expect and the opposition
+    behind them, `fit` supplies the pipeline's own coefficients so nothing is
+    refitted here, and `draws` supplies the sampling budget. Each ablation in
+    `ABLATIONS` re-scores the same slot with one correction switched off, which
+    is what fills `SlotRow.variants` and makes "is this correction worth
+    anything" a number in the table rather than a claim in a docstring.
+    """
     team = cfg.roster.get(name)
     players = [team.by_role(r) for r in SLOT_ROLES[slot]]
     opp = expected_opponent_rating(outcome, ratings, name)
@@ -205,7 +236,7 @@ def score_slot(
     deciders = outcome.decider_samples.get(name, [])
 
     scored: dict[str, list] = {}
-    for label, flags in (ABLATIONS if variants else ABLATIONS[-1:]):
+    for label, flags in (ABLATIONS if draws.variants else ABLATIONS[-1:]):
         pg = (
             team_games(
                 cfg, games, players, fit=fit, minutes_to=minutes_to, rating_to=opp
@@ -231,15 +262,15 @@ def score_slot(
         flat = titles.flat_suffix_multiplier if flags["titles"] else 1.0
         vals = [s * flat for s, _, _ in rows]
         weights = (
-            recency_weights(rows, game_weight=gw, half_life_days=half_life)
+            recency_weights(rows, game_weight=gw, half_life_days=draws.half_life)
             if flags["recency"]
             else ([gw.get(mid, 1.0) for _, _, mid in rows] if gw else None)
         )
         proj = expected_best_series(
             vals,
             shapes,
-            rng=np.random.default_rng(seed),
-            n_sims=n_sims,
+            rng=np.random.default_rng(draws.seed),
+            n_sims=draws.n_sims,
             weights=weights,
             decider_samples=deciders if flags["titles"] else None,
             decider_bonus=titles.decider_bonus if flags["titles"] else 0.0,
@@ -249,15 +280,15 @@ def score_slot(
     label = ABLATIONS[-1][0]
     proj, vals, weights, plan, combined, rows, flags = scored[label]
     sd = lo = hi = 0.0
-    if n_boot:
+    if draws.n_boot:
         sd, lo, hi = best_series_interval(
             vals,
             shapes,
             weights=weights,
             decider_samples=deciders,
             decider_bonus=titles.decider_bonus,
-            n_boot=n_boot,
-            rng=np.random.default_rng(seed + 1),
+            n_boot=draws.n_boot,
+            rng=np.random.default_rng(draws.seed + 1),
         )
     pool = [g for p in players for g in games.get(p.account_id or -1, [])]
     return SlotRow(
@@ -403,6 +434,17 @@ def main() -> int:
     fit = Fit.from_reports(a.factor_reports)
     minutes_to = event_minutes(a.corpus, cfg.tournament.name)
 
+    # Fixed rather than taken from the clock: every slot on every team is scored
+    # from this one seed, so two teams' numbers differ because their games do
+    # and not because they were drawn from different streams.
+    draws = Draws(
+        half_life=args.half_life,
+        n_sims=args.period_sims,
+        n_boot=args.boot,
+        seed=20260820,
+        variants=not args.no_ablation,
+    )
+
     console.print(f"[bold]coach titles:[/bold] {escape(titles.describe())}")
     console.print(
         f"[bold]restating to:[/bold] "
@@ -467,11 +509,7 @@ def main() -> int:
                 titles,
                 fit,
                 minutes_to,
-                half_life=args.half_life,
-                n_sims=args.period_sims,
-                n_boot=args.boot,
-                seed=20260820,
-                variants=not args.no_ablation,
+                draws,
             )
             if r is None:
                 console.print(f"[yellow]no joint games sampled for {slot}/{name}[/yellow]")

@@ -8,7 +8,9 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint && node scripts/check-tone.mjs",
     "preview": "vite preview",
-    "check:tone": "node scripts/check-tone.mjs"
+    "check:tone": "node scripts/check-tone.mjs",
+    "build:watch": "vite build --watch",
+    "check:dead": "knip --no-config-hints"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
@@ -31,6 +33,7 @@
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "@vitejs/plugin-react": "^6.1.0",
+    "knip": "^6.35.1",
     "oxlint": "^1.79.0",
     "tailwindcss": "^4.3.3",
     "typescript": "~6.0.2",

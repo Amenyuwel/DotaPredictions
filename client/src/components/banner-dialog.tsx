@@ -1,5 +1,7 @@
 import { BannerBuilder } from "@/components/banner-builder"
 import { EmblemSetDialog } from "@/components/emblem-set-dialog"
+import { colorStyle } from "@/lib/emblem-catalog"
+import { cn } from "@/lib/utils"
 import type { Emblem, Scoring } from "@/types/run"
 
 /**
@@ -55,6 +57,29 @@ export function BannerDialog({
             : `${slots} of ${slots} placed`
       }
       title={`${role} banner`}
+      // The banner itself, small, beside its count. Folded down to "5 of 5
+      // placed", the one object the reader built was invisible next to the
+      // ranking it produced, and checking what a slot was wearing meant
+      // opening it. One weave per slot in banner order, the slot's own colour
+      // because that is fixed by role, dashed where nothing is placed yet --
+      // the same two states the builder draws inside.
+      preview={
+        placed > 0 &&
+        value.map((emblem, i) => {
+          const style = slotColors[i] ? colorStyle(slotColors[i]) : null
+          return (
+            <span
+              key={i}
+              aria-hidden
+              {...(emblem && style ? style.attrs : {})}
+              className={cn(
+                "size-6 rounded-md",
+                emblem && style ? style.swatch : "border-input border border-dashed",
+              )}
+            />
+          )
+        })
+      }
     >
       <BannerBuilder
         emblems={emblems}

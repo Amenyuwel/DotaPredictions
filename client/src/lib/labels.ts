@@ -28,8 +28,18 @@ export const ROLE_LABEL: Record<FantasyRole, string> = {
  * Three components drew this string and each joined it by hand; the separator
  * is a decision, so it is made once. `routes/optimize.ts` spells the same pair
  * into an error sentence server-side and is the one copy outside this file.
+ *
+ * In lane order, whatever order the players arrived in. The picker lists a duo
+ * carry first and the server's answers did not, so one pair was "Yatoro &
+ * Collapse" on the card a reader tapped and "Collapse & Yatoro" on the answer
+ * it produced -- close enough to look like the same unit, far enough to make a
+ * reader check.
  */
-export const unitName = (players: Player[]) => players.map((p) => p.nick).join(" & ")
+export const unitName = (players: Player[]) =>
+  [...players]
+    .sort((a, b) => LANE_ORDER.indexOf(a.lane) - LANE_ORDER.indexOf(b.lane))
+    .map((p) => p.nick)
+    .join(" & ")
 
 /** Stage key -> the words a reader sees. Three places showed this pair -- the
  * header, the switcher and the saved list -- and a hand-typed "Main Event" in
@@ -76,3 +86,28 @@ export const LANE_LABEL: Record<Lane, string> = {
  * always read. `LANE_LABEL`'s own key order would do it, but relying on the
  * declaration order of an object as a sort key is a rule nothing enforces. */
 export const LANE_ORDER: Lane[] = ["carry", "mid", "offlane", "soft_support", "hard_support"]
+
+/**
+ * A stat key as a reader sees it: `courier_kills` -> `Courier Kills`.
+ *
+ * The keys are the scoring table's own, and they stay exactly as they are
+ * everywhere they are SENT -- an emblem id is `stat:tier:trait`, so the key is
+ * load-bearing. This is only how the same stat is written down for a person.
+ *
+ * Deliberately the same transform the publisher applies when it builds an
+ * emblem's `displayName` (`stat.replace("_", " ").title()` in
+ * engine/scripts/publish.py, mirrored in server/src/admin/overlay.ts). A reader
+ * comparing the configuration editor against an emblem in the client must see
+ * one spelling, not two -- so this is a third copy of one rule, and the reason
+ * it is tolerated rather than shared is that the three live in three languages.
+ * `server/test/overlay.test.ts` pins the pair that CAN drift silently.
+ */
+export const statLabel = (key: string) =>
+  key.replace(/_/g, " ").replace(/[a-z]+/gi, (word) => capitalize(word.toLowerCase()))
+
+/** First letter up, rest untouched. For values that are already words -- an
+ * emblem colour, a source of "none" -- where the contract holds them lowercase
+ * and only the reader needs them otherwise. */
+export const capitalize = (value: string) =>
+  value.length === 0 ? value : value[0]!.toUpperCase() + value.slice(1)
+

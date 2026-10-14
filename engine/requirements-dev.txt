@@ -1,0 +1,22 @@
+# Everything the engine needs, plus what only the tests need.
+#
+# Split from requirements.txt so a deployment that runs the crawler does not
+# install a test runner, and so CI installs the runner by NAME rather than with
+# a bare `pip install pytest` line in a workflow -- an unpinned dependency that
+# nothing in the repository records is one nobody can reproduce.
+-r requirements.txt
+
+pytest>=8.0
+
+# Dead-code detection. Worth a tool rather than an eye here for a specific
+# reason: this tree is mostly modules that answer one question and scripts that
+# print, so an obsolete helper does not break anything and does not get read --
+# it just sits there looking like it is part of the model. The audit that added
+# this found four by hand (two source stubs returning empty, a protocol nobody
+# annotated against, a block of environment variables for a deleted feature),
+# which is three more than a codebase should surrender to manual reading.
+#
+# Confidence is the whole interface: vulture guesses, and a dynamic call it
+# cannot see reads as dead. See `vulture-allowlist.py` for what is deliberately
+# kept and why.
+vulture>=2.16

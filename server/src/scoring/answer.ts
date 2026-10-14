@@ -37,7 +37,6 @@ export function unmeasurableCaveats(banner: Emblem[]): string[] {
     .filter((e) => !e.measurable)
     .map(
       (e) =>
-        `${e.displayName}: no data for ${e.stat} at any depth, so it scores 0 for ` +
-        `every unit. It is worth real points in the client -- the model cannot see them.`,
+        `${e.displayName}: no data, scored 0 here. It still pays in the client.`,
     )
 }

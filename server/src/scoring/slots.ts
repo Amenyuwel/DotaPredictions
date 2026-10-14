@@ -43,23 +43,6 @@ export function slotColors(
   return row.slice(0, slots)
 }
 
-/** The stats each slot may carry, in banner order. */
-export function slotStatPools(
-  scoring: Scoring,
-  role: FantasyRole,
-  slots: number,
-): string[][] | null {
-  const colors = slotColors(scoring, role, slots)
-  if (!colors) return null
-  const byColor = new Map<string, string[]>()
-  for (const [stat, spec] of Object.entries(scoring.stats)) {
-    const list = byColor.get(spec.color)
-    if (list) list.push(stat)
-    else byColor.set(spec.color, [stat])
-  }
-  return colors.map((color) => byColor.get(color) ?? [])
-}
-
 /**
  * Why this banner is illegal, or null if it is not.
  *

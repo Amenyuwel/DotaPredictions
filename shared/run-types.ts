@@ -141,7 +141,14 @@ export interface Scoring {
     [k: string]: {
       bonus: number
       adjacentBonus: number
+      /**
+       * The condition in words, for the reader. Prose only -- it is displayed, never evaluated.
+       */
       condition?: string | null
+      /**
+       * Which of the scorer's implemented rules gates this trait's OWN bonus. The rule is code and the name of it is data, so that a trait added or renamed without a release cannot quietly fall through to paying unconditionally. Absent on a run published before this field existed, and the scorer then falls back to matching on the trait's name -- correct for the five traits that shipped with the client, and exactly the fallback a new trait must not rely on.
+       */
+      conditionRule?: null | "always" | "never" | "allQualitiesDiffer" | "countAtLeast3" | "onlyOne" | "neighboursOnly"
     }
   }
 }

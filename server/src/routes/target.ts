@@ -374,34 +374,31 @@ function target(payload: RunPayload, unit: Unit, goal: Goal) {
     caveats: [
       ...unmeasurableCaveats(found.best.emblems),
       ...new Set(unit.members.flatMap((m) => m.warnings)),
-      // Every caveat here is one line. They are required output -- a limit that
-      // qualifies a number travels with it -- but a paragraph nobody finishes
-      // qualifies nothing, so each says its fact and stops.
-      `Slot colours are fixed: ${colors.join(" ")}. Each slot had 6 stats to choose from, ` +
-        `and every combination was scored.`,
+      // Every caveat here is one clause. They are required output -- a limit
+      // that qualifies a number travels with it -- but a paragraph nobody
+      // finishes qualifies nothing, so each says its fact and stops. The fixed
+      // slot colours used to be listed here too; they are a rule, not a limit,
+      // and the banner drawn above already shows them.
       // The rung itself, stated with the mechanic that makes it a rung. Quality
       // is the half of a banner no token can buy, so a reader has to be told
       // what this answer assumes they already own.
       qualities.every((tier) => tier === TOP_TIER(payload.scoring))
-        ? `Every emblem Tier V - the best that could exist. Tiers cannot be rerolled, so ` +
-          `this is a benchmark, not a target.`
-        : `Assumes you own tiers ${qualities.map(tierNumeral).join(" ")}. Tiers cannot be ` +
-          `rerolled; only the stat and trait on each emblem can.`,
+        ? `All Tier V: a benchmark, not a target. Tiers can't be rerolled.`
+        : `Assumes tiers ${qualities.map(tierNumeral).join(" ")}. Tiers can't be rerolled.`,
       ...(rerolls
         ? [
             // Rolling is random, so "how many tokens" is the part people get
             // wrong. Said as a count they can compare to what they hold.
-            `Rerolls are random, so building this takes about ${rerolls.expected} of them.` +
+            `About ${rerolls.expected} rerolls to build` +
               (rerolls.tokens === null
-                ? ` This period's token count is not recorded, so we cannot say if that fits.`
-                : ` You get ${rerolls.tokens} tokens for the whole roster, so this slot alone ` +
-                  `fits about ${(rerolls.withinBudget! * 100).toFixed(0)}% of the time.`),
+                ? ` (this stage's token count isn't recorded).`
+                : `; alone, fits the roster's ${rerolls.tokens} tokens ` +
+                  `${(rerolls.withinBudget! * 100).toFixed(0)}% of the time.`),
           ]
         : []),
       ...(found.statsDropped.length > 0
         ? [
-            `${found.statsDropped.join(", ")} left out: the value can go negative, and the ` +
-              `argument that narrows the search assumes a bigger multiplier is never worse.`,
+            `${found.statsDropped.join(", ")} left out of the search: can score negative.`,
           ]
         : []),
     ],

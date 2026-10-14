@@ -232,11 +232,8 @@ function optimize(
       ...new Set(unit.members.flatMap((m) => m.warnings)),
       ...(found.rescored < found.arrangements
         ? [
-            `All ${found.arrangements.toLocaleString("en")} arrangements were compared on a ` +
-              `${config.search.screenSims}-simulation screen that draws the same games for ` +
-              `every one of them; only the ${found.rescored} shown were rescored at ` +
-              `${config.scoring.sims} with an interval. A banner the screen misplaced by ` +
-              `less than its own sampling error could be missing from this list.`,
+            `${found.arrangements.toLocaleString("en")} arrangements screened quickly; only ` +
+              `the top ${found.rescored} were fully scored, so a near-equal one may be missing.`,
           ]
         : []),
     ],

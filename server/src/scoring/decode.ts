@@ -53,7 +53,7 @@ function bigIntsToFloats(b: Buffer): Float64Array {
   return out
 }
 
-export function decodeSamples(s: PlayerSamples): DecodedSamples {
+function decodeSamples(s: PlayerSamples): DecodedSamples {
   const games = buf(s.games)
   const matchId = bigIntsToFloats(buf(s.matchId))
   const rowOfMatch = new Map<number, number>()
@@ -84,7 +84,7 @@ export function decodeSamples(s: PlayerSamples): DecodedSamples {
   }
 }
 
-export function decodeProjection(p: StageProjection): DecodedProjection {
+function decodeProjection(p: StageProjection): DecodedProjection {
   return {
     teamId: p.teamId,
     nShapeSamples: p.nShapeSamples,

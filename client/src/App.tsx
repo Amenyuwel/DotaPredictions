@@ -1,37 +1,55 @@
-import { useMemo, useState, type ReactNode } from "react"
+import { useMemo, useRef, useState, type ReactNode } from "react"
 
 import { AccountMenu } from "@/components/account-menu"
+import { AnswerBar, type AnswerSummary } from "@/components/answer-bar"
+import { AuthDialog } from "@/components/auth-dialog"
 import { BannerDialog } from "@/components/banner-dialog"
 import { FaqButton, FaqDialog } from "@/components/faq"
 import { ResultPanel } from "@/components/result-panel"
 import { RoleTabs } from "@/components/role-tabs"
+import { RosterAnswer } from "@/components/roster-answer"
 import { RunHeader } from "@/components/run-header"
-import { SlotTargetCard } from "@/components/slot-target-card"
 import { SavedBanners } from "@/components/saved-banners"
 import { SavedRosters } from "@/components/saved-rosters"
 import { SiteFooter } from "@/components/site-footer"
+import { SiteMenu } from "@/components/site-menu"
 import { StageSwitcher } from "@/components/stage-switcher"
 import { AwaitingInput, LoadingRun, RunError } from "@/components/states"
 import { ThemeMenu } from "@/components/theme-menu"
 import { UnitPicker } from "@/components/unit-picker"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Loading } from "@/components/ui/spinner"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Skeleton, SkeletonPanel } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { buildCatalog, type EmblemCatalog } from "@/lib/emblem-catalog"
-import { points } from "@/lib/format"
+import { ApiError } from "@/lib/api"
+import { buildCatalog } from "@/lib/emblem-catalog"
+import {
+  clearStageChoice,
+  isStale,
+  readStageChoice,
+  storeStageChoice,
+  type StageChoice,
+} from "@/lib/stage-choice"
+import { day, matchCount, points, timestamp } from "@/lib/format"
 import { ROLE_DETAIL, ROLE_LABEL, ROLE_ORDER } from "@/lib/labels"
+import { rosterTotal, type Roster } from "@/lib/roster"
+import { useMediaQuery } from "@/hooks/use-media-query"
 import { useTarget } from "@/hooks/use-target"
 import { useRank } from "@/hooks/use-rank"
 import { useRun } from "@/hooks/use-run"
 import { useSession } from "@/hooks/use-session"
-import type { Emblem, FantasyRole, Player, Stage } from "@/types/run"
-
-/** A fantasy roster is three units, one per slot. Null is a slot nobody has
- * been picked for yet, which is the state the tab opens in. */
-type Roster = Record<FantasyRole, Player | null>
+import type { Emblem, FantasyRole, Player, Stage, Team } from "@/types/run"
 
 const EMPTY_ROSTER: Roster = { core: null, mid: null, support: null }
+
+/** The stage a cold load opens on when nothing is remembered on this device,
+ * or what was remembered has gone stale. See the `useRun` call in `App`. */
+const DEFAULT_STAGE: Stage = "group"
 
 /** Both tabs ask their question three times, once per fantasy slot, so the
  * empty state is the same shape on either side. */
@@ -52,9 +70,6 @@ const EMPTY_BANNERS: Record<FantasyRole, (Emblem | null)[]> = {
  */
 const sized = (banner: (Emblem | null)[], slots: number): (Emblem | null)[] =>
   banner.length === slots ? banner : Array.from({ length: slots }, (_, i) => banner[i] ?? null)
-
-/** What a banner answer arrives as, for the panel that draws it. */
-type BannerQuery = ReturnType<typeof useTarget>
 
 /**
  * Two mirrored entry paths, one column of answers.
@@ -80,19 +95,64 @@ type BannerQuery = ReturnType<typeof useTarget>
  * number.
  */
 export default function App() {
-  // Null means "whatever the server considers newest", which is what a cold
-  // load asks. It becomes concrete the moment the reader picks a stage.
-  const [selected, setSelected] = useState<{ tournamentId: string; stage: Stage } | null>(
-    null,
-  )
-  const { data, isPending, error } = useRun(selected?.tournamentId, selected?.stage)
+  // The stage last picked on this device, or null for the default (below).
+  // `restored` marks a choice read back from storage rather than made in this
+  // visit: only a restored choice can be stale, and only it is dropped for
+  // being so.
+  const [selected, setSelected] = useState<StageChoice | null>(readStageChoice)
+  const [restored, setRestored] = useState(() => selected !== null)
+  // A cold load opens on the Group Stage, not on whatever was published last.
+  // The tool's first question of an event is the group roster, and landing a
+  // reader on the Main Event before it has been drawn for them -- or after
+  // they came for the group answer -- meant a stage switch before anything
+  // else. The newest run of any stage is the fallback only when no Group Stage
+  // run exists at all; asking for one that is missing must not end on an error
+  // page when another stage could answer.
+  const preferred = useRun(selected?.tournamentId, selected?.stage ?? DEFAULT_STAGE)
+  const noDefault =
+    selected === null && preferred.error instanceof ApiError && preferred.error.status === 404
+  const fallback = useRun(undefined, undefined, noDefault)
+  const { data, isPending, error } = noDefault ? fallback : preferred
+
+  // A remembered stage that no longer answers -- its run is gone, or a newer
+  // tournament has been published since -- is forgotten, and the page falls
+  // back to the default. Adjusted during render rather than in an effect, so
+  // the stale stage is never painted first.
+  if (
+    restored &&
+    selected &&
+    ((preferred.error instanceof ApiError && preferred.error.status === 404) ||
+      isStale(selected, preferred.data?.available))
+  ) {
+    clearStageChoice()
+    setSelected(null)
+    setRestored(false)
+  }
   const auth = useSession()
-  const [tab, setTab] = useState("banner")
+  // The roster tab is the front door: three taps to a figure, against
+  // twenty-odd for a banner, and a visitor who has not rolled anything yet
+  // has no banner to bring. The banner question is one tap along.
+  const [tab, setTab] = useState("roster")
 
   // The FAQ's open state, held here rather than inside the header button:
   // the dialog is a sibling of the page rather than a child of a control in
   // a wrapping flex row, which is not somewhere a modal should be mounted.
   const [faqOpen, setFaqOpen] = useState(false)
+
+  // Sign-in is now asked for from two places -- the account button on a wide
+  // header, a menu item on a narrow one -- and the dialog belongs to neither.
+  // A modal mounted inside a menu item unmounts with the menu the moment the
+  // item is pressed, which is the press that was meant to open it.
+  const [authOpen, setAuthOpen] = useState(false)
+
+  // Whether the answer has a column of its own. Below this the page is one
+  // column, and the answer moves into a dialog the bottom bar opens rather than
+  // sitting a screen below the questions -- see `AnswerBar`. A media query
+  // rather than two copies behind `lg:hidden`, because the answer is written
+  // once and put in one of two places.
+  const wide = useMediaQuery("(min-width: 64rem)")
+  const [answerOpen, setAnswerOpen] = useState(false)
+  const answerTitleRef = useRef<HTMLHeadingElement>(null)
 
   // One banner per fantasy slot, each an ORDERED array with a null for every
   // slot not filled yet. Nulls are held in place rather than closed up: an
@@ -162,6 +222,72 @@ export default function App() {
     [data?.emblems, data?.scoring],
   )
 
+  const answerHeading =
+    tab === "banner" ? "Who should wear these banners" : "What this roster scores"
+
+  /** What to do to get an answer, for the narrow layout's bar. The long form of
+   * the same sentence is what `AwaitingInput` prints inside the panel; this is
+   * the one line that fits above a thumb. */
+  const answerHint =
+    tab === "banner"
+      ? "Enter a banner to see who should wear it."
+      : "Pick a core, a mid and a support."
+
+  /**
+   * The answer itself, written once.
+   *
+   * Rendered into the right-hand column on a wide screen and into a dialog on a
+   * narrow one. Two copies behind `lg:hidden` would be two live regions
+   * announcing the same number to a screen reader and two sets of the same
+   * headings to walk past, and the day one copy is edited they stop agreeing.
+   */
+  const answer =
+    tab === "banner" ? (
+      <BannerAnswers
+        banners={banners}
+        ranks={ranks}
+        slots={slots}
+        teams={data?.teams}
+        stage={data?.run.stage}
+      />
+    ) : (
+      <RosterAnswer
+        roster={roster}
+        targets={targets}
+        run={run}
+        slots={slots}
+        catalog={catalog}
+        onAskBanner={() => setTab("banner")}
+      />
+    )
+
+  /**
+   * What the narrow layout's bar says, or null while there is no answer behind
+   * it yet.
+   *
+   * Read off the same queries the panel draws, and null until at least one of
+   * them has resolved: a button offered the moment a picker is touched opens
+   * onto a box still saying "two more emblems to go". The roster total goes
+   * through `rosterTotal` rather than being added up again here, so the bar and
+   * the card cannot disagree.
+   */
+  const answerSummary: AnswerSummary | null = (() => {
+    if (tab === "banner") {
+      const ranked = ROLE_ORDER.filter(
+        (r) => slots > 0 && banners[r].filter(Boolean).length === slots && ranks[r].data?.best,
+      ).length
+      return ranked === 0 ? null : { title: `${ranked} of 3 banners ranked` }
+    }
+
+    const scored = ROLE_ORDER.filter((r) => targets[r].data?.best).length
+    if (scored === 0) return null
+
+    const total = rosterTotal(targets)
+    return total === null
+      ? { title: `${scored} of 3 slots scored` }
+      : { title: "Projected roster total", value: points(total) }
+  })()
+
   /**
    * Switching stage clears both inputs rather than carrying them across.
    *
@@ -172,47 +298,12 @@ export default function App() {
    * team in the group stage is not necessarily in the main event, and one that
    * is not would be a selection that cannot be scored.
    */
-  function selectRun(next: { tournamentId: string; stage: Stage }) {
+  function selectRun(next: StageChoice) {
     setSelected(next)
+    setRestored(false)
+    storeStageChoice(next)
     setBanners(EMPTY_BANNERS)
     setRoster(EMPTY_ROSTER)
-  }
-
-  /**
-   * Load a saved banner back into the builder.
-   *
-   * Emblem ids are resolved against THIS run's catalog rather than trusted: a
-   * banner saved against an earlier run can name an emblem the current one does
-   * not generate. An unresolved id becomes an empty slot, so the banner comes
-   * back visibly incomplete instead of silently scoring four emblems as five.
-   */
-  function loadSaved(savedRole: FantasyRole, emblemIds: string[]) {
-    const rows = data?.emblems ?? []
-    const resolved = emblemIds.map((id) => rows.find((e) => e.emblemId === id) ?? null)
-    // Into the card for the role it was SAVED under, never the one on screen: a
-    // support banner loaded into the core slot would be scored against the
-    // wrong unit and look like a finding.
-    setBanner(savedRole, Array.from({ length: slots }, (_, i) => resolved[i] ?? null))
-  }
-
-  /**
-   * Load a saved roster back into the three pickers.
-   *
-   * Player ids are resolved against THIS run rather than trusted, the same way
-   * a saved banner's emblems are: a roster saved against the Group Stage can
-   * name a player whose team did not make the Main Event. An id the run does
-   * not carry becomes an empty slot, so the roster comes back visibly short
-   * instead of scoring two units as three.
-   */
-  function loadRoster(players: { core: number; mid: number; support: number }) {
-    const rows = data?.players ?? []
-    const find = (playerId: number, slotRole: FantasyRole) =>
-      rows.find((p) => p.playerId === playerId && p.fantasyRole === slotRole) ?? null
-    setRoster({
-      core: find(players.core, "core"),
-      mid: find(players.mid, "mid"),
-      support: find(players.support, "support"),
-    })
   }
 
   if (isPending) {
@@ -241,17 +332,30 @@ export default function App() {
       {/* The header carries the run's identity, a stage control and an account
           menu before the page proper starts, and every tab press walks through
           them. One link, invisible until it has focus. */}
-      <a
-        href="#answers"
-        className="focus-visible:ring-ring bg-popover text-popover-foreground sr-only rounded-md px-3 py-2 text-sm shadow-md focus-visible:not-sr-only focus-visible:absolute focus-visible:top-2 focus-visible:left-2 focus-visible:z-50 focus-visible:ring-2"
-      >
-        Skip to answers
-      </a>
+      {/* Only where the answer is on the page. In the narrow layout it is
+          behind a button at the bottom of the document, so a link offering to
+          skip to it would land on nothing. */}
+      {wide && (
+        <a
+          href="#answers"
+          className="focus-visible:ring-ring bg-popover text-popover-foreground sr-only rounded-md px-3 py-2 text-sm shadow-md focus-visible:not-sr-only focus-visible:absolute focus-visible:top-2 focus-visible:left-2 focus-visible:z-50 focus-visible:ring-2"
+        >
+          Skip to answers
+        </a>
+      )}
 
       <RunHeader
         run={data.run}
-        account={<AccountMenu state={auth} />}
+        overlay={data.overlay}
+        account={<AccountMenu state={auth} onSignIn={() => setAuthOpen(true)} />}
         help={<FaqButton onClick={() => setFaqOpen(true)} />}
+        menu={
+          <SiteMenu
+            auth={auth}
+            onSignIn={() => setAuthOpen(true)}
+            onOpenFaq={() => setFaqOpen(true)}
+          />
+        }
         stages={
           <StageSwitcher
             available={data.available}
@@ -261,14 +365,22 @@ export default function App() {
         }
       />
 
-      <main className="mx-auto grid w-full max-w-6xl grow gap-6 px-6 py-8 content-start lg:grid-cols-[minmax(0,24rem)_1fr]">
+      <main className="mx-auto grid w-full max-w-6xl grow gap-6 px-4 py-6 content-start sm:px-6 sm:py-8 lg:grid-cols-[minmax(0,24rem)_1fr]">
         <Tabs value={tab} onValueChange={(next) => setTab(next as string)} className="flex flex-col gap-4">
+          {/* The wide layout's answer column opens on an orientation panel;
+              a phone has no column, so the one sentence that says what the
+              page is for goes above the question instead. */}
+          {!wide && (
+            <p className="text-muted-foreground text-sm text-pretty">
+              See which banner each of your fantasy slots should roll for.
+            </p>
+          )}
           <TabsList className="w-full">
-            <TabsTrigger value="banner" className="flex-1">
-              I have a banner
-            </TabsTrigger>
             <TabsTrigger value="roster" className="flex-1">
               My roster
+            </TabsTrigger>
+            <TabsTrigger value="banner" className="flex-1">
+              I have a banner
             </TabsTrigger>
           </TabsList>
 
@@ -310,9 +422,13 @@ export default function App() {
             <SavedBanners
               run={data.run}
               auth={auth}
+              emblems={data.emblems}
               banners={banners}
               slots={slots}
-              onLoad={loadSaved}
+              // Kept now, so the builder starts the next banner rather than
+              // holding one that is already in the list below. Only the slot
+              // that was saved -- the other two are still being built.
+              onSaved={(savedRole) => setBanner(savedRole, [])}
             />
           </TabsContent>
 
@@ -339,31 +455,101 @@ export default function App() {
               </Card>
             ))}
 
-            <SavedRosters run={data.run} auth={auth} roster={roster} onLoad={loadRoster} />
+            <SavedRosters
+              run={data.run}
+              auth={auth}
+              players={data.players}
+              roster={roster}
+              // Kept now, so the pickers start the next one rather than
+              // holding a roster that is already in the list below.
+              onSaved={() => setRoster(EMPTY_ROSTER)}
+              // The saved list answers for itself, in its own dialog. It never
+              // writes back into these three pickers: a reader opening a row to
+              // check a number they saved last week has not asked for the
+              // roster they are building now to be thrown away.
+              slots={slots}
+              catalog={catalog}
+            />
           </TabsContent>
         </Tabs>
 
         {/* Named, because "region" alone tells a screen-reader user nothing
             about which of the two columns they have landed in. Live, because
-            this is where an answer appears without the reader having moved. */}
-        <section id="answers" aria-label="Answer" aria-live="polite">
-          {tab === "banner" ? (
-            <BannerAnswers banners={banners} ranks={ranks} slots={slots} />
-          ) : (
-            <RosterAnswer
-              roster={roster}
-              targets={targets}
-              run={run}
-              slots={slots}
-              catalog={catalog}
-            />
-          )}
-        </section>
+            this is where an answer appears without the reader having moved.
+            Focusable, because the skip link moves the viewport here, and moving
+            the viewport without moving focus leaves a keyboard user tabbing on
+            from the control they were just sent away from. */}
+        {wide && (
+          <section
+            id="answers"
+            aria-labelledby="answers-heading"
+            aria-live="polite"
+            tabIndex={-1}
+            className="scroll-mt-4 outline-none"
+          >
+            <h2 id="answers-heading" className="sr-only">
+              {answerHeading}
+            </h2>
+
+            {answer}
+          </section>
+        )}
       </main>
+
+      {/* The narrow layout's answer: a bar that is always there and a dialog it
+          opens. Not rendered at all on a wide screen, so the answer exists once
+          in the document rather than once per layout. */}
+      {!wide && (
+        <>
+          <AnswerBar
+            summary={answerSummary}
+            hint={answerHint}
+            onOpen={() => setAnswerOpen(true)}
+          />
+
+          <Dialog open={answerOpen} onOpenChange={setAnswerOpen}>
+            {/* Capped against the viewport rather than given a height, and
+                scrolled inside: a roster answer is a total and three cards, and
+                the ranked list is longer still. */}
+            {/* Focus lands on the title, not on the first card. Base UI's
+                default is the first tabbable element, which here is the Core
+                card -- and its focus ring, drawn the moment the dialog opened,
+                read as Core having been selected. The title is also what a
+                screen reader should announce first. */}
+            <DialogContent
+              initialFocus={answerTitleRef}
+              className="max-h-[85dvh] overflow-y-auto sm:max-w-2xl"
+            >
+              <DialogHeader>
+                <DialogTitle ref={answerTitleRef} tabIndex={-1} className="outline-none">
+                  {answerHeading}
+                </DialogTitle>
+              </DialogHeader>
+
+              {answer}
+
+              {/* The footer's date is under this dialog, so the dialog carries
+                  its own: an answer read with no date on screen is
+                  indistinguishable from a stale one. */}
+              <p className="text-muted-foreground border-t pt-3 text-xs">
+                {day(data.run.dataWindow.from)} – {day(data.run.dataWindow.to)},{" "}
+                {matchCount(data.run.dataWindow.matchCount)} · Published{" "}
+                {timestamp(data.run.createdAt)}
+              </p>
+            </DialogContent>
+          </Dialog>
+        </>
+      )}
 
       <SiteFooter run={data.run} />
 
       <FaqDialog open={faqOpen} onOpenChange={setFaqOpen} slots={slots} />
+
+      <AuthDialog
+        open={authOpen}
+        onOpenChange={setAuthOpen}
+        onGuest={() => setAuthOpen(false)}
+      />
     </div>
   )
 }
@@ -378,7 +564,7 @@ export default function App() {
  */
 function PreRun({ children }: { children: ReactNode }) {
   return (
-    <main className="mx-auto min-h-dvh max-w-6xl px-6 py-10">
+    <main className="mx-auto min-h-dvh max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
       <div className="mb-4 flex justify-end">
         <ThemeMenu />
       </div>
@@ -391,12 +577,13 @@ function PreRun({ children }: { children: ReactNode }) {
  * be indistinguishable from a real one. */
 function Pending() {
   return (
-    <div className="space-y-2" aria-busy>
-      <Loading>Scoring every unit through this banner…</Loading>
+    <SkeletonPanel label="Scoring every unit through this banner…">
+      {/* Five, because five rungs is what the ladder comes back with. A
+          placeholder that reserves the wrong number of rows still reflows. */}
       {Array.from({ length: 5 }, (_, i) => (
         <Skeleton key={i} className="h-16 w-full" />
       ))}
-    </div>
+    </SkeletonPanel>
   )
 }
 
@@ -416,19 +603,21 @@ function BannerAnswers({
   banners,
   ranks,
   slots,
+  teams,
+  stage,
 }: {
   banners: Record<FantasyRole, (Emblem | null)[]>
   ranks: Record<FantasyRole, ReturnType<typeof useRank>>
   slots: number
+  teams: Team[] | undefined
+  stage: Stage | undefined
 }) {
   const placed = (r: FantasyRole) => banners[r].filter(Boolean).length
 
   if (ROLE_ORDER.every((r) => placed(r) === 0)) {
     return (
       <AwaitingInput>
-        Build a banner for any of the three slots to see which units score best through
-        it. Each is {slots} emblems and each is scored on its own - core and support are
-        duos, mid is one player.
+        Enter a banner for any slot to see who scores best wearing it.
       </AwaitingInput>
     )
   }
@@ -460,103 +649,12 @@ function BannerAnswers({
         if (!query.data?.best) {
           return (
             <AwaitingInput compact>
-              No unit in this stage has a joint sample to score through this banner.
+              No unit has enough games to score this banner.
             </AwaitingInput>
           )
         }
-        return <ResultPanel answer={query.data} />
+        return <ResultPanel answer={query.data} teams={teams} stage={stage} />
       }}
     />
-  )
-}
-
-/**
- * The roster's three answers as three cards, with their total on top once all
- * three have one.
- *
- * The total is a plain sum of each slot's best score, not a re-optimisation
- * across them -- `enumerate_fantasy_rosters` in the engine treats the three
- * slots the same way, because the client scores core, mid and support as
- * separate averages and adds them. No interval is shown on the total: summing
- * the three point estimates is exact, but summing their confidence intervals
- * would overstate the combined uncertainty, and understating it is worse than
- * leaving it off.
- *
- * What it sums is the REALISTIC rung of each slot, not the ceiling. Quality
- * cannot be rerolled -- the client rolls stats and traits and nothing else --
- * so a total built from five Tier V emblems per slot is a number no run of luck
- * can be planned towards. It is still one tab along on every card, because the
- * ceiling is what a real goal is measured against.
- */
-function RosterAnswer({
-  roster,
-  targets,
-  run,
-  slots,
-  catalog,
-}: {
-  roster: Roster
-  targets: Record<FantasyRole, BannerQuery>
-  run: { tournamentId: string; stage: Stage } | undefined
-  slots: number
-  catalog: EmblemCatalog
-}) {
-  const bests = ROLE_ORDER.map((r) => targets[r].data?.best ?? null)
-  const total = bests.every((b) => b !== null)
-    ? bests.reduce((sum, b) => sum + b!.score, 0)
-    : null
-
-  // Before the first player is picked the three slots have nothing to say
-  // apart from each other, and saying it three times fills the whole answer
-  // column with a paragraph repeated with one word changed. One sentence until
-  // there is something to be specific about.
-  if (ROLE_ORDER.every((r) => roster[r] === null)) {
-    return (
-      <AwaitingInput>
-        Pick a core, a mid and a support. Each one gets the {slots} emblems that score
-        best for it out of the whole catalog -- the banner to go and roll for -- and the
-        three are added up.
-      </AwaitingInput>
-    )
-  }
-
-  return (
-    <div className="space-y-4">
-      {total !== null && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">Projected roster total</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-semibold tabular-nums">{points(total)}</p>
-            <p className="text-muted-foreground mt-1 text-xs">
-              Sum of each slot's realistic target, so it is what this roster is worth on a
-              hand of emblems an ordinary set of crafts leaves you with - not the ceiling.
-              Quality cannot be rerolled, so the perfect banner is a number to measure
-              against rather than one to plan for; each card opens on the whole ladder.
-              The game scores core, mid and support as separate averages, so there is
-              nothing for the slots to trade off against each other.
-            </p>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Three cards rather than three stacked answers, and rather than one
-          answer behind a tab: the three numbers the ceiling is the sum of are
-          then on the page together, which is the comparison a reader came for.
-          The emblems are what they act on one slot at a time, so those open. */}
-      <div className="grid auto-rows-fr gap-3 sm:grid-cols-3">
-        {ROLE_ORDER.map((slotRole) => (
-          <SlotTargetCard
-            key={slotRole}
-            role={slotRole}
-            player={roster[slotRole]}
-            run={run}
-            target={targets[slotRole]}
-            catalog={catalog}
-          />
-        ))}
-      </div>
-    </div>
   )
 }

@@ -48,9 +48,6 @@ class SwissOutcome:
     def prob(self, team: str, bucket: str) -> float:
         return self.bucket_prob.get(team, {}).get(bucket, 0.0)
 
-    def prob_matrix(self, teams: list[str], buckets: list[str]) -> np.ndarray:
-        return np.array([[self.prob(t, b) for b in buckets] for t in teams])
-
 
 def _pair_group(
     group: list[str],

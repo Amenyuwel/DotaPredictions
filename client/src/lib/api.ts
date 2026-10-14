@@ -88,23 +88,11 @@ export function rankPlayers(body: RankRequest) {
   })
 }
 
-export interface OptimizeRequest {
-  /** Which slot wears the banner. Core and support are duos, mid is one
-   * player, and the same emblems are worth different amounts to each. */
-  role: FantasyRole
-  teamId: number
-  /** The emblems you own. Unordered: the order is what is being asked for. */
-  inventory: { emblemId: string }[]
-  tournamentId?: string
-  stage?: Stage
-}
-
-export function optimiseBanner(body: OptimizeRequest) {
-  return request<BannerAnswer>("/api/banner/optimize", {
-    method: "POST",
-    body: JSON.stringify(body),
-  })
-}
+// `POST /api/banner/optimize` -- "order the emblems I already own" -- has no
+// caller here. The endpoint is live and tested on the server; what was removed
+// is the client half, which had been unreachable from `main.tsx` since before
+// this file was last touched. Wire it back from the server contract rather than
+// from memory if the inventory screen returns.
 
 export interface TargetRequest {
   /** Which slot wears the banner. Core and support are duos, mid is one

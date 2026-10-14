@@ -15,6 +15,10 @@ export function useRank(
   role: FantasyRole,
   slots: number,
   run: { tournamentId: string; stage: Stage } | undefined,
+  /** Off until a reader asks. The tab's three builders always want their
+   * answer, so it defaults on; a saved row does not, and a list of eight opened
+   * and closed once each would otherwise be eight rankings nobody read. */
+  enabledWhen: boolean = true,
 ) {
   const chosen = banner.filter((e): e is Emblem => e !== null)
   const complete = chosen.length === slots
@@ -31,7 +35,7 @@ export function useRank(
         stage: run?.stage,
         emblems: chosen.map((e, order) => ({ emblemId: e.emblemId, order })),
       }),
-    enabled: complete && run !== undefined,
+    enabled: complete && run !== undefined && enabledWhen,
     // The run is immutable and the server memoises by body, so the same banner
     // has the same answer for the life of the process.
     staleTime: Infinity,

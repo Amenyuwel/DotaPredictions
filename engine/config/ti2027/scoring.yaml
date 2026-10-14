@@ -69,21 +69,29 @@ emblem_quality:
   tier_iii: 0.6
   tier_iv: 1.0
   tier_v: 1.5
+# `condition_rule` names which implemented rule gates the trait's own bonus.
+# Required: a trait without one pays unconditionally, and a trait this client
+# renamed would then silently pay always. See ti2026/scoring.yaml for the list.
 emblem_traits:
   fractal:
     bonus: 0.6
+    condition_rule: allQualitiesDiffer
     condition: all emblem qualities on the banner differ
   benevolent:
     bonus: 0.0
     adjacent_bonus: 0.2
+    condition_rule: neighboursOnly
   vampiric:
     bonus: 0.5
     adjacent_bonus: -0.1
+    condition_rule: always
   unique:
     bonus: 0.3
+    condition_rule: onlyOne
     condition: only Unique emblem on the banner
   friendly:
     bonus: 0.5
+    condition_rule: countAtLeast3
     condition: at least 3 Friendly emblems on the banner
 banner_colors:
 - red

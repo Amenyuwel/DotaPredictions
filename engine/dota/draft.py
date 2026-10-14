@@ -109,13 +109,6 @@ class DraftModel:
         return m
 
     # -- estimates ---------------------------------------------------------
-    @property
-    def field_contest_rate(self) -> float:
-        """Mean share of matches in which a given contested hero is contested."""
-        if not self.matches_seen or not self.contested:
-            return 0.0
-        return sum(self.contested.values()) / (self.matches_seen * len(self.contested))
-
     def denial_rate(self, team: str, hero_id: int) -> float:
         """P(team removes this hero from the pool), shrunk toward the field rate.
 
@@ -164,13 +157,6 @@ class DraftModel:
         if not self.matches_seen:
             return []
         rows = [(h, c / self.matches_seen) for h, c in self.banned.items()]
-        rows.sort(key=lambda r: -r[1])
-        return rows[:n]
-
-    def most_contested(self, n: int = 10) -> list[tuple[int, float]]:
-        if not self.matches_seen:
-            return []
-        rows = [(h, c / self.matches_seen) for h, c in self.contested.items()]
         rows.sort(key=lambda r: -r[1])
         return rows[:n]
 

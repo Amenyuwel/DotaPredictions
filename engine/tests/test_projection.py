@@ -131,8 +131,8 @@ def test_interval_narrows_with_sample_size():
     rng = np.random.default_rng(7)
     small = list(rng.lognormal(8.5, 0.35, size=25))
     large = list(rng.lognormal(8.5, 0.35, size=400))
-    sd_s, lo_s, hi_s = best_series_interval(small, SHAPES, n_boot=120, n_sims=600)
-    sd_l, lo_l, hi_l = best_series_interval(large, SHAPES, n_boot=120, n_sims=600)
+    _sd_s, lo_s, hi_s = best_series_interval(small, SHAPES, n_boot=120, n_sims=600)
+    _sd_l, lo_l, hi_l = best_series_interval(large, SHAPES, n_boot=120, n_sims=600)
     assert hi_s - lo_s > 2 * (hi_l - lo_l), (hi_s - lo_s, hi_l - lo_l)
     assert lo_s < hi_s and lo_l < hi_l
     print(

@@ -1,0 +1,203 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dotapredictions.local/overlay-schema.json",
+  "title": "ConfigOverlay",
+  "description": "An admin-authored patch over a published run. Nothing here changes what was measured -- playerSamples and stageProjections are absent by construction, because the crawler is the only thing allowed to write a measurement. Everything here is a table the server reads at request time, so applying it needs no re-crawl and no engine run. One mechanism per entity: a patch map keyed by id, plus a list of ids to remove. An entry whose key the run does not carry is an ADDITION, and the apply step then requires it to be complete rather than merging it onto nothing.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion"],
+  "properties": {
+    "schemaVersion": {
+      "description": "Bumped when the shape below changes incompatibly. A server that does not recognise the number refuses the overlay and serves the published run unchanged, which is the safe direction: an overlay it cannot read is an overlay it cannot half-apply.",
+      "type": "integer",
+      "const": 1
+    },
+    "scoring": {
+      "description": "The half of a run that is recomputed per request. Omit a key to leave the published value alone; omitting the whole object leaves the published scoring table untouched.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "stats": {
+          "description": "Stat key -> fields to change. Merged over the published spec, so a partial entry moves only what it names. A key the run does not carry is a NEW stat and must name every field, `source` included -- see the note on `source`.",
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/Key" },
+          "additionalProperties": { "$ref": "#/$defs/StatPatch" }
+        },
+        "statsRemoved": {
+          "description": "Stat keys to drop entirely. Every emblem carrying the stat disappears with it, which is the point: a stat that pays nothing and an emblem that cannot be built are the same statement, and leaving the emblem behind would offer a choice that scores zero.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/Key" },
+          "uniqueItems": true
+        },
+        "quality": {
+          "description": "Emblem tier -> its multiplier bonus, as a fraction (Tier V at +150% is 1.5). A key the run does not carry adds a tier, and a new tier multiplies the emblem catalog by one more row per stat per trait.",
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/Key" },
+          "additionalProperties": { "$ref": "#/$defs/Bonus" }
+        },
+        "qualityRemoved": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Key" },
+          "uniqueItems": true
+        },
+        "traits": {
+          "description": "Trait -> what it pays itself and what it does to each NEIGHBOUR. Merged over the published spec like stats. A trait whose name the scorer has no rule for pays its flat `bonus` unconditionally -- see `conditionRule`.",
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/Key" },
+          "additionalProperties": { "$ref": "#/$defs/TraitPatch" }
+        },
+        "traitsRemoved": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Key" },
+          "uniqueItems": true
+        },
+        "colors": {
+          "description": "The palette, replaced whole rather than patched -- it is an ordered list of three-ish names and a per-index patch over it would be unreadable. Absent means the published palette stands.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/Key" },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "bannerColors": {
+          "description": "Fantasy role -> the colour of each banner slot, at the longest period's length. Replaced per role, not per slot: a row is the shape of a banner and half a row is not a shape. This decides which stats a slot can hold at all, so a row naming a colour no stat carries makes that slot unfillable -- rejected at apply time rather than discovered as an empty picker.",
+          "type": "object",
+          "propertyNames": { "enum": ["core", "mid", "support"] },
+          "additionalProperties": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/Key" },
+            "minItems": 1
+          }
+        }
+      }
+    },
+    "teams": {
+      "description": "OpenDota team id (as a string key) -> fields to change. A key the run does not carry adds a team, which then needs `name`. An added team has no stageProjection, so it is absent from every picker until a re-crawl gives it one -- it is not a team scored as zero.",
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/NumericKey" },
+      "additionalProperties": { "$ref": "#/$defs/TeamPatch" }
+    },
+    "teamsRemoved": {
+      "description": "Team ids to drop. Their players go with them: a player on no team cannot be ranked, and leaving them behind would put an orphan in a picker.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/NumericKey" },
+      "uniqueItems": true
+    },
+    "players": {
+      "description": "OpenDota account id (as a string key) -> fields to change. A key the run does not carry adds a player, which then needs `nick`, `teamId`, `fantasyRole` and `lane`. An added player has no sample matrix and is therefore unrankable until a re-crawl -- reported as having no data, never scored as zero.",
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/NumericKey" },
+      "additionalProperties": { "$ref": "#/$defs/PlayerPatch" }
+    },
+    "playersRemoved": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/NumericKey" },
+      "uniqueItems": true
+    }
+  },
+  "$defs": {
+    "Key": {
+      "description": "An identifier the rest of the stack uses as an object key and a URL-safe token. Deliberately narrow: a stat called `gold per min` would key fine here and break every place that splits an emblemId on a colon.",
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_]{0,63}$"
+    },
+    "NumericKey": {
+      "description": "A positive integer id written as a string, because JSON object keys are strings and a silent Number() round trip on a 17-digit Steam id is exactly the kind of quiet corruption this project exists to avoid.",
+      "type": "string",
+      "pattern": "^[1-9][0-9]{0,18}$"
+    },
+    "Bonus": {
+      "description": "A multiplier bonus as a fraction. Bounded well outside anything Valve has shipped and well inside absurdity: the range is not a claim about what is correct, it is a guard against a decimal point in the wrong place turning a 1.5 into a 15 that nothing downstream would question.",
+      "type": "number",
+      "minimum": -10,
+      "maximum": 10
+    },
+    "StatPatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "perUnit": {
+          "description": "Points per unit of the stat. Signed: Deaths pays -195.",
+          "type": "number",
+          "minimum": -1000000,
+          "maximum": 1000000
+        },
+        "base": {
+          "description": "Points paid once if the stat is present at all, before any per-unit amount. Deaths carries 1950 here.",
+          "type": "number",
+          "minimum": -1000000,
+          "maximum": 1000000
+        },
+        "color": {
+          "description": "Which emblem colour carries this stat. Must be one the palette lists, or the stat becomes unreachable from every slot.",
+          "$ref": "#/$defs/Key"
+        },
+        "measurable": {
+          "description": "False means the source data has no field for this at any depth. Such a stat is excluded from emblem CHOICE rather than scored as zero, so that the tool never recommends an emblem it cannot value. Setting this true without a working `source` is the one edit here that can manufacture a confident wrong number, and the apply step refuses it.",
+          "type": "boolean"
+        },
+        "source": {
+          "description": "The column name in playerSamples.stats that carries this stat's per-game values, or null for a stat nothing measures. It cannot be invented: the run ships a fixed set of columns and a name outside that set measures nothing. The admin UI offers the run's own column list, and apply rejects anything else.",
+          "type": ["string", "null"],
+          "maxLength": 128
+        }
+      }
+    },
+    "TraitPatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "bonus": { "$ref": "#/$defs/Bonus" },
+        "adjacentBonus": {
+          "description": "What this trait does to the emblem on either side. Vampiric charges -0.10 and Benevolent pays +0.20, which is why a banner's value depends on the ORDER of its emblems and not only on which ones they are.",
+          "$ref": "#/$defs/Bonus"
+        },
+        "condition": {
+          "description": "The condition in words, for the reader. Prose only -- it is displayed, never evaluated. `conditionRule` is what the scorer reads.",
+          "type": ["string", "null"],
+          "maxLength": 200
+        },
+        "conditionRule": {
+          "description": "Which of the scorer's implemented rules gates this trait's own bonus. These are the five the client has shipped and they are CODE, not data: `allQualitiesDiffer` scans the banner's tiers, `countAtLeast3` and `onlyOne` count the trait. A trait naming no rule pays `bonus` unconditionally, which is right for one that has none and wrong-and-silent for one whose rule was simply not named -- so the admin form makes this an explicit choice rather than a blank that defaults.",
+          "type": ["string", "null"],
+          "enum": [null, "always", "never", "allQualitiesDiffer", "countAtLeast3", "onlyOne", "neighboursOnly"]
+        }
+      }
+    },
+    "TeamPatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "name": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "tag": { "type": "string", "maxLength": 16 },
+        "region": { "type": "string", "maxLength": 40 },
+        "logoUrl": { "type": "string", "maxLength": 500 },
+        "alsoTeamIds": {
+          "description": "Other OpenDota ids the same org played under. Load-bearing rather than cosmetic: one org carrying two ids splits its evidence in half and the model rates it on the remainder with no error anywhere. Editing this here renames nothing retroactively -- the samples were already gathered under whatever ids the last crawl knew, so a correction added today takes effect at the next crawl and the UI says so.",
+          "type": "array",
+          "items": { "type": "integer", "minimum": 1 },
+          "uniqueItems": true
+        }
+      }
+    },
+    "PlayerPatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "nick": { "type": "string", "minLength": 1, "maxLength": 60 },
+        "teamId": { "type": "integer", "minimum": 1 },
+        "fantasyRole": {
+          "description": "Which fantasy slot this player is picked into. Core and support are duos and mid is a single player, so moving someone between these changes what unit they are part of -- and a role with the wrong number of members in it is skipped rather than scored short-handed.",
+          "enum": ["core", "mid", "support"]
+        },
+        "lane": {
+          "description": "The in-game position. `fantasyRole` follows from it in the published run, and the two are kept separate here because a stand-in can be slotted somewhere their lane label does not predict.",
+          "enum": ["carry", "mid", "offlane", "soft_support", "hard_support"]
+        }
+      }
+    }
+  }
+}

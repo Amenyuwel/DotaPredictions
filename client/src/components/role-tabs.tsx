@@ -52,7 +52,7 @@ export function RoleTabs({
           the height is a property of the content rather than a constant. */}
       <TabsList className="w-full p-1.5 group-data-horizontal/tabs:h-auto">
         {ROLE_ORDER.map((r) => (
-          <TabsTrigger key={r} value={r} className="h-auto flex-1 flex-col gap-0 px-3 py-2">
+          <TabsTrigger key={r} value={r} className="h-auto flex-1 flex-col gap-0 px-3 py-2 pointer-coarse:min-h-11">
             {ROLE_LABEL[r]}
             {/* Drawn whether or not there is a number, because a line that
                 appears when an answer arrives makes the strip taller than it

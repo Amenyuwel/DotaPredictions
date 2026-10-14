@@ -46,12 +46,6 @@ class PredictionPlan:
     expected_correct: float
     n_slots: int
 
-    def by_bucket(self) -> dict[str, list[PredictionPick]]:
-        out: dict[str, list[PredictionPick]] = {}
-        for p in self.picks:
-            out.setdefault(p.bucket_id, []).append(p)
-        return out
-
     @property
     def key(self) -> frozenset[tuple[str, str]]:
         """Identity of a grid: which team sits in which bucket.

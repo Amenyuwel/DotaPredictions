@@ -24,6 +24,35 @@ const ICON: Record<Theme, typeof Sun> = {
 }
 
 /**
+ * The three palette choices as menu items, with no menu around them.
+ *
+ * Split out because the narrow header folds this control, the FAQ and the
+ * account into one menu, and a menu inside a menu is a submenu a thumb has to
+ * hold open. The items are the same items either way -- one radio group, one
+ * place -- so the two headers cannot drift into offering different choices.
+ */
+export function ThemeItems() {
+  const { theme, setTheme } = useTheme()
+
+  return (
+    <DropdownMenuRadioGroup
+      value={theme}
+      onValueChange={(next) => setTheme(next as Theme)}
+    >
+      {THEMES.map((option) => {
+        const Icon = ICON[option]
+        return (
+          <DropdownMenuRadioItem key={option} value={option}>
+            <Icon aria-hidden />
+            {LABEL[option]}
+          </DropdownMenuRadioItem>
+        )
+      })}
+    </DropdownMenuRadioGroup>
+  )
+}
+
+/**
  * The theme control: light, dark, or whatever the machine says.
  *
  * A menu rather than a two-state toggle, because a toggle can only express the
@@ -37,7 +66,7 @@ const ICON: Record<Theme, typeof Sun> = {
  * accessible name says both, so the distinction survives without the icon.
  */
 export function ThemeMenu() {
-  const { theme, palette, setTheme } = useTheme()
+  const { theme, palette } = useTheme()
   const TriggerIcon = ICON[palette]
 
   return (
@@ -54,20 +83,7 @@ export function ThemeMenu() {
         }
       />
       <DropdownMenuContent align="end" className="w-36">
-        <DropdownMenuRadioGroup
-          value={theme}
-          onValueChange={(next) => setTheme(next as Theme)}
-        >
-          {THEMES.map((option) => {
-            const Icon = ICON[option]
-            return (
-              <DropdownMenuRadioItem key={option} value={option}>
-                <Icon aria-hidden />
-                {LABEL[option]}
-              </DropdownMenuRadioItem>
-            )
-          })}
-        </DropdownMenuRadioGroup>
+        <ThemeItems />
       </DropdownMenuContent>
     </DropdownMenu>
   )

@@ -13,7 +13,8 @@
  * Scoring is NOT here. Ranked answers come from the Express server, which reads
  * an immutable published run; nothing the browser can send changes a projection.
  */
-import { createClient, type Session, type SupabaseClient } from "@supabase/supabase-js"
+// Type-only: the library itself is loaded on demand, see `getSupabase`.
+import type { Session, SupabaseClient } from "@supabase/supabase-js"
 
 const url = import.meta.env.VITE_SUPABASE_URL ?? ""
 const publishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? ""
@@ -28,8 +29,22 @@ const publishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? ""
  */
 export const authConfigured = Boolean(url && publishableKey)
 
-export const supabase: SupabaseClient | null = authConfigured
-  ? createClient(url, publishableKey, {
+/**
+ * The client, loaded the first time something needs it.
+ *
+ * The library is ~130 kB gzipped -- more than half of the JavaScript a first
+ * visit used to download -- and a guest, who is most visitors, never uses it.
+ * Imported eagerly it sat in front of the first paint for everyone; behind a
+ * dynamic import it costs nothing until someone signs in, has a stored session
+ * (`mayHaveSession`), or opens a page that needs one. One promise, shared, so
+ * every caller gets the same client and the module loads once.
+ */
+let client: Promise<SupabaseClient | null> | null = null
+
+export function getSupabase(): Promise<SupabaseClient | null> {
+  if (!authConfigured) return Promise.resolve(null)
+  client ??= import("@supabase/supabase-js").then(({ createClient }) =>
+    createClient(url, publishableKey, {
       auth: {
         // PKCE, and the library exchanges the code itself when the provider
         // redirects back. There is no server-side callback route to run one:
@@ -39,14 +54,41 @@ export const supabase: SupabaseClient | null = authConfigured
         persistSession: true,
         autoRefreshToken: true,
       },
-    })
-  : null
+    }),
+  )
+  return client
+}
+
+/**
+ * Whether this page load could be a signed-in one, read without the library.
+ *
+ * Two cases need the client at startup: a session the library persisted
+ * (`sb-<ref>-auth-token`, plus its PKCE verifier mid-sign-in) and the OAuth
+ * redirect landing back with `?code=`, which the library must exchange. Neither
+ * present means a guest, and the guest's first paint does not wait on auth.
+ * Storage that throws is treated as "maybe": loading the client is the safe
+ * side of being wrong.
+ */
+export function mayHaveSession(): boolean {
+  if (!authConfigured) return false
+  try {
+    if (new URLSearchParams(window.location.search).has("code")) return true
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)
+      if (key?.startsWith("sb-") && key.includes("-auth-token")) return true
+    }
+    return false
+  } catch {
+    return true
+  }
+}
 
 export type { Session }
 
 export type OAuthProvider = "google" | "github"
 
 export async function signIn(provider: OAuthProvider): Promise<void> {
+  const supabase = await getSupabase()
   if (!supabase) throw new Error("Supabase is not configured")
   const { error } = await supabase.auth.signInWithOAuth({
     provider,
@@ -58,6 +100,7 @@ export async function signIn(provider: OAuthProvider): Promise<void> {
 }
 
 export async function signOut(): Promise<void> {
+  const supabase = await getSupabase()
   if (!supabase) return
   const { error } = await supabase.auth.signOut()
   if (error) throw error
@@ -110,17 +153,36 @@ const fromRow = (row: SavedBannerRow): SavedBanner => ({
  * offering to save. That is deliberate: "continue as guest" means the rows do
  * not exist, not that they are hidden.
  */
-export async function listSavedBanners(tournamentId: string, stage: string) {
+const BANNER_COLUMNS = "id, tournament_id, stage, role, emblem_ids, label, created_at"
+
+/**
+ * Two screens ask different questions of one table, so the scope is a
+ * parameter rather than a second query.
+ *
+ * The sidebar asks "what did I save for the run on screen" and MUST be scoped:
+ * a Group Stage banner offered inside a Main Event would load three emblems
+ * into five slots and score as if it belonged there. The account page asks
+ * "what have I saved at all", which a scoped list cannot answer however many
+ * times it is called. One builder for both, because the column list and the
+ * ordering are the parts that would drift.
+ */
+async function queryBanners(scope?: { tournamentId: string; stage: string }) {
+  const supabase = await getSupabase()
   if (!supabase) return []
-  const { data, error } = await supabase
-    .from("saved_banners")
-    .select("id, tournament_id, stage, role, emblem_ids, label, created_at")
-    .eq("tournament_id", tournamentId)
-    .eq("stage", stage)
-    .order("created_at", { ascending: false })
+  const base = supabase.from("saved_banners").select(BANNER_COLUMNS)
+  const scoped = scope
+    ? base.eq("tournament_id", scope.tournamentId).eq("stage", scope.stage)
+    : base
+  const { data, error } = await scoped.order("created_at", { ascending: false })
   if (error) throw new Error(error.message)
   return (data as SavedBannerRow[]).map(fromRow)
 }
+
+export const listSavedBanners = (tournamentId: string, stage: string) =>
+  queryBanners({ tournamentId, stage })
+
+/** Every saved banner this user has, whichever run it belongs to. */
+export const listAllSavedBanners = () => queryBanners()
 
 export async function saveBanner(input: {
   tournamentId: string
@@ -129,6 +191,7 @@ export async function saveBanner(input: {
   emblemIds: string[]
   label: string
 }): Promise<SavedBanner> {
+  const supabase = await getSupabase()
   if (!supabase) throw new Error("Supabase is not configured")
   // user_id is not sent. It defaults from the JWT in Postgres and the insert
   // policy checks it again, so a forged owner cannot even be expressed here.
@@ -148,6 +211,7 @@ export async function saveBanner(input: {
 }
 
 export async function deleteBanner(id: string): Promise<void> {
+  const supabase = await getSupabase()
   if (!supabase) throw new Error("Supabase is not configured")
   const { error } = await supabase.from("saved_banners").delete().eq("id", id)
   if (error) throw new Error(error.message)
@@ -201,17 +265,24 @@ const rosterFromRow = (row: SavedRosterRow): SavedRoster => ({
   createdAt: row.created_at,
 })
 
-export async function listSavedRosters(tournamentId: string, stage: string) {
+/** Scoped or not, for the same reason banners are -- see `queryBanners`. */
+async function queryRosters(scope?: { tournamentId: string; stage: string }) {
+  const supabase = await getSupabase()
   if (!supabase) return []
-  const { data, error } = await supabase
-    .from("saved_rosters")
-    .select(ROSTER_COLUMNS)
-    .eq("tournament_id", tournamentId)
-    .eq("stage", stage)
-    .order("created_at", { ascending: false })
+  const base = supabase.from("saved_rosters").select(ROSTER_COLUMNS)
+  const scoped = scope
+    ? base.eq("tournament_id", scope.tournamentId).eq("stage", scope.stage)
+    : base
+  const { data, error } = await scoped.order("created_at", { ascending: false })
   if (error) throw new Error(error.message)
   return (data as SavedRosterRow[]).map(rosterFromRow)
 }
+
+export const listSavedRosters = (tournamentId: string, stage: string) =>
+  queryRosters({ tournamentId, stage })
+
+/** Every saved roster this user has, whichever run it belongs to. */
+export const listAllSavedRosters = () => queryRosters()
 
 export async function saveRoster(input: {
   tournamentId: string
@@ -219,6 +290,7 @@ export async function saveRoster(input: {
   players: { core: number; mid: number; support: number }
   label: string
 }): Promise<SavedRoster> {
+  const supabase = await getSupabase()
   if (!supabase) throw new Error("Supabase is not configured")
   // user_id is not sent, for the same reason as a banner: it defaults from the
   // JWT in Postgres and the insert policy checks it again.
@@ -239,6 +311,7 @@ export async function saveRoster(input: {
 }
 
 export async function deleteRoster(id: string): Promise<void> {
+  const supabase = await getSupabase()
   if (!supabase) throw new Error("Supabase is not configured")
   const { error } = await supabase.from("saved_rosters").delete().eq("id", id)
   if (error) throw new Error(error.message)
