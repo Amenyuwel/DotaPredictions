@@ -11,5 +11,9 @@
     "not_found_handling": "single-page-application",
     // ...but never for the API, or a missing server reads as a 200 of HTML.
     "run_worker_first": ["/api/*"]
-  }
+  },
+  // Non-production branches deploy with `wrangler preview`, which refuses to
+  // run without this block. Empty is enough: assets and compatibility settings
+  // stay at the top level.
+  "previews": {}
 }
