@@ -12,7 +12,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import { Loading } from "@/components/ui/spinner"
+import { Spinner } from "@/components/ui/spinner"
+import { reasonsOf } from "@/lib/admin-ui"
+import { stageName } from "@/lib/labels"
 import type { AdminConfig, OverlayPreview } from "@/types/admin"
 
 /**
@@ -40,6 +42,7 @@ export function PublishDialog({
   config,
   preview,
   publishing,
+  error,
   onPublish,
 }: {
   open: boolean
@@ -47,6 +50,10 @@ export function PublishDialog({
   config: AdminConfig
   preview: OverlayPreview | null
   publishing: boolean
+  /** Why the last attempt failed. Shown here, beside the button that was
+   * pressed: the dialog stays open on a failure, and an error rendered on the
+   * page behind it is one the reader finds only after closing the box. */
+  error: unknown
   onPublish: (note: string) => void
 }) {
   const [note, setNote] = useState("")
@@ -75,7 +82,7 @@ export function PublishDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-lg" showCloseButton={false}>
         <DialogHeader>
-          <DialogTitle>Publish to {config.scope.stage}</DialogTitle>
+          <DialogTitle>Publish to {stageName(config.scope.stage)}</DialogTitle>
           <DialogDescription>
             {!preview?.ok
               ? "This draft cannot be published yet."
@@ -104,8 +111,11 @@ export function PublishDialog({
             </Alert>
           ) : null}
 
+          {/* `role="note"`: worth reading, not worth interrupting a screen
+              reader for. Alert's default `role="alert"` is assertive, and
+              announced these the instant the dialog opened. */}
           {preview?.ok && preview.notes.length > 0 ? (
-            <Alert>
+            <Alert role="note">
               <AlertTriangle aria-hidden />
               <AlertTitle>Worth knowing</AlertTitle>
               <AlertDescription>
@@ -119,7 +129,7 @@ export function PublishDialog({
           ) : null}
 
           {preview?.ok && preview.redundant.length > 0 ? (
-            <Alert>
+            <Alert role="note">
               <CheckCircle2 aria-hidden />
               <AlertTitle>These now match the published run</AlertTitle>
               <AlertDescription>
@@ -149,10 +159,26 @@ export function PublishDialog({
               autoFocus
             />
             <p id={hintId} className="text-muted-foreground text-xs">
-              Required. Every version here is one somebody may later need to revert to,
-              and one with no note is one nobody can judge.
+              Required, at least 3 characters. It is how this version is judged later.
             </p>
           </div>
+
+          {error ? (
+            <Alert variant="destructive">
+              <AlertTriangle aria-hidden />
+              <AlertTitle>Not published</AlertTitle>
+              <AlertDescription>
+                {error instanceof Error ? error.message : "Unknown error."}
+                {reasonsOf(error).length > 0 ? (
+                  <ul className="mt-1 grid list-disc gap-1 pl-4">
+                    {reasonsOf(error).map((reason) => (
+                      <li key={reason}>{reason}</li>
+                    ))}
+                  </ul>
+                ) : null}
+              </AlertDescription>
+            </Alert>
+          ) : null}
         </div>
 
         <DialogFooter>
@@ -160,11 +186,12 @@ export function PublishDialog({
             Cancel
           </Button>
           <Button disabled={!canPublish} onClick={() => onPublish(note.trim())}>
-            {publishing ? <Loading>Publishing…</Loading> : <Send aria-hidden />}
-            Make it live
+            {publishing ? <Spinner /> : <Send aria-hidden />}
+            {publishing ? "Publishing…" : "Make it live"}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   )
 }
+

@@ -49,6 +49,11 @@ export const STAGE_LABEL: Record<Stage, string> = {
   main: "Main Event",
 }
 
+/** A stage key that arrives as a plain string -- the admin scope is typed that
+ * way -- as its words, or the key itself when it is not one this build knows,
+ * so an unknown stage is visible rather than blank. */
+export const stageName = (stage: string): string => STAGE_LABEL[stage as Stage] ?? stage
+
 /**
  * A tournament id as a reader writes it: `ti2026` -> `TI2026`.
  *

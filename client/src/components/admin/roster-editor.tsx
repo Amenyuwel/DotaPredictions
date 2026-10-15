@@ -6,6 +6,7 @@ import { ConfirmDialog, type ConfirmRequest } from "@/components/admin/confirm-d
 import { EditDialog, EditField } from "@/components/admin/edit-dialog"
 import { UndoDialog, type ChangeRow } from "@/components/admin/undo-dialog"
 import {
+  EditedMark,
   FilterField,
   RemovedChips,
   RowActions,
@@ -31,7 +32,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { useMediaQuery } from "@/hooks/use-media-query"
-import { validateId } from "@/lib/admin-ui"
+import { mergeEntry, validateId } from "@/lib/admin-ui"
 import { LANE_LABEL, LANE_ORDER, ROLE_LABEL, ROLE_ORDER } from "@/lib/labels"
 import { cn } from "@/lib/utils"
 import type { AdminConfig, ConfigOverlay, PlayerPatch } from "@/types/admin"
@@ -51,11 +52,10 @@ import type { FantasyRole, Lane, Player, Team } from "@/types/run"
  * them: no sample matrix means no distribution to draw from, and a player
  * scored from nothing looks like a weak player rather than an unknown one.
  *
- * That boundary is stated once, in the rail's "What this page can and cannot
- * change". It used to be repeated as a banner at the top of this form in the
- * same words, which is a second copy to keep in step and a warning frame around
- * something that is not a warning -- the per-row "no data" badges are where an
- * unmeasured player is actually visible, and they are attached to the player.
+ * That boundary is stated where it bites: in the Add and Edit dialogs'
+ * descriptions, and in the per-row "no data" badges, which are attached to the
+ * player they describe. A banner at the top of this form said it once more, in
+ * a warning frame around something that is not a warning.
  *
  * A list beside a detail pane, rather than sixteen expanding panels. Expanding
  * panels made the page grow with every team opened, so reading two of them
@@ -77,6 +77,30 @@ import type { FantasyRole, Lane, Player, Team } from "@/types/run"
  * shows; a second copy of either is a second spelling waiting to drift. */
 const LANE_OPTIONS = LANE_ORDER.map((lane) => ({ value: lane, label: LANE_LABEL[lane] }))
 const ROLE_OPTIONS = ROLE_ORDER.map((role) => ({ value: role, label: ROLE_LABEL[role] }))
+
+type TeamPatch = NonNullable<ConfigOverlay["teams"]>[string]
+
+/** A player's or team's name inside a heading. Headings are Space Grotesk, and
+ * that face has no Cyrillic or Greek, so a nickname set in it would render in
+ * two fonts at once; names stay in Inter wherever they appear (DESIGN.md). */
+function Name({ children }: { children: string }) {
+  return <span className="font-sans">{children}</span>
+}
+
+/**
+ * "Also played under", parsed, or null when any part is not an id.
+ *
+ * Null rather than the parts that did parse. Dropping a mistyped id quietly
+ * saved a list one shorter than the one typed, and a missing id is evidence
+ * split in half with no error anywhere -- so a bad token refuses the save.
+ */
+function parseIds(value: string): number[] | null {
+  const parts = value
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean)
+  return parts.every((part) => validateId(part) === null) ? parts.map(Number) : null
+}
 
 export function RosterEditor({
   config,
@@ -186,7 +210,7 @@ export function RosterEditor({
           <CardTitle className="text-sm">Teams</CardTitle>
           <Button size="sm" variant="outline" onClick={() => setAddingTeam(true)}>
             <Plus aria-hidden />
-            Add
+            Add team
           </Button>
         </div>
         <FilterField
@@ -195,8 +219,8 @@ export function RosterEditor({
           label="Filter by team or player"
           summary={
             shown.length === inStage.length
-              ? `${inStage.length}`
-              : `${shown.length} of ${inStage.length}`
+              ? `${inStage.length} teams`
+              : `${shown.length} of ${inStage.length} teams`
           }
         />
       </CardHeader>
@@ -222,24 +246,23 @@ export function RosterEditor({
                     if (!wide) setDetailOpen(true)
                   }}
                   className={cn(
-                    "focus-visible:ring-ring flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-sm focus-visible:ring-2 focus-visible:outline-none",
+                    "focus-visible:ring-ring flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-sm focus-visible:ring-2 focus-visible:outline-none active:translate-y-px pointer-coarse:min-h-11",
                     wide && isSelected ? "bg-muted font-medium" : "hover:bg-muted/50",
                   )}
                 >
                   <span className="min-w-0 flex-1 truncate">{team.name}</span>
-                  {isTouched(team) ? (
-                    <span
-                      className="bg-primary size-1.5 shrink-0 rounded-full"
-                      title="Edited in this draft"
-                    />
-                  ) : null}
+                  {isTouched(team) ? <EditedMark /> : null}
+                  {/* Words for both counts, not a `title`: a screen reader read
+                      this row as "Team Spirit 2 5" and a phone cannot hover. */}
                   {noData > 0 ? (
-                    <Badge variant="destructive" title={`${noData} with no sample matrix`}>
+                    <Badge variant="outline">
                       {noData}
+                      <span className="sr-only"> with no data,</span>
                     </Badge>
                   ) : null}
-                  <span className="text-muted-foreground shrink-0 text-2xs tabular-nums">
+                  <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
                     {roster.length}
+                    <span className="sr-only"> players</span>
                   </span>
                   {wide ? null : (
                     <ChevronRight className="text-muted-foreground size-3.5 shrink-0" aria-hidden />
@@ -259,10 +282,8 @@ export function RosterEditor({
         {/* Said rather than left to be noticed. A list that quietly drops
             half its rows is one a reader checks against another source. */}
         {hidden > 0 ? (
-          <p className="text-muted-foreground mt-2 px-1 text-2xs">
-            {hidden} team{hidden === 1 ? "" : "s"} not in this stage are hidden. An
-            overlay is per stage, and a team with no projection is absent from every
-            picker anyway.
+          <p className="text-muted-foreground mt-2 px-1 text-xs">
+            {hidden === 1 ? "1 team not in this stage is hidden." : `${hidden} teams not in this stage are hidden.`}
           </p>
         ) : null}
       </CardContent>
@@ -274,8 +295,8 @@ export function RosterEditor({
       <Card>
         <CardHeader className="gap-2">
           <div className="flex flex-wrap items-center gap-2">
-            <CardTitle className="mr-auto">{selected.name}</CardTitle>
-            <code className="text-muted-foreground text-2xs">{selected.teamId}</code>
+            <CardTitle className="mr-auto font-sans">{selected.name}</CardTitle>
+            <code className="text-muted-foreground text-xs">{selected.teamId}</code>
             {!publishedTeams.has(selected.teamId) ? (
               <Badge variant="secondary">new</Badge>
             ) : null}
@@ -309,7 +330,7 @@ export function RosterEditor({
         </CardHeader>
 
         <CardContent className="grid gap-3 px-0">
-          <Table>
+          <Table aria-label={`${selected.name} roster`}>
             <TableHeader>
               <TableRow>
                 <TableHead className="pl-6">Player</TableHead>
@@ -338,11 +359,13 @@ export function RosterEditor({
 
                     <TableCell>
                       <div className="flex items-center gap-1.5">
-                        <code className="text-muted-foreground text-2xs">
+                        <code className="text-muted-foreground text-xs">
                           {player.playerId}
                         </code>
+                        {/* Outline, as the stats table marks an unmeasured stat:
+                            the same fact in two variants read as two facts. */}
                         {!measured.has(player.playerId) ? (
-                          <Badge variant="destructive" title="No sample matrix in this run">
+                          <Badge variant="outline" title="No sample matrix in this run">
                             no data
                           </Badge>
                         ) : null}
@@ -371,7 +394,11 @@ export function RosterEditor({
                         onUndo={() => setUndoingPlayer(player.playerId)}
                         onRemove={() =>
                           setPending({
-                            title: `Remove ${player.nick}?`,
+                            title: (
+                              <>
+                                Remove <Name>{player.nick}</Name>?
+                              </>
+                            ),
                             detail: `They leave ${selected.name} for this stage's overlay.`,
                             confirmText: player.nick,
                             confirmLabel: "Remove player",
@@ -438,7 +465,11 @@ export function RosterEditor({
               className="text-destructive ml-auto text-xs"
               onClick={() =>
                 setPending({
-                  title: `Remove ${selected.name}?`,
+                  title: (
+                    <>
+                      Remove <Name>{selected.name}</Name>?
+                    </>
+                  ),
                   detail: `Its ${(byTeam.get(selected.teamId) ?? []).length} players go with it — a player on no team cannot be ranked at all.`,
                   confirmText: selected.name,
                   confirmLabel: "Remove team",
@@ -513,7 +544,7 @@ export function RosterEditor({
         entries={[
           ...teamsRemoved.map((id) => ({
             key: `team:${id}`,
-            label: `team ${publishedTeams.get(Number(id))?.name ?? id}`,
+            label: `${publishedTeams.get(Number(id))?.name ?? id} (team)`,
           })),
           ...playersRemoved.map((id) => ({
             key: `player:${id}`,
@@ -560,7 +591,15 @@ export function RosterEditor({
       <AddDialog
         open={addingPlayer}
         onOpenChange={setAddingPlayer}
-        title={`Add a player to ${selected?.name ?? ""}`}
+        title={
+          selected ? (
+            <>
+              Add a player to <Name>{selected.name}</Name>
+            </>
+          ) : (
+            "Add a player"
+          )
+        }
         description="They will have no sample matrix, so they are shown as having no data and cannot be ranked until the next crawl."
         fields={[
           {
@@ -572,9 +611,15 @@ export function RosterEditor({
             validate: validateId,
           },
           { name: "nick", label: "Nickname", placeholder: "SumaiL" },
+          // Chosen here, in the open. They used to be fixed at Carry and Core
+          // with a comment calling that a starting point to correct -- but the
+          // row that appears only displays them, so a support stand-in went
+          // live as a core unless somebody thought to open a second dialog.
+          { name: "lane", label: "Lane", options: LANE_OPTIONS },
+          { name: "fantasyRole", label: "Fantasy slot", options: ROLE_OPTIONS },
         ]}
         submitLabel="Add player"
-        onSubmit={({ playerId, nick }) => {
+        onSubmit={({ playerId, nick, lane, fantasyRole }) => {
           if (!selected) return
           onChange({
             ...doc,
@@ -582,10 +627,13 @@ export function RosterEditor({
               ...(doc.players ?? {}),
               // Every field named: a player the run does not carry has nothing
               // to merge onto, and the server refuses a partial one rather than
-              // filling in a lane nobody chose. Carry and core are a starting
-              // point to correct, not a guess presented as a fact -- both
-              // controls sit on the row that appears.
-              [playerId]: { nick, teamId: selected.teamId, fantasyRole: "core", lane: "carry" },
+              // filling in a lane nobody chose.
+              [playerId]: {
+                nick,
+                teamId: selected.teamId,
+                fantasyRole: fantasyRole as FantasyRole,
+                lane: lane as Lane,
+              },
             },
           })
         }}
@@ -596,18 +644,27 @@ export function RosterEditor({
           player={players.find((p) => p.playerId === editingPlayer)!}
           published={publishedPlayers.get(editingPlayer)}
           onClose={() => setEditingPlayer(null)}
-          onSave={(changes) =>
+          onSave={(changes) => {
+            // The dialog's three fields are replaced, not merged over. Merging
+            // kept a field the reader had just set back to its published value,
+            // so the override could never be cleared and an untouched save left
+            // an empty entry that marked the row changed. Anything else the
+            // entry carries -- an added player's team -- is kept.
+            const key = String(editingPlayer)
+            const rest = { ...(doc.players?.[key] ?? {}) }
+            delete rest.nick
+            delete rest.lane
+            delete rest.fantasyRole
             onChange({
               ...doc,
-              players: {
-                ...(doc.players ?? {}),
-                [String(editingPlayer)]: {
-                  ...(doc.players?.[String(editingPlayer)] ?? {}),
-                  ...changes,
-                },
-              },
+              players: mergeEntry(
+                doc.players,
+                key,
+                { ...rest, ...changes },
+                publishedPlayers.has(editingPlayer),
+              ),
             })
-          }
+          }}
         />
       ) : null}
 
@@ -615,28 +672,38 @@ export function RosterEditor({
         <EditDialog
           open
           onOpenChange={(open) => !open && setEditingTeam(false)}
-          title={`Edit ${selected.name}`}
+          title={
+            <>
+              Edit <Name>{selected.name}</Name>
+            </>
+          }
           description="Labels only — a roster's measurements come from the crawler."
           value={{
             name: selected.name,
             alsoTeamIds: selected.alsoTeamIds.join(", "),
           }}
-          onSave={(next) =>
-            onChange({
-              ...doc,
-              teams: {
-                ...(doc.teams ?? {}),
-                [String(selected.teamId)]: {
-                  ...(doc.teams?.[String(selected.teamId)] ?? {}),
-                  name: next.name,
-                  alsoTeamIds: next.alsoTeamIds
-                    .split(",")
-                    .map((part) => Number(part.trim()))
-                    .filter((n) => Number.isInteger(n) && n > 0),
-                },
-              },
-            })
+          validate={(next) =>
+            !next.name.trim()
+              ? "Enter a team name."
+              : parseIds(next.alsoTeamIds) === null
+                ? "Also played under takes OpenDota team ids, digits only, separated by commas."
+                : null
           }
+          onSave={(next) => {
+            // Diffed against the published team, as every other editor here
+            // does. This wrote both fields on every save, so saving the dialog
+            // untouched minted an override that agreed with the run.
+            const key = String(selected.teamId)
+            const base = publishedTeams.get(selected.teamId)
+            const ids = parseIds(next.alsoTeamIds) ?? []
+            const name = next.name.trim()
+            const changes: TeamPatch = { ...(doc.teams?.[key] ?? {}) }
+            delete changes.name
+            delete changes.alsoTeamIds
+            if (!base || name !== base.name) changes.name = name
+            if (!base || ids.join(",") !== base.alsoTeamIds.join(",")) changes.alsoTeamIds = ids
+            onChange({ ...doc, teams: mergeEntry(doc.teams, key, changes, base !== undefined) })
+          }}
         >
           {(draft, set) => (
             <>
@@ -664,7 +731,11 @@ export function RosterEditor({
         <UndoDialog
           open
           onOpenChange={(open) => !open && setUndoingPlayer(null)}
-          title={`Changes to ${publishedPlayers.get(undoingPlayer)?.nick ?? "this player"}`}
+          title={
+            <>
+              Changes to <Name>{publishedPlayers.get(undoingPlayer)?.nick ?? "this player"}</Name>
+            </>
+          }
           rows={playerChangeRows(
             doc.players[String(undoingPlayer)],
             publishedPlayers.get(undoingPlayer),
@@ -677,7 +748,11 @@ export function RosterEditor({
         <UndoDialog
           open
           onOpenChange={(open) => !open && setUndoingTeam(false)}
-          title={`Changes to ${publishedTeams.get(selected.teamId)?.name ?? "this team"}`}
+          title={
+            <>
+              Changes to <Name>{publishedTeams.get(selected.teamId)?.name ?? "this team"}</Name>
+            </>
+          }
           rows={teamChangeRows(
             doc.teams[String(selected.teamId)],
             publishedTeams.get(selected.teamId),
@@ -718,7 +793,11 @@ function PlayerEditDialog({
     <EditDialog
       open
       onOpenChange={(open) => !open && onClose()}
-      title={`Edit ${player.nick}`}
+      title={
+        <>
+          Edit <Name>{player.nick}</Name>
+        </>
+      }
       description="Labels only — per-game stat lines come from the crawler."
       value={{ nick: player.nick, lane: player.lane, fantasyRole: player.fantasyRole }}
       onSave={(next) => {

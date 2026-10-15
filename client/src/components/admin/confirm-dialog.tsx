@@ -32,7 +32,7 @@ import { Input } from "@/components/ui/input"
  */
 
 export interface ConfirmRequest {
-  title: string
+  title: ReactNode
   /** What else this takes with it. Omitted when there genuinely is nothing. */
   detail?: ReactNode
   /** Typed back, exactly, before the button does anything. The name of the
@@ -74,8 +74,6 @@ export function ConfirmDialog({
   const matches =
     request !== null && typed.trim().toLowerCase() === request.confirmText.trim().toLowerCase()
 
-  // The words in the box and the words a screen reader hears, from one place.
-  const hint = request ? `Type ${request.confirmText} to delete` : ""
 
   return (
     <Dialog open={request !== null} onOpenChange={(open) => !open && onClose()}>
@@ -101,20 +99,19 @@ export function ConfirmDialog({
                 : "This cannot be undone."}
             </p>
 
-            <div>
-              {/* The instruction is the placeholder. It vanishes at the first
-                  keystroke, which is normally the reason not to put one there,
-                  and is survivable here only because the title carries the same
-                  name and does not vanish. The label says the same words for
-                  anyone who cannot see either. */}
-              <label htmlFor={inputId} className="sr-only">
-                {hint}
+            <div className="grid gap-1.5">
+              {/* A visible label, not a placeholder. The instruction used to be
+                  the placeholder, which vanishes at the first keystroke -- the
+                  moment the reader is checking what they are meant to type.
+                  "Confirm", not "delete": the same gate also guards discarding a
+                  draft and replacing one, which delete does not describe. */}
+              <label htmlFor={inputId} className="text-xs">
+                Type <strong className="font-medium">{request.confirmText}</strong> to confirm
               </label>
               <Input
                 id={inputId}
                 value={typed}
                 onChange={(event) => setTyped(event.currentTarget.value)}
-                placeholder={hint}
                 aria-describedby={hintId}
                 autoComplete="off"
                 autoFocus

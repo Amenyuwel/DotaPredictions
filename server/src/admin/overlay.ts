@@ -1,8 +1,8 @@
-import { readFileSync } from "node:fs"
-import { fileURLToPath } from "node:url"
-
 import { Ajv2020, type ValidateFunction } from "ajv/dist/2020.js"
 
+// Imported, not read from disk, for the same reason as validate.ts: it is the
+// only form whose path survives compilation into dist/.
+import schema from "../../../shared/overlay-schema.json" with { type: "json" }
 import type { ConfigOverlay } from "../../../shared/overlay-types.js"
 import { assertRunPayload, type Emblem, type Player, type RunPayload, type Scoring, type Team } from "../validate.js"
 
@@ -38,9 +38,6 @@ import { assertRunPayload, type Emblem, type Player, type RunPayload, type Scori
  * engine's own output is validated against -- so an overlay cannot produce a
  * payload the server would have refused to boot on.
  */
-
-const schemaPath = fileURLToPath(new URL("../../../shared/overlay-schema.json", import.meta.url))
-const schema = JSON.parse(readFileSync(schemaPath, "utf8")) as object
 
 // `strict: false` and no ajv-formats, both for the same reason as validate.ts:
 // this schema declares no formats, and strict mode rejects the annotation-only

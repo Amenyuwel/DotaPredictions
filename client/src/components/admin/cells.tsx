@@ -36,7 +36,12 @@ import { cn } from "@/lib/utils"
  * Binding straight to a number makes "-" and "1." unrepresentable, so the field
  * fights back halfway through every negative and every decimal, and an emptied
  * box becomes NaN -- which reaching an overlay is a stat that pays nothing while
- * looking deliberate. Committed on blur: a partially typed number is not one. */
+ * looking deliberate. Committed on blur: a partially typed number is not one.
+ *
+ * An emptied box is checked for by name. `Number("")` is 0 and finite, and a
+ * `type="number"` input reports "" for anything it cannot parse, a lone "-"
+ * included -- so testing the parse alone let clearing a field publish a stat
+ * that pays nothing, the exact case this comment exists to prevent. */
 export function NumberCell({
   value,
   onCommit,
@@ -59,11 +64,22 @@ export function NumberCell({
       step={step ?? "any"}
       defaultValue={String(value)}
       onBlur={(event) => {
-        const parsed = Number(event.currentTarget.value)
-        if (Number.isFinite(parsed) && parsed !== value) onCommit(parsed)
-        else event.currentTarget.value = String(value)
+        const raw = event.currentTarget.value.trim()
+        const parsed = Number(raw)
+        if (raw !== "" && !event.currentTarget.validity.badInput && Number.isFinite(parsed)) {
+          if (parsed !== value) onCommit(parsed)
+        } else {
+          event.currentTarget.value = String(value)
+        }
       }}
-      className={cn("h-7 tabular-nums", width, changed && "border-primary/60 bg-primary/5")}
+      // A focused number input steps on the scroll wheel, so scrolling a form
+      // past it edits it. Blurring first makes the wheel scroll the page.
+      onWheel={(event) => event.currentTarget.blur()}
+      className={cn(
+        "h-7 tabular-nums pointer-coarse:h-11",
+        width,
+        changed && "border-primary/60 bg-primary/5",
+      )}
     />
   )
 }
@@ -116,7 +132,7 @@ export function TextCell({
         const next = event.currentTarget.value
         if (next !== value) onCommit(next)
       }}
-      className={cn("h-7", className, changed && "border-primary/60 bg-primary/5")}
+      className={cn("h-7 pointer-coarse:h-11", className, changed && "border-primary/60 bg-primary/5")}
     />
   )
 }
@@ -212,12 +228,12 @@ export function FilterField({
           value={value}
           onChange={(event) => onChange(event.currentTarget.value)}
           placeholder={label}
-          className="h-7 pl-7"
+          className="h-7 pl-7 pointer-coarse:h-11"
         />
       </label>
       {/* Wraps only the count, not the list: a live region around the table
           would re-read every row on each keystroke. */}
-      <span className="text-muted-foreground shrink-0 text-2xs tabular-nums" aria-live="polite">
+      <span className="text-muted-foreground shrink-0 text-xs tabular-nums" aria-live="polite">
         {summary}
       </span>
     </div>
@@ -299,7 +315,7 @@ export function LabelledField({
         </label>
         <UndoCell changed={changed} what={label} onRevert={onUndo} />
       </div>
-      <p className="text-muted-foreground min-h-4 text-2xs">
+      <p className="text-muted-foreground min-h-4 text-xs">
         {changed && was ? `was ${was}` : hint}
       </p>
     </div>
@@ -358,4 +374,21 @@ export function RowActions({
  * at a glance and keeps exactly one height either way. */
 export function ValueCell({ value, changed }: { value: ReactNode; changed: boolean }) {
   return <span className={cn("tabular-nums", changed && "font-medium")}>{value}</span>
+}
+
+/**
+ * "This holds unsaved or unpublished edits", as one mark everywhere.
+ *
+ * The rail, the scoring tabs and the team list each needed to say it, and the
+ * team list said it with a bare dot whose only words were a `title` -- which a
+ * screen reader does not read and a phone cannot hover. One component, so the
+ * dot and the words travel together and look the same in all three places.
+ */
+export function EditedMark() {
+  return (
+    <>
+      <span aria-hidden className="bg-foreground size-1.5 shrink-0 rounded-full" />
+      <span className="sr-only">, has edits</span>
+    </>
+  )
 }

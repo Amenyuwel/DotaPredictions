@@ -1,8 +1,11 @@
-import { readFileSync } from "node:fs"
-import { fileURLToPath } from "node:url"
-
 import { Ajv2020, type ValidateFunction } from "ajv/dist/2020.js"
 import addFormats from "ajv-formats"
+
+// Imported rather than read from disk: tsc then emits the schema beside the
+// compiled code, so this one relative path holds from src/ (tsx) and from
+// dist/server/src/ (npm start). A readFileSync path was right in only one, and
+// the compiled server died at boot with ENOENT.
+import schema from "../../shared/run-schema.json" with { type: "json" }
 
 import type {
   Emblem,
@@ -27,9 +30,6 @@ import type {
  * and the reader disagree about what the bytes mean, and any number computed
  * from it would be confidently wrong.
  */
-
-const schemaPath = fileURLToPath(new URL("../../shared/run-schema.json", import.meta.url))
-const schema = JSON.parse(readFileSync(schemaPath, "utf8")) as object
 
 const ajv = new Ajv2020({ allErrors: true, strict: false })
 addFormats.default(ajv)

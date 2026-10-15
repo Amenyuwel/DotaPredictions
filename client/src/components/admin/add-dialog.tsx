@@ -1,4 +1,4 @@
-import { useId, useState } from "react"
+import { useId, useState, type ReactNode } from "react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -9,6 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { SelectCell } from "@/components/admin/cells"
 import { Input } from "@/components/ui/input"
 
 /**
@@ -43,6 +44,9 @@ export interface AddField {
    * lives with the field rather than in the caller's submit handler, so the
    * message can appear next to the input that caused it. */
   validate?: (value: string) => string | null
+  /** A closed set, rendered as a select that opens on its first option. For a
+   * value the server only accepts from a list, a text box is a typo waiting. */
+  options?: readonly { value: string; label: string }[]
 }
 
 export function AddDialog({
@@ -56,7 +60,7 @@ export function AddDialog({
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
-  title: string
+  title: ReactNode
   description?: string
   fields: AddField[]
   submitLabel?: string
@@ -77,7 +81,11 @@ export function AddDialog({
   if (open !== wasOpen) {
     setWasOpen(open)
     if (open) {
-      setValues({})
+      setValues(
+        Object.fromEntries(
+          fields.flatMap((f) => (f.options?.[0] ? [[f.name, f.options[0].value]] : [])),
+        ),
+      )
       setErrors({})
     }
   }
@@ -120,34 +128,53 @@ export function AddDialog({
             const error = errors[field.name]
             return (
               <div key={field.name} className="grid gap-1.5">
-                <label htmlFor={id} className="text-sm font-medium">
-                  {field.label}
-                </label>
-                <Input
-                  id={id}
-                  autoFocus={index === 0}
-                  inputMode={field.numeric ? "numeric" : undefined}
-                  placeholder={field.placeholder}
-                  value={values[field.name] ?? ""}
-                  aria-invalid={Boolean(error)}
-                  aria-describedby={error || field.hint ? describedBy : undefined}
-                  onChange={(event) => {
-                    const next = event.currentTarget.value
-                    setValues((prev) => ({ ...prev, [field.name]: next }))
-                    // Clear the error as soon as it is being addressed. Leaving
-                    // it until the next submit means the message describes a
-                    // value that is no longer in the box.
-                    if (error) setErrors((prev) => ({ ...prev, [field.name]: "" }))
-                  }}
-                />
+                {field.options ? (
+                  <>
+                    {/* The trigger carries the accessible name itself, so this
+                        is the visible half only. */}
+                    <span className="text-sm font-medium">{field.label}</span>
+                    <SelectCell
+                      label={field.label}
+                      value={values[field.name] ?? field.options[0]?.value ?? ""}
+                      options={field.options}
+                      width="w-full"
+                      onChange={(next) => setValues((prev) => ({ ...prev, [field.name]: next }))}
+                    />
+                  </>
+                ) : (
+                  <>
+                    <label htmlFor={id} className="text-sm font-medium">
+                      {field.label}
+                    </label>
+                    <Input
+                      id={id}
+                      autoFocus={index === 0}
+                      inputMode={field.numeric ? "numeric" : undefined}
+                      placeholder={field.placeholder}
+                      value={values[field.name] ?? ""}
+                      aria-invalid={Boolean(error)}
+                      aria-describedby={error || field.hint ? describedBy : undefined}
+                      onChange={(event) => {
+                        const next = event.currentTarget.value
+                        setValues((prev) => ({ ...prev, [field.name]: next }))
+                        // Clear the error as soon as it is being addressed. Leaving
+                        // it until the next submit means the message describes a
+                        // value that is no longer in the box.
+                        if (error) setErrors((prev) => ({ ...prev, [field.name]: "" }))
+                      }}
+                    />
+                  </>
+                )}
                 {/* One element for hint and error, so the row keeps its height
                     whichever is showing and the fields below do not jump. */}
-                <p
-                  id={describedBy}
-                  className={error ? "text-destructive text-xs" : "text-muted-foreground text-xs"}
-                >
-                  {error || field.hint}
-                </p>
+                {error || field.hint ? (
+                  <p
+                    id={describedBy}
+                    className={error ? "text-destructive text-xs" : "text-muted-foreground text-xs"}
+                  >
+                    {error || field.hint}
+                  </p>
+                ) : null}
               </div>
             )
           })}
