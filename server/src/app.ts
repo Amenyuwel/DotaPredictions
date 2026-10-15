@@ -83,8 +83,12 @@ export function createApp(): Express {
  * In development Vite serves it and proxies /api back.
  */
 function serveClient(app: Express): void {
-  const dist = fileURLToPath(new URL("../../client/dist", import.meta.url))
-  if (!existsSync(dist)) return
+  // Two levels up from src/ (tsx) but four from dist/server/src/ (npm start),
+  // because tsc's rootDir is the repo root. Only one of them exists.
+  const dist = ["../../client/dist", "../../../../client/dist"]
+    .map((rel) => fileURLToPath(new URL(rel, import.meta.url)))
+    .find((candidate) => existsSync(candidate))
+  if (!dist) return
 
   app.use(express.static(dist))
   // The SPA shell for routes only. A path ending in a file extension that
