@@ -1,0 +1,15 @@
+{
+  // Static hosting for the built client on the existing `dotapredictions`
+  // Worker. Only `dist` is uploaded: pointing assets at `client/` itself ships
+  // the raw source, and the browser cannot run `/src/main.tsx`.
+  "name": "dotapredictions",
+  "main": "./worker.js",
+  "compatibility_date": "2026-09-01",
+  "assets": {
+    "directory": "./dist",
+    // Client-side routes such as /admin have no file; serve the app for them.
+    "not_found_handling": "single-page-application",
+    // ...but never for the API, or a missing server reads as a 200 of HTML.
+    "run_worker_first": ["/api/*"]
+  }
+}
