@@ -41,7 +41,7 @@ export function UndoDialog({
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
-  title: string
+  title: ReactNode
   rows: ChangeRow[]
   onUndo: () => void
 }) {
@@ -62,18 +62,20 @@ export function UndoDialog({
         {/* A real table: three columns of the same two facts per row is exactly
             what one is for, and the header is what says which column is which
             without repeating "was" on every line. */}
-        <table className="w-full text-sm">
+        <table className="w-full text-sm" aria-label="Published run against this draft">
           <thead>
             <tr className="text-muted-foreground text-left text-xs">
-              <th className="pb-1 font-medium">Field</th>
-              <th className="pb-1 font-medium">Published run</th>
-              <th className="pb-1 font-medium">This draft</th>
+              <th scope="col" className="pb-1 font-medium">Field</th>
+              <th scope="col" className="pb-1 font-medium">Published run</th>
+              <th scope="col" className="pb-1 font-medium">This draft</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((row) => (
               <tr key={row.label} className="border-t">
-                <td className="py-1.5 pr-2">{row.label}</td>
+                <th scope="row" className="py-1.5 pr-2 text-left font-normal">
+                  {row.label}
+                </th>
                 <td className="text-muted-foreground py-1.5 pr-2 tabular-nums">
                   {row.was ?? "—"}
                 </td>
@@ -90,8 +92,11 @@ export function UndoDialog({
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             Keep it
           </Button>
+          {/* The default weight, not destructive red. Undoing returns the row to
+              what is already public -- the safe direction -- and painting it as
+              the dangerous choice spent the alarm colour on the one answer that
+              cannot make a projection wrong. */}
           <Button
-            variant="destructive"
             onClick={() => {
               onUndo()
               onOpenChange(false)

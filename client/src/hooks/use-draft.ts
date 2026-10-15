@@ -70,14 +70,20 @@ export interface DraftState {
   note: string
   setNote: (note: string) => void
   save: () => void
-  publish: (note: string) => void
+  /** `onDone` runs only once the version is live, so the caller can keep its
+   * dialog open -- spinner showing, error beside the button -- until then. */
+  publish: (note: string, onDone?: () => void) => void
   discard: () => void
   loadVersion: (version: number) => void
   saving: boolean
   publishing: boolean
   /** The last thing that failed, for the one place that renders it. */
   actionError: unknown
+  /** The publish failure alone, for the dialog the publish was pressed in. */
+  publishError: unknown
   lastSavedAt: string | null
+  /** One line about the last action that finished: "v5 is live." */
+  notice: string | null
 }
 
 export function useDraft(tournamentId?: string, stage?: string): DraftState {
@@ -100,8 +106,21 @@ export function useDraft(tournamentId?: string, stage?: string): DraftState {
    * instead of leaving a flag nothing can clear. */
   const [savedDoc, setSavedDoc] = useState<ConfigOverlay>(EMPTY)
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null)
+  // Tagged with the scope it is about, so "v5 is live" said of the Main Event
+  // is not still showing after a switch to the Group Stage.
+  const [notice, setNoticeState] = useState<{ scope: string; text: string } | null>(null)
 
   const dirty = canonical(doc) !== canonical(savedDoc)
+
+  // Unsaved edits live only in this tab. Closing it, reloading it or following
+  // the link back to the tool threw them away without a word; the browser's own
+  // "leave site?" prompt is the one guard that covers all three.
+  useEffect(() => {
+    if (!dirty) return
+    const warn = (event: BeforeUnloadEvent) => event.preventDefault()
+    window.addEventListener("beforeunload", warn)
+    return () => window.removeEventListener("beforeunload", warn)
+  }, [dirty])
 
   // Which scope the local document belongs to. Without this, switching stage
   // carries one stage's edits into the other's form -- and they would look like
@@ -118,6 +137,9 @@ export function useDraft(tournamentId?: string, stage?: string): DraftState {
     setNote(query.data.draft?.note ?? "")
     setLastSavedAt(query.data.draft?.updatedAt ?? null)
   }, [query.data, scopeKey])
+
+  const setNotice = (text: string | null) =>
+    setNoticeState(text && scopeKey ? { scope: scopeKey, text } : null)
 
   const setDoc = useCallback((next: ConfigOverlay) => setDocState(next), [])
 
@@ -153,7 +175,8 @@ export function useDraft(tournamentId?: string, stage?: string): DraftState {
 
   const publishMutation = useMutation({
     mutationFn: (publishNote: string) => publishDraft({ ...scope, note: publishNote }),
-    onSuccess: () => {
+    onSuccess: (result) => {
+      setNotice(`v${result.version} is live.`)
       // A publish changes what the PUBLIC page is being served, so everything
       // the browser holds about a run is now potentially describing the
       // previous configuration.
@@ -170,6 +193,7 @@ export function useDraft(tournamentId?: string, stage?: string): DraftState {
       setSavedDoc(EMPTY)
       setNote("")
       setLastSavedAt(null)
+      setNotice("Draft discarded.")
       void queryClient.invalidateQueries({ queryKey: ["admin-config"] })
     },
   })
@@ -182,9 +206,21 @@ export function useDraft(tournamentId?: string, stage?: string): DraftState {
       loadedScope.current = null
       setNote(`Loaded from version ${version}`)
       void queryClient.invalidateQueries({ queryKey: ["admin-config"] })
+      setNotice(`v${version} loaded into the draft. Check it, then publish.`)
       void result
     },
   })
+
+  // Every action starts from a clean slate. React Query keeps a mutation's
+  // error until that same mutation runs again, so a failed publish went on
+  // headlining the page after three successful saves.
+  const fresh = () => {
+    saveMutation.reset()
+    publishMutation.reset()
+    discardMutation.reset()
+    revertMutation.reset()
+    setNotice(null)
+  }
 
   return {
     config: query.data,
@@ -195,14 +231,28 @@ export function useDraft(tournamentId?: string, stage?: string): DraftState {
     dirty,
     note,
     setNote,
-    save: () => saveMutation.mutate(),
-    publish: (publishNote: string) => publishMutation.mutate(publishNote),
-    discard: () => discardMutation.mutate(),
-    loadVersion: (version: number) => revertMutation.mutate(version),
+    save: () => {
+      fresh()
+      saveMutation.mutate()
+    },
+    publish: (publishNote: string, onDone?: () => void) => {
+      fresh()
+      publishMutation.mutate(publishNote, { onSuccess: () => onDone?.() })
+    },
+    discard: () => {
+      fresh()
+      discardMutation.mutate()
+    },
+    loadVersion: (version: number) => {
+      fresh()
+      revertMutation.mutate(version)
+    },
     saving: saveMutation.isPending,
     publishing: publishMutation.isPending,
     actionError:
       saveMutation.error ?? publishMutation.error ?? discardMutation.error ?? revertMutation.error,
+    publishError: publishMutation.error,
     lastSavedAt,
+    notice: notice && notice.scope === scopeKey ? notice.text : null,
   }
 }

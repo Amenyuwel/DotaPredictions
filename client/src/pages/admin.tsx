@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react"
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react"
 import { ArrowLeft, ShieldAlert } from "lucide-react"
 
 import { AdminNav, DraftStatus } from "@/components/admin/admin-sidebar"
@@ -17,8 +17,9 @@ import { useAdmin } from "@/hooks/use-admin"
 import { useMediaQuery } from "@/hooks/use-media-query"
 import { useDraft } from "@/hooks/use-draft"
 import { useSession } from "@/hooks/use-session"
-import { exportYaml } from "@/lib/admin-api"
-import { SECTIONS } from "@/lib/admin-ui"
+import { AdminError, exportYaml } from "@/lib/admin-api"
+import { reasonsOf, SECTIONS } from "@/lib/admin-ui"
+import { stageName } from "@/lib/labels"
 import type { Stage } from "@/types/run"
 
 /**
@@ -63,6 +64,35 @@ export function AdminPage() {
   // sitting visually after it. Read up here with the other hooks, because the
   // loading and unauthorised states below return early.
   const wide = useMediaQuery("(min-width: 48rem)")
+  const [exportError, setExportError] = useState<unknown>(null)
+
+  // Ctrl+S (Cmd+S) saves the draft. The browser's own Save Page is never what
+  // anybody on this page means, and saving is the step between every edit and
+  // seeing whether the server accepts it -- the most repeated action here.
+  //
+  // Read through a ref, because the listener outlives the render that added
+  // it. And the focused field is blurred first: the palette and slot fields
+  // commit on blur, so saving while one was focused saved the draft without
+  // the value being typed into it.
+  const latest = useRef(draft)
+  useLayoutEffect(() => {
+    latest.current = draft
+  })
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== "s") return
+      event.preventDefault()
+      // Inside a dialog the draft is not what is being edited: an edit dialog
+      // holds its own copy until its own Save.
+      if (document.querySelector('[role="dialog"]')) return
+      if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
+      setTimeout(() => {
+        if (latest.current.dirty && !latest.current.saving) latest.current.save()
+      }, 0)
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [])
 
   if (session.status === "loading" || admin.status === "loading") {
     return (
@@ -136,6 +166,58 @@ export function AdminPage() {
   const effective = !draft.dirty && preview?.ok ? preview : undefined
   const blocked = preview !== null && !preview.ok
 
+  // Which rail sections the draft touches, read off the document itself so an
+  // unsaved edit counts -- that is the one most worth being able to find.
+  const doc = draft.doc
+  const edited = new Set<string>()
+  if (doc.scoring && Object.values(doc.scoring).some((v) => v !== undefined)) edited.add("scoring")
+  if (doc.teams || doc.players || doc.teamsRemoved?.length || doc.playersRemoved?.length) {
+    edited.add("roster")
+  }
+
+  /**
+   * Switching stage replaces the document with the other stage's draft, and
+   * edits that were never saved exist nowhere else. It used to happen on the
+   * select's change with no word at all. Saved drafts survive a switch, so
+   * only unsaved edits are asked about.
+   */
+  const switchStage = (next: { tournamentId: string; stage: Stage }) => {
+    if (!draft.dirty) {
+      setSelected(next)
+      return
+    }
+    setPending({
+      title: `Leave ${stageName(config.scope.stage)} with unsaved edits?`,
+      detail: `Switching to ${stageName(next.stage)} throws away every edit since the last save. The saved draft is kept.`,
+      confirmText: stageName(config.scope.stage),
+      confirmLabel: "Switch and lose edits",
+      reversible: false,
+      onConfirm: () => setSelected(next),
+    })
+  }
+
+  /**
+   * Loading a version REPLACES the draft, on the server as well as here. With
+   * nothing in the draft that costs nothing, so it is not asked about; with
+   * something in it, it is the same loss as Discard and gets the same gate.
+   */
+  const loadVersion = (version: number) => {
+    if (!draft.dirty && !config.draft) {
+      draft.loadVersion(version)
+      return
+    }
+    setPending({
+      title: `Replace the draft with v${version}?`,
+      detail: draft.dirty
+        ? "The saved draft and every unsaved edit are replaced by this version. What is live now is unaffected."
+        : "The saved draft is replaced by this version. What is live now is unaffected.",
+      confirmText: `v${version}`,
+      confirmLabel: "Replace draft",
+      reversible: false,
+      onConfirm: () => draft.loadVersion(version),
+    })
+  }
+
   // One element, placed in one of two slots. Built here rather than twice, so
   // the two layouts cannot drift into two different status cards.
   const status = (
@@ -144,6 +226,8 @@ export function AdminPage() {
       preview={preview}
       dirty={draft.dirty}
       saving={draft.saving}
+      lastSavedAt={draft.lastSavedAt}
+      notice={draft.notice}
       onSave={draft.save}
       onPublish={() => setPublishOpen(true)}
       onDiscard={() =>
@@ -152,9 +236,9 @@ export function AdminPage() {
           detail:
             "Every unpublished edit in it goes. What is live now is unaffected — the published version keeps serving.",
           // A draft has no name of its own, so the stage it belongs to is what
-          // gets typed. It is still the thing being destroyed, and it is still
-          // on screen to be read off.
-          confirmText: config.scope.stage,
+          // gets typed -- as the header and title print it, not the key behind
+          // it, which appears nowhere on screen to be read off.
+          confirmText: stageName(config.scope.stage),
           confirmLabel: "Discard draft",
           // The one action here that writes through: it deletes the draft row
           // rather than adding an entry to it, so the Removed list cannot bring
@@ -163,7 +247,11 @@ export function AdminPage() {
           onConfirm: draft.discard,
         })
       }
-      onExport={() => void download(config.scope.tournamentId, config.scope.stage)}
+      onExport={() => {
+        setExportError(null)
+        // Caught here: an unhandled rejection was the whole failure report.
+        download(config.scope.tournamentId, config.scope.stage).catch(setExportError)
+      }}
     />
   )
 
@@ -176,7 +264,7 @@ export function AdminPage() {
             tournamentId: config.scope.tournamentId,
             stage: config.scope.stage as Stage,
           }}
-          onSelect={setSelected}
+          onSelect={switchStage}
         />
       }
       subtitle={
@@ -196,7 +284,7 @@ export function AdminPage() {
               read: where you are, then what state the draft is in. In one
               column it does not follow it at all -- see below. */}
           <div className="grid gap-4 md:sticky md:top-4">
-            <AdminNav section={section} onSection={setSection} />
+            <AdminNav section={section} onSection={setSection} edited={edited} />
             {wide ? status : null}
           </div>
         </div>
@@ -227,23 +315,8 @@ export function AdminPage() {
             </Alert>
           ) : null}
 
-          {draft.actionError ? (
-            <Alert variant="destructive">
-              <ShieldAlert aria-hidden />
-              <AlertTitle>That did not go through</AlertTitle>
-              <AlertDescription>
-                {draft.actionError instanceof Error
-                  ? draft.actionError.message
-                  : "Unknown error."}
-                {reasonsOf(draft.actionError).length > 0 ? (
-                  <ul className="mt-1 grid list-disc gap-1 pl-4">
-                    {reasonsOf(draft.actionError).map((reason) => (
-                      <li key={reason}>{reason}</li>
-                    ))}
-                  </ul>
-                ) : null}
-              </AlertDescription>
-            </Alert>
+          {draft.actionError ?? exportError ? (
+            <ActionError error={draft.actionError ?? exportError} />
           ) : null}
 
           {section === "scoring" ? (
@@ -280,13 +353,26 @@ export function AdminPage() {
                   Published run:{" "}
                   <strong>{config.published.emblemCount.toLocaleString()}</strong> emblems.
                 </p>
-                {effective ? (
+                {effective || !draft.dirty ? (
                   <p>
-                    With this draft:{" "}
-                    <strong>{effective.emblemCount.toLocaleString()}</strong> emblems (
-                    {Object.keys(effective.scoring.stats).length} stats ×{" "}
-                    {Object.keys(effective.scoring.quality).length} tiers ×{" "}
-                    {Object.keys(effective.scoring.traits).length} traits).
+                    {effective ? (
+                      <>
+                        With this draft:{" "}
+                        <strong>{effective.emblemCount.toLocaleString()}</strong> emblems (
+                        {Object.keys(effective.scoring.stats).length} stats ×{" "}
+                        {Object.keys(effective.scoring.quality).length} tiers ×{" "}
+                        {Object.keys(effective.scoring.traits).length} traits).
+                      </>
+                    ) : (
+                      // Clean and nothing saved, or saved and blocked: either
+                      // way there is no checked draft to count, and "save to
+                      // see" would ask for a save that has nothing to send.
+                      <span className="text-muted-foreground">
+                        {blocked
+                          ? "The saved draft cannot be applied, so it generates nothing."
+                          : "No saved draft yet."}
+                      </span>
+                    )}
                   </p>
                 ) : (
                   <p className="text-muted-foreground">
@@ -302,7 +388,7 @@ export function AdminPage() {
               tournamentId={config.scope.tournamentId}
               stage={config.scope.stage}
               currentVersion={config.live?.version ?? null}
-              onLoad={draft.loadVersion}
+              onLoad={loadVersion}
             />
           ) : null}
         </main>
@@ -321,10 +407,11 @@ export function AdminPage() {
         config={config}
         preview={preview}
         publishing={draft.publishing}
-        onPublish={(note) => {
-          draft.publish(note)
-          setPublishOpen(false)
-        }}
+        error={draft.publishError}
+        // Closed by the publish finishing, not by the press. Closing first hid
+        // "Publishing…", sent a failure to the page behind the dialog, and left
+        // the reader not knowing whether anything had gone live.
+        onPublish={(note) => draft.publish(note, () => setPublishOpen(false))}
       />
     </Shell>
   )
@@ -444,13 +531,35 @@ function BackLink({ className }: { className?: string }) {
   )
 }
 
-/** The server rejects an overlay for EVERY reason at once, precisely so all of
- * them can be shown. Fixing them one round trip at a time is how a five-minute
- * correction becomes an afternoon. */
-function reasonsOf(error: unknown): string[] {
-  return error && typeof error === "object" && "reasons" in error
-    ? ((error as { reasons?: string[] }).reasons ?? [])
-    : []
+/**
+ * A failed save, discard, load or export, said in the server's words.
+ *
+ * The headline is the server's `reason` (or a sentence for the status), and the
+ * request line -- `PUT /api/admin/config/draft -> 409` -- sits under it in small
+ * print. It used to BE the headline, which told the reader which endpoint
+ * refused and not why.
+ */
+function ActionError({ error }: { error: unknown }) {
+  const reasons = reasonsOf(error)
+  return (
+    <Alert variant="destructive">
+      <ShieldAlert aria-hidden />
+      <AlertTitle>That did not go through</AlertTitle>
+      <AlertDescription>
+        <p>{error instanceof Error ? error.message : "Unknown error."}</p>
+        {reasons.length > 0 ? (
+          <ul className="mt-1 grid list-disc gap-1 pl-4">
+            {reasons.map((reason) => (
+              <li key={reason}>{reason}</li>
+            ))}
+          </ul>
+        ) : null}
+        {error instanceof AdminError && error.request ? (
+          <p className="mt-1 font-mono text-xs opacity-80">{error.request}</p>
+        ) : null}
+      </AlertDescription>
+    </Alert>
+  )
 }
 
 /**

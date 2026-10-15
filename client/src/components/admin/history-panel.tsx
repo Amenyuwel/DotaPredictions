@@ -71,9 +71,17 @@ export function HistoryPanel({
             ))}
           </SkeletonPanel>
         ) : query.error ? (
-          <p className="text-destructive text-sm">Could not read the history.</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-destructive text-sm">
+              Could not read the history.{" "}
+              {query.error instanceof Error ? query.error.message : null}
+            </p>
+            <Button size="sm" variant="outline" onClick={() => void query.refetch()}>
+              Try again
+            </Button>
+          </div>
         ) : query.data && query.data.versions.length > 0 ? (
-          <Table>
+          <Table aria-label="Published versions">
             <TableHeader>
               <TableRow>
                 <TableHead>Version</TableHead>
@@ -104,7 +112,10 @@ export function HistoryPanel({
                     {version.authorEmail || "unknown"}
                   </TableCell>
                   <TableCell className="text-muted-foreground text-xs whitespace-nowrap">
-                    {new Date(version.publishedAt).toLocaleString()}
+                    {new Date(version.publishedAt).toLocaleString(undefined, {
+                      dateStyle: "medium",
+                      timeStyle: "short",
+                    })}
                   </TableCell>
                   <TableCell className="text-right">
                     <Button

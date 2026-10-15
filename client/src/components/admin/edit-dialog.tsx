@@ -1,4 +1,5 @@
-import { useState, type ReactNode } from "react"
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react"
+import { flushSync } from "react-dom"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -37,19 +38,36 @@ export function EditDialog<T>({
   description,
   value,
   onSave,
+  validate,
   children,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
-  title: string
+  title: ReactNode
   description?: ReactNode
   /** The row as it stands. Copied on open; the original is never touched. */
   value: T
   onSave: (next: T) => void
+  /** A reason the working copy cannot be saved, or null. Checked on Save and
+   * shown on the button's bar, so a value the caller would otherwise have to
+   * drop quietly -- an id that is not a number -- is refused out loud. */
+  validate?: (draft: T) => string | null
   /** The fields, given the working copy and a way to change one of them. */
   children: (draft: T, set: <K extends keyof T>(key: K, next: T[K]) => void) => ReactNode
 }) {
   const [draft, setDraft] = useState<T>(value)
+  const [error, setError] = useState<string | null>(null)
+
+  // The working copy as of the last commit, for the submit handler. The fields
+  // commit on blur, and Enter submits the form WITHOUT a blur -- so the handler
+  // blurs the focused field itself, flushes that commit, and then needs the
+  // copy it produced rather than the one its own closure captured. Reading
+  // `draft` there saved the value from before the edit: type 1340, press Enter,
+  // and the dialog closed on the old number as though it had worked.
+  const latest = useRef(draft)
+  useLayoutEffect(() => {
+    latest.current = draft
+  }, [draft])
 
   // Re-seeded whenever a different row is opened, adjusted during render rather
   // than in an effect: an effect would paint the previous row's numbers once
@@ -58,7 +76,10 @@ export function EditDialog<T>({
   const [lastOpen, setLastOpen] = useState(open)
   if (open !== lastOpen) {
     setLastOpen(open)
-    if (open) setDraft(value)
+    if (open) {
+      setDraft(value)
+      setError(null)
+    }
   }
 
   const set = <K extends keyof T>(key: K, next: T[K]) =>
@@ -70,7 +91,15 @@ export function EditDialog<T>({
         <form
           onSubmit={(event) => {
             event.preventDefault()
-            onSave(draft)
+            const focused = document.activeElement
+            if (focused instanceof HTMLElement && event.currentTarget.contains(focused)) {
+              flushSync(() => focused.blur())
+            }
+            const next = latest.current
+            const problem = validate?.(next) ?? null
+            setError(problem)
+            if (problem) return
+            onSave(next)
             onOpenChange(false)
           }}
           className="grid gap-5"
@@ -90,8 +119,13 @@ export function EditDialog<T>({
               one more thing to weigh up in a box that had four already. The
               footer had the room standing empty. */}
           <DialogFooter className="flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-muted-foreground text-xs">
-              Saves into the draft. Nothing public changes until you publish.
+            {/* The refusal takes the caption's place rather than adding a line,
+                so the bar keeps its height and the buttons stay put. */}
+            <p
+              className={error ? "text-destructive text-xs" : "text-muted-foreground text-xs"}
+              role={error ? "alert" : undefined}
+            >
+              {error ?? "Saves into the draft. Nothing public changes until you publish."}
             </p>
             <div className="flex justify-end gap-2">
               <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>

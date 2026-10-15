@@ -1,8 +1,9 @@
 import { Download, Save, Send, Trash2 } from "lucide-react"
 
+import { EditedMark } from "@/components/admin/cells"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Loading } from "@/components/ui/spinner"
+import { Spinner } from "@/components/ui/spinner"
 import { SECTIONS } from "@/lib/admin-ui"
 import { cn } from "@/lib/utils"
 import type { AdminConfig, OverlayPreview } from "@/types/admin"
@@ -35,9 +36,13 @@ import type { AdminConfig, OverlayPreview } from "@/types/admin"
 export function AdminNav({
   section,
   onSection,
+  edited,
 }: {
   section: string
   onSection: (next: string) => void
+  /** Sections the draft touches, so an edit made in another section is found
+   * from the rail rather than by opening each one. */
+  edited: ReadonlySet<string>
 }) {
   return (
     <nav aria-label="Configuration sections">
@@ -49,13 +54,14 @@ export function AdminNav({
               aria-current={entry.value === section ? "page" : undefined}
               onClick={() => onSection(entry.value)}
               className={cn(
-                "focus-visible:ring-ring w-full rounded-md px-2.5 py-1.5 text-left text-sm focus-visible:ring-2 focus-visible:outline-none",
+                "focus-visible:ring-ring flex w-full items-center gap-1.5 rounded-md px-2.5 py-1.5 text-left text-sm focus-visible:ring-2 focus-visible:outline-none active:translate-y-px pointer-coarse:min-h-11",
                 entry.value === section
                   ? "bg-muted text-foreground font-medium"
                   : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
               )}
             >
               {entry.label}
+              {edited.has(entry.value) ? <EditedMark /> : null}
             </button>
           </li>
         ))}
@@ -69,6 +75,8 @@ export function DraftStatus({
   preview,
   dirty,
   saving,
+  lastSavedAt,
+  notice,
   onSave,
   onPublish,
   onDiscard,
@@ -78,6 +86,10 @@ export function DraftStatus({
   preview: OverlayPreview | null
   dirty: boolean
   saving: boolean
+  lastSavedAt: string | null
+  /** One line about the last thing that finished -- "v5 is live" -- so a
+   * publish ends on a fact rather than on a dialog simply going away. */
+  notice: string | null
   onSave: () => void
   onPublish: () => void
   onDiscard: () => void
@@ -124,7 +136,7 @@ export function DraftStatus({
       className="bg-card grid gap-3 rounded-lg border p-3"
     >
       <div className="grid gap-1">
-        <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+        <h2 className="text-muted-foreground text-2xs font-semibold tracking-[0.12em] uppercase">
           Live now
         </h2>
         {config.live ? (
@@ -136,9 +148,14 @@ export function DraftStatus({
                 {config.live.changeCount === 1 ? "" : "s"}
               </span>
             </p>
+            {/* With the time. Mid-event there can be several publishes in a
+                day, and a date alone cannot tell them apart. */}
             <p className="text-muted-foreground text-xs">
               {config.live.authorEmail || "unknown"},{" "}
-              {new Date(config.live.publishedAt).toLocaleDateString()}
+              {new Date(config.live.publishedAt).toLocaleString(undefined, {
+                dateStyle: "medium",
+                timeStyle: "short",
+              })}
             </p>
           </>
         ) : (
@@ -149,16 +166,20 @@ export function DraftStatus({
       </div>
 
       <div className="grid gap-1">
-        <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+        <h2 className="text-muted-foreground text-2xs font-semibold tracking-[0.12em] uppercase">
           Draft
         </h2>
         {/* One line, never absent -- so the card keeps one height and the
             buttons below it do not move as you type. It reports what the
             draft CONTAINS, not whether one exists: those differ the moment
             every change in it is undone. */}
+        {/* Unsaved is ink, not alarm red. It is the normal state of the page
+            for as long as anyone is working, and red that is always on reads
+            as noise -- so by the time "cannot be published" turned red, it
+            looked like the line that had been red all along. */}
         <p className="text-sm">
           {dirty ? (
-            <span className="text-destructive">Unsaved edits, not yet checked</span>
+            <span className="font-medium">Unsaved edits, not yet checked</span>
           ) : blocked ? (
             <span className="text-destructive">Saved, cannot be published</span>
           ) : savedChanges > 0 ? (
@@ -171,12 +192,22 @@ export function DraftStatus({
             <span className="text-muted-foreground">Nothing to publish</span>
           )}
         </p>
+        {lastSavedAt ? (
+          <p className="text-muted-foreground text-xs">
+            Last saved{" "}
+            {new Date(lastSavedAt).toLocaleTimeString(undefined, { timeStyle: "short" })}
+          </p>
+        ) : null}
+        {notice ? <p className="text-xs font-medium">{notice}</p> : null}
       </div>
 
       <div className="grid gap-1.5">
         <Button size="sm" onClick={onSave} disabled={!dirty || saving} className="justify-start">
-          {saving ? <Loading>Saving…</Loading> : <Save aria-hidden />}
-          Save draft
+          {/* A bare spinner and a changed label, not `Loading`: that is a
+              muted paragraph with its own live region, so inside an ink button
+              it read "Saving… Save draft" twice over in low-contrast grey. */}
+          {saving ? <Spinner /> : <Save aria-hidden />}
+          {saving ? "Saving…" : "Save draft"}
         </Button>
         <Button
           size="sm"

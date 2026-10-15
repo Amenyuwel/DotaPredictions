@@ -6,6 +6,7 @@ import { ConfirmDialog, type ConfirmRequest } from "@/components/admin/confirm-d
 import { EditDialog, EditField } from "@/components/admin/edit-dialog"
 import { UndoDialog, type ChangeRow } from "@/components/admin/undo-dialog"
 import {
+  EditedMark,
   FilterField,
   LabelledField,
   NumberCell,
@@ -35,7 +36,7 @@ import {
 } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useMediaQuery } from "@/hooks/use-media-query"
-import { validateKey } from "@/lib/admin-ui"
+import { mergeEntry, validateKey, without } from "@/lib/admin-ui"
 import { tierLabel, traitLabel } from "@/lib/emblem-catalog"
 import { capitalize, ROLE_LABEL, statLabel } from "@/lib/labels"
 import type { FantasyRole } from "@/types/run"
@@ -104,15 +105,6 @@ const pct = (value: number | undefined) =>
   value === undefined ? undefined : `${Math.round(value * 1000) / 10}%`
 
 /**
- * Drop a key, and the map with it once empty.
- *
- * Dropping rather than writing the published value back. An overlay entry that
- * agrees with the run is not nothing -- it is a standing instruction to hold
- * that value if the run ever changes, which is the silent revert this design
- * exists to prevent. An empty map left behind is the same problem smaller: it
- * still counts as a change and still publishes.
- */
-/**
  * The fields an override actually moves, paired with what the run says.
  *
  * Built from the OVERLAY entry rather than by diffing two whole rows: the entry
@@ -177,33 +169,6 @@ function traitChangeRows(
  * contract does not admit. */
 type TraitRule = NonNullable<TraitPatch["conditionRule"]>
 
-/**
- * Put an entry's changed fields into a patch map, or drop the entry entirely
- * when nothing differs from the published run.
- *
- * An edit dialog hands back a whole row, so the diff happens on save. Writing
- * every field would leave entries that AGREE with the run -- standing
- * instructions to hold a value if it ever changes, which is the silent revert
- * this design exists to avoid. `isKnown` is false for a row the run does not
- * carry, where the entry is kept whole because there is nothing to merge onto.
- */
-function mergeEntry<T extends object>(
-  map: Record<string, T> | undefined,
-  key: string,
-  changes: T,
-  isKnown: boolean,
-): Record<string, T> | undefined {
-  if (isKnown && Object.keys(changes).length === 0) return without(map, key)
-  return { ...(map ?? {}), [key]: changes }
-}
-
-function without<T extends object>(map: T | undefined, key: string): T | undefined {
-  if (!map || !(key in map)) return map
-  const next = { ...map } as Record<string, unknown>
-  delete next[key]
-  return (Object.keys(next).length > 0 ? next : undefined) as T | undefined
-}
-
 export function ScoringEditor({
   config,
   doc,
@@ -242,6 +207,16 @@ export function ScoringEditor({
   const wide = useMediaQuery("(min-width: 48rem)")
   const [open, setOpen] = useState(false)
 
+  // Which tables the draft touches, so a reader can find an edit made three
+  // tabs ago without opening each one. Read off the document, not the server's
+  // preview: an unsaved edit is exactly the one most worth finding.
+  const edited: Record<(typeof PANES)[number]["value"], boolean> = {
+    stats: Boolean(patch.stats || patch.statsRemoved?.length),
+    traits: Boolean(patch.traits || patch.traitsRemoved?.length),
+    quality: Boolean(patch.quality || patch.qualityRemoved?.length),
+    colours: Boolean(patch.colors || patch.bannerColors),
+  }
+
   const table = (value: string) =>
     value === "stats" ? (
       <StatsCard {...shared} />
@@ -272,7 +247,10 @@ export function ScoringEditor({
                 setOpen(true)
               }}
             >
-              {entry.label}
+              <span className="flex items-center gap-1.5">
+                {entry.label}
+                {edited[entry.value] ? <EditedMark /> : null}
+              </span>
               <ChevronRight aria-hidden />
             </Button>
           ))}
@@ -318,6 +296,7 @@ export function ScoringEditor({
         {PANES.map((entry) => (
           <TabsTrigger key={entry.value} value={entry.value} className="flex-1">
             {entry.label}
+            {edited[entry.value] ? <EditedMark /> : null}
           </TabsTrigger>
         ))}
       </TabsList>
@@ -376,8 +355,14 @@ function StatsCard({ scoring, published, patch, setScoring }: SectionProps) {
     () => scoring.colors.map((c) => ({ value: c, label: capitalize(c) })),
     [scoring.colors],
   )
-  const all = Object.keys(scoring.stats).sort()
-  const keys = all.filter((key) => key.includes(filter.trim().toLowerCase()))
+  // Sorted and matched by the words on screen, with the key as a fallback.
+  // Matching the key alone meant "hero damage" -- what the row says -- found
+  // nothing, because the key spells it with an underscore.
+  const all = Object.keys(scoring.stats).sort((a, b) => statLabel(a).localeCompare(statLabel(b)))
+  const needle = filter.trim().toLowerCase()
+  const keys = all.filter(
+    (key) => key.includes(needle) || statLabel(key).toLowerCase().includes(needle),
+  )
 
   return (
     <Card>
@@ -390,22 +375,24 @@ function StatsCard({ scoring, published, patch, setScoring }: SectionProps) {
           </Button>
         </div>
         <p className="text-muted-foreground max-w-prose text-xs">
-          What each stat pays, and which emblem colour carries it. A player scores only the
-          stats on their banner, so these values are the whole ranking. Which measured
-          column feeds a stat is not set here — that is <code>STAT_SOURCE</code> in the
-          engine, and it changes when the crawler learns to read a new field. A stat this
-          run could not measure is marked, and stays excluded from emblem choice.
+          What each stat pays, and which emblem colour carries it. These values are the
+          whole ranking. Which measured column feeds a stat is set in the engine
+          (<code>STAT_SOURCE</code>), not here.
         </p>
         <FilterField
           value={filter}
           onChange={setFilter}
           label="Filter stats"
-          summary={keys.length === all.length ? `${all.length}` : `${keys.length} of ${all.length}`}
+          summary={
+            keys.length === all.length
+              ? `${all.length} stats`
+              : `${keys.length} of ${all.length} stats`
+          }
         />
       </CardHeader>
 
       <CardContent className="grid gap-3 px-0">
-        <Table>
+        <Table aria-label="Stats">
           <TableHeader>
             <TableRow>
               <TableHead className="pl-6">Stat</TableHead>
@@ -447,7 +434,7 @@ function StatsCard({ scoring, published, patch, setScoring }: SectionProps) {
 
             {keys.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-muted-foreground py-6 text-center">
+                <TableCell colSpan={5} className="text-muted-foreground py-6 text-center">
                   No stat matches “{filter}”.
                 </TableCell>
               </TableRow>
@@ -683,14 +670,18 @@ function TraitsCard({ scoring, published, patch, setScoring }: SectionProps) {
       </CardHeader>
 
       <CardContent className="grid gap-3 px-0">
-        <Table>
+        {/* Six columns. A seventh, "What that means", restated the rule in a
+            sentence on every row -- the rule's name, its explanation and the
+            reader-facing condition said one fact three times per row. The
+            explanation is the hint under the Rule field in the edit dialog,
+            where it is read at the moment the rule is chosen. */}
+        <Table aria-label="Emblem traits">
           <TableHeader>
             <TableRow>
               <TableHead className="pl-6">Trait</TableHead>
               <TableHead>Own bonus</TableHead>
               <TableHead>Each neighbour</TableHead>
               <TableHead>Rule</TableHead>
-              <TableHead>What that means</TableHead>
               <TableHead>Condition, in words</TableHead>
               <TableHead className="w-0 pr-6 text-right">
                 <span className="sr-only">Actions</span>
@@ -916,10 +907,6 @@ function TraitRow({
         />
       </TableCell>
 
-      <TableCell className="text-muted-foreground max-w-56 text-2xs whitespace-normal">
-        {RULE_DETAIL[shown.conditionRule ?? ""] ?? "No rule named — scored as paying nothing."}
-      </TableCell>
-
       <TableCell className="text-muted-foreground max-w-64 text-xs whitespace-normal">
         {shown.condition || "—"}
       </TableCell>
@@ -977,7 +964,7 @@ function QualityCard({ scoring, published, patch, setScoring }: SectionProps) {
             return (
               <div
                 key={tier}
-                className={`grid w-32 gap-1 rounded-lg border p-2 ${changed ? "border-primary/40 bg-primary/5" : ""}`}
+                className={`grid min-w-32 gap-1 rounded-lg border p-2 ${changed ? "border-primary/40 bg-primary/5" : ""}`}
               >
                 <div className="flex items-center justify-between gap-1">
                   <span className="text-xs font-medium">{tierLabel(tier)}</span>
@@ -1004,7 +991,7 @@ function QualityCard({ scoring, published, patch, setScoring }: SectionProps) {
                   />
                 </div>
                 <p className={changed ? "text-sm font-medium" : "text-sm"}>{pct(bonus)}</p>
-                <p className="text-muted-foreground min-h-4 text-2xs">
+                <p className="text-muted-foreground min-h-4 text-xs">
                   {changed ? `was ${pct(published.quality[tier]) ?? "absent"}` : null}
                 </p>
               </div>

@@ -35,3 +35,50 @@ export const validateKey = (value: string): string | null =>
 
 export const validateId = (value: string): string | null =>
   /^[1-9][0-9]{0,18}$/.test(value) ? null : "Enter the numeric id, digits only."
+
+/**
+ * Drop a key, and the map with it once empty.
+ *
+ * Dropping rather than writing the published value back. An overlay entry that
+ * agrees with the run is not nothing -- it is a standing instruction to hold
+ * that value if the run ever changes, which is the silent revert this design
+ * exists to prevent. An empty map left behind is the same problem smaller: it
+ * still counts as a change and still publishes.
+ */
+export function without<T extends object>(map: T | undefined, key: string): T | undefined {
+  if (!map || !(key in map)) return map
+  const next = { ...map } as Record<string, unknown>
+  delete next[key]
+  return (Object.keys(next).length > 0 ? next : undefined) as T | undefined
+}
+
+/**
+ * Put an entry's changed fields into a patch map, or drop the entry entirely
+ * when nothing differs from the published run.
+ *
+ * An edit dialog hands back a whole row, so the diff happens on save. Writing
+ * every field would leave entries that AGREE with the run. `isKnown` is false
+ * for a row the run does not carry, where the entry is kept whole because there
+ * is nothing to merge onto. Shared by both editors, because the roster's copy of
+ * this rule was the one that drifted: it spread the old entry over the new
+ * changes, so a field set back to its published value could never be cleared.
+ */
+export function mergeEntry<T extends object>(
+  map: Record<string, T> | undefined,
+  key: string,
+  changes: T,
+  isKnown: boolean,
+): Record<string, T> | undefined {
+  if (isKnown && Object.keys(changes).length === 0) return without(map, key)
+  return { ...(map ?? {}), [key]: changes }
+}
+
+/** The server rejects an overlay for EVERY reason at once, precisely so all of
+ * them can be shown. Fixing them one round trip at a time is how a five-minute
+ * correction becomes an afternoon. Shared, because the page and the publish
+ * dialog both render a failure and must list the same reasons. */
+export function reasonsOf(error: unknown): string[] {
+  return error && typeof error === "object" && "reasons" in error
+    ? ((error as { reasons?: string[] }).reasons ?? [])
+    : []
+}

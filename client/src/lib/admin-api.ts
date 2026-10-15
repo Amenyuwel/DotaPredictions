@@ -27,12 +27,36 @@ import type {
  * correction becomes an afternoon. */
 export class AdminError extends ApiError {
   readonly reasons: string[]
+  /** The request line and status, e.g. `PUT /api/admin/config/draft -> 409`.
+   * Kept for whoever has to look at the server log, and kept OUT of the
+   * message: as a headline it told the reader which endpoint refused, not why. */
+  readonly request: string | null
 
-  constructor(message: string, status: number, code: string | null, reason: string | null, reasons: string[]) {
+  constructor(
+    message: string,
+    status: number,
+    code: string | null,
+    reason: string | null,
+    reasons: string[],
+    request: string | null = null,
+  ) {
     super(message, status, code, reason)
     this.name = "AdminError"
     this.reasons = reasons
+    this.request = request
   }
+}
+
+/** A sentence for a refusal the server did not explain. The server's own
+ * `reason` always wins over this; these cover the codes that arrive without
+ * one, and a proxy, crash or expired session where the body carries nothing. */
+function statusSentence(status: number, code: string | null): string {
+  if (code === "overlay_rejected") return "The server rejected this draft."
+  if (code === "no_such_run") return "That run is no longer published. Reload to pick another."
+  if (status === 401) return "Your sign-in has expired. Reload the page and sign in again."
+  if (status === 403) return "This account is not allowed to change the configuration."
+  if (status >= 500) return "The server failed while handling this. Nothing was changed; try again."
+  return `The server refused this (status ${status}).`
 }
 
 /**
@@ -87,7 +111,14 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     } catch {
       // no JSON body; the status is the whole message
     }
-    throw new AdminError(`${init?.method ?? "GET"} ${path} -> ${res.status}`, res.status, code, reason, reasons)
+    throw new AdminError(
+      reason ?? statusSentence(res.status, code),
+      res.status,
+      code,
+      reason,
+      reasons,
+      `${init?.method ?? "GET"} ${path} -> ${res.status}`,
+    )
   }
 
   // 204-shaped answers do not occur here, but an empty body from a proxy would
@@ -162,7 +193,14 @@ export async function exportYaml(tournamentId: string, stage: string): Promise<s
     headers: { authorization: `Bearer ${token}` },
   })
   if (!res.ok) {
-    throw new AdminError(`GET export -> ${res.status}`, res.status, null, null, [])
+    throw new AdminError(
+      statusSentence(res.status, null),
+      res.status,
+      null,
+      null,
+      [],
+      `GET /api/admin/config/export -> ${res.status}`,
+    )
   }
   return res.text()
 }
