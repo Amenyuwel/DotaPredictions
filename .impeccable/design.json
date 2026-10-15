@@ -1,0 +1,538 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-15T00:42:13Z",
+  "title": "Design System: DotaPredictions",
+  "extensions": {
+    "colorMeta": {
+      "page": {
+        "role": "neutral",
+        "displayName": "Paper",
+        "canonical": "oklch(1 0 0)",
+        "tonalRamp": [
+          "oklch(0.15 0 0)",
+          "oklch(0.27 0 0)",
+          "oklch(0.40 0 0)",
+          "oklch(0.56 0 0)",
+          "oklch(0.71 0 0)",
+          "oklch(0.87 0 0)",
+          "oklch(0.97 0 0)",
+          "oklch(1 0 0)"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Body Ink",
+        "canonical": "oklch(0.145 0 0)",
+        "tonalRamp": [
+          "oklch(0.15 0 0)",
+          "oklch(0.27 0 0)",
+          "oklch(0.40 0 0)",
+          "oklch(0.56 0 0)",
+          "oklch(0.71 0 0)",
+          "oklch(0.87 0 0)",
+          "oklch(0.97 0 0)",
+          "oklch(1 0 0)"
+        ]
+      },
+      "ink-strong": {
+        "role": "primary",
+        "displayName": "Ledger Ink",
+        "canonical": "oklch(0.205 0 0)",
+        "tonalRamp": [
+          "oklch(0.15 0 0)",
+          "oklch(0.27 0 0)",
+          "oklch(0.40 0 0)",
+          "oklch(0.56 0 0)",
+          "oklch(0.71 0 0)",
+          "oklch(0.87 0 0)",
+          "oklch(0.97 0 0)",
+          "oklch(1 0 0)"
+        ]
+      },
+      "ink-muted": {
+        "role": "neutral",
+        "displayName": "Pencil",
+        "canonical": "oklch(0.556 0 0)",
+        "tonalRamp": [
+          "oklch(0.15 0 0)",
+          "oklch(0.27 0 0)",
+          "oklch(0.40 0 0)",
+          "oklch(0.56 0 0)",
+          "oklch(0.71 0 0)",
+          "oklch(0.87 0 0)",
+          "oklch(0.97 0 0)",
+          "oklch(1 0 0)"
+        ]
+      },
+      "wash": {
+        "role": "neutral",
+        "displayName": "Wash",
+        "canonical": "oklch(0.97 0 0)",
+        "tonalRamp": [
+          "oklch(0.15 0 0)",
+          "oklch(0.27 0 0)",
+          "oklch(0.40 0 0)",
+          "oklch(0.56 0 0)",
+          "oklch(0.71 0 0)",
+          "oklch(0.87 0 0)",
+          "oklch(0.97 0 0)",
+          "oklch(1 0 0)"
+        ]
+      },
+      "hairline": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "oklch(0.922 0 0)",
+        "tonalRamp": [
+          "oklch(0.15 0 0)",
+          "oklch(0.27 0 0)",
+          "oklch(0.40 0 0)",
+          "oklch(0.56 0 0)",
+          "oklch(0.71 0 0)",
+          "oklch(0.87 0 0)",
+          "oklch(0.97 0 0)",
+          "oklch(1 0 0)"
+        ]
+      },
+      "focus": {
+        "role": "neutral",
+        "displayName": "Focus Grey",
+        "canonical": "oklch(0.708 0 0)",
+        "tonalRamp": [
+          "oklch(0.15 0 0)",
+          "oklch(0.27 0 0)",
+          "oklch(0.40 0 0)",
+          "oklch(0.56 0 0)",
+          "oklch(0.71 0 0)",
+          "oklch(0.87 0 0)",
+          "oklch(0.97 0 0)",
+          "oklch(1 0 0)"
+        ]
+      },
+      "alarm": {
+        "role": "error",
+        "displayName": "Alarm Red",
+        "canonical": "oklch(0.577 0.245 27.325)",
+        "tonalRamp": [
+          "oklch(0.15 0 0)",
+          "oklch(0.27 0 0)",
+          "oklch(0.40 0 0)",
+          "oklch(0.56 0 0)",
+          "oklch(0.71 0 0)",
+          "oklch(0.87 0 0)",
+          "oklch(0.97 0 0)",
+          "oklch(1 0 0)"
+        ]
+      },
+      "page-dark": {
+        "role": "neutral",
+        "displayName": "Night",
+        "canonical": "oklch(0.145 0 0)",
+        "tonalRamp": [
+          "oklch(0.15 0 0)",
+          "oklch(0.27 0 0)",
+          "oklch(0.40 0 0)",
+          "oklch(0.56 0 0)",
+          "oklch(0.71 0 0)",
+          "oklch(0.87 0 0)",
+          "oklch(0.97 0 0)",
+          "oklch(1 0 0)"
+        ]
+      },
+      "card-dark": {
+        "role": "neutral",
+        "displayName": "Night Card",
+        "canonical": "oklch(0.205 0 0)",
+        "tonalRamp": [
+          "oklch(0.15 0 0)",
+          "oklch(0.27 0 0)",
+          "oklch(0.40 0 0)",
+          "oklch(0.56 0 0)",
+          "oklch(0.71 0 0)",
+          "oklch(0.87 0 0)",
+          "oklch(0.97 0 0)",
+          "oklch(1 0 0)"
+        ]
+      },
+      "ink-dark": {
+        "role": "neutral",
+        "displayName": "Night Ink",
+        "canonical": "oklch(0.985 0 0)",
+        "tonalRamp": [
+          "oklch(0.15 0 0)",
+          "oklch(0.27 0 0)",
+          "oklch(0.40 0 0)",
+          "oklch(0.56 0 0)",
+          "oklch(0.71 0 0)",
+          "oklch(0.87 0 0)",
+          "oklch(0.97 0 0)",
+          "oklch(1 0 0)"
+        ]
+      },
+      "ink-muted-dark": {
+        "role": "neutral",
+        "displayName": "Night Pencil",
+        "canonical": "oklch(0.708 0 0)",
+        "tonalRamp": [
+          "oklch(0.15 0 0)",
+          "oklch(0.27 0 0)",
+          "oklch(0.40 0 0)",
+          "oklch(0.56 0 0)",
+          "oklch(0.71 0 0)",
+          "oklch(0.87 0 0)",
+          "oklch(0.97 0 0)",
+          "oklch(1 0 0)"
+        ]
+      },
+      "answer-gold": {
+        "role": "secondary",
+        "displayName": "Compendium Gold",
+        "canonical": "oklch(0.955 0.045 88)",
+        "tonalRamp": [
+          "oklch(0.24 0.04 70)",
+          "oklch(0.29 0.05 75)",
+          "oklch(0.35 0.06 75)",
+          "oklch(0.46 0.07 70)",
+          "oklch(0.62 0.12 75)",
+          "oklch(0.8 0.13 85)",
+          "oklch(0.915 0.06 86)",
+          "oklch(0.955 0.045 88)"
+        ]
+      },
+      "answer-gold-ink": {
+        "role": "secondary",
+        "displayName": "Gold Ink",
+        "canonical": "oklch(0.24 0.04 70)",
+        "tonalRamp": [
+          "oklch(0.24 0.04 70)",
+          "oklch(0.29 0.05 75)",
+          "oklch(0.35 0.06 75)",
+          "oklch(0.46 0.07 70)",
+          "oklch(0.62 0.12 75)",
+          "oklch(0.8 0.13 85)",
+          "oklch(0.915 0.06 86)",
+          "oklch(0.955 0.045 88)"
+        ]
+      },
+      "answer-gold-edge": {
+        "role": "secondary",
+        "displayName": "Gold Edge",
+        "canonical": "oklch(0.62 0.12 75)",
+        "tonalRamp": [
+          "oklch(0.24 0.04 70)",
+          "oklch(0.29 0.05 75)",
+          "oklch(0.35 0.06 75)",
+          "oklch(0.46 0.07 70)",
+          "oklch(0.62 0.12 75)",
+          "oklch(0.8 0.13 85)",
+          "oklch(0.915 0.06 86)",
+          "oklch(0.955 0.045 88)"
+        ]
+      },
+      "answer-gold-dark": {
+        "role": "secondary",
+        "displayName": "Night Gold",
+        "canonical": "oklch(0.29 0.05 75)",
+        "tonalRamp": [
+          "oklch(0.24 0.04 70)",
+          "oklch(0.29 0.05 75)",
+          "oklch(0.35 0.06 75)",
+          "oklch(0.46 0.07 70)",
+          "oklch(0.62 0.12 75)",
+          "oklch(0.8 0.13 85)",
+          "oklch(0.915 0.06 86)",
+          "oklch(0.955 0.045 88)"
+        ]
+      },
+      "answer-gold-ink-dark": {
+        "role": "secondary",
+        "displayName": "Night Gold Ink",
+        "canonical": "oklch(0.97 0.025 90)",
+        "tonalRamp": [
+          "oklch(0.24 0.04 70)",
+          "oklch(0.29 0.05 75)",
+          "oklch(0.35 0.06 75)",
+          "oklch(0.46 0.07 70)",
+          "oklch(0.62 0.12 75)",
+          "oklch(0.8 0.13 85)",
+          "oklch(0.915 0.06 86)",
+          "oklch(0.955 0.045 88)"
+        ]
+      },
+      "answer-gold-edge-dark": {
+        "role": "secondary",
+        "displayName": "Night Gold Edge",
+        "canonical": "oklch(0.8 0.13 85)",
+        "tonalRamp": [
+          "oklch(0.24 0.04 70)",
+          "oklch(0.29 0.05 75)",
+          "oklch(0.35 0.06 75)",
+          "oklch(0.46 0.07 70)",
+          "oklch(0.62 0.12 75)",
+          "oklch(0.8 0.13 85)",
+          "oklch(0.915 0.06 86)",
+          "oklch(0.955 0.045 88)"
+        ]
+      },
+      "emblem-red-hue": {
+        "role": "tertiary",
+        "displayName": "Red Weave",
+        "canonical": "oklch(0.68 0.11 21)",
+        "tonalRamp": [
+          "oklch(0.36 0.09 21)",
+          "oklch(0.48 0.1 21)",
+          "oklch(0.68 0.11 21)",
+          "oklch(0.74 0.127 21)",
+          "oklch(0.82 0.085 21)",
+          "oklch(0.84 0.075 21)",
+          "oklch(0.88 0.056 21)",
+          "oklch(0.94 0.027 21)"
+        ]
+      },
+      "emblem-blue-hue": {
+        "role": "tertiary",
+        "displayName": "Blue Weave",
+        "canonical": "oklch(0.68 0.11 274)",
+        "tonalRamp": [
+          "oklch(0.36 0.09 274)",
+          "oklch(0.48 0.1 274)",
+          "oklch(0.68 0.11 274)",
+          "oklch(0.74 0.127 274)",
+          "oklch(0.82 0.085 274)",
+          "oklch(0.84 0.075 274)",
+          "oklch(0.88 0.056 274)",
+          "oklch(0.94 0.027 274)"
+        ]
+      },
+      "emblem-green-hue": {
+        "role": "tertiary",
+        "displayName": "Green Weave",
+        "canonical": "oklch(0.68 0.11 145)",
+        "tonalRamp": [
+          "oklch(0.36 0.09 145)",
+          "oklch(0.48 0.1 145)",
+          "oklch(0.68 0.11 145)",
+          "oklch(0.74 0.127 145)",
+          "oklch(0.82 0.085 145)",
+          "oklch(0.84 0.075 145)",
+          "oklch(0.88 0.056 145)",
+          "oklch(0.94 0.027 145)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Card and dialog titles. Never player or team names."
+      },
+      "figure": {
+        "displayName": "Figure",
+        "purpose": "Projected scores; always followed by the interval caption."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Sentences and control labels."
+      },
+      "caption": {
+        "displayName": "Caption",
+        "purpose": "Intervals, run date, helper lines."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Uppercase legends, team names, emblem traits."
+      },
+      "brand": {
+        "displayName": "Brand",
+        "purpose": "Page name in the header, Space Grotesk 600 at 1.25rem."
+      }
+    },
+    "shadows": [
+      {
+        "name": "selected",
+        "value": "0 1px 2px 0 rgb(0 0 0 / 0.05)",
+        "purpose": "A selected choice chip (shadow-xs)."
+      },
+      {
+        "name": "active-tab",
+        "value": "0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)",
+        "purpose": "The active segment of the tab control."
+      },
+      {
+        "name": "floating",
+        "value": "0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)",
+        "purpose": "Dialogs, popovers, menus."
+      }
+    ],
+    "motion": [
+      {
+        "name": "press",
+        "value": "translateY(1px) on :active",
+        "purpose": "Tactile press on buttons."
+      },
+      {
+        "name": "reduced",
+        "value": "0.01ms durations under prefers-reduced-motion",
+        "purpose": "All motion is confirmation and can be removed."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "sm",
+        "value": "640px",
+        "purpose": "Page gutters grow from 16px to 24px."
+      },
+      {
+        "name": "md",
+        "value": "768px",
+        "purpose": "Configuration editor: the rail sits beside the editor; below it the rail stacks and scoring tables open in a dialog."
+      },
+      {
+        "name": "lg",
+        "value": "1024px",
+        "purpose": "Answer column appears; below it the answer lives in a dialog. Roster editor's list and detail pane sit side by side."
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one committing action in a dialog or bar.",
+      "html": "<button class=\"ds-btn-primary\">See the answer</button>",
+      "css": ".ds-btn-primary { background: oklch(0.205 0 0); color: oklch(0.985 0 0); height: 32px; padding: 0 10px; border: 1px solid transparent; border-radius: 10px; font: 500 14px/1 'Inter Variable', system-ui, sans-serif; cursor: pointer; transition: background .15s, transform .1s; } .ds-btn-primary:hover { background: oklch(0.205 0 0 / 0.8); } .ds-btn-primary:active { transform: translateY(1px); } .ds-btn-primary:focus-visible { outline: none; box-shadow: 0 0 0 3px oklch(0.708 0 0 / 0.5); }"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "Secondary actions and header controls.",
+      "html": "<button class=\"ds-btn-outline\">Sign in</button>",
+      "css": ".ds-btn-outline { background: oklch(1 0 0); color: oklch(0.145 0 0); height: 32px; padding: 0 10px; border: 1px solid oklch(0.922 0 0); border-radius: 10px; font: 500 14px/1 'Inter Variable', system-ui, sans-serif; cursor: pointer; transition: background .15s, transform .1s; } .ds-btn-outline:hover { background: oklch(0.97 0 0); } .ds-btn-outline:active { transform: translateY(1px); } .ds-btn-outline:focus-visible { outline: none; box-shadow: 0 0 0 3px oklch(0.708 0 0 / 0.5); }"
+    },
+    {
+      "name": "Choice Chip",
+      "kind": "chip",
+      "refersTo": "choice",
+      "description": "Tactile radio option: stat, quality, trait.",
+      "html": "<label class=\"ds-choice\"><input type=\"radio\" name=\"q\"> Gold Per Min</label><label class=\"ds-choice ds-choice-on\"><input type=\"radio\" name=\"q\" checked> Kills</label>",
+      "css": ".ds-choice { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 8px 12px; border: 1px solid oklch(0.922 0 0); border-radius: 14px; background: linear-gradient(to bottom, transparent, oklch(0.145 0 0 / 0.02)); font: 400 14px 'Inter Variable', system-ui, sans-serif; cursor: pointer; margin: 4px; } .ds-choice input { position: absolute; opacity: 0; } .ds-choice:hover { background: oklch(0.97 0 0); } .ds-choice-on { border-color: oklch(0.708 0 0); background: oklch(0.97 0 0); font-weight: 500; box-shadow: 0 1px 2px rgb(0 0 0 / .05); }"
+    },
+    {
+      "name": "Emblem Colour Chip",
+      "kind": "chip",
+      "description": "The client's red checker weave, revealed on selection.",
+      "html": "<span class=\"ds-emblem\">RED</span>",
+      "css": ".ds-emblem { display: inline-grid; place-items: center; width: 150px; height: 40px; border-radius: 14px; border: 2px solid oklch(0.68 0.11 21); background: repeating-conic-gradient(oklch(0.84 0.075 21) 0% 25%, transparent 0% 50%) 0 0 / 24px 24px, oklch(0.91 0.041 21); color: oklch(0.36 0.09 21); font: 600 11px 'Inter Variable', system-ui, sans-serif; letter-spacing: .12em; }",
+      "refersTo": "choice-selected"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Flat container separated by a 10% ring.",
+      "html": "<div class=\"ds-card\"><div class=\"ds-card-title\">Core <span>· Carry &amp; Offlane</span></div></div>",
+      "css": ".ds-card { background: oklch(1 0 0); border-radius: 14px; box-shadow: 0 0 0 1px oklch(0.145 0 0 / .1); padding: 16px; width: 320px; } .ds-card-title { font: 500 14px 'Space Grotesk Variable', system-ui, sans-serif; color: oklch(0.145 0 0); } .ds-card-title span { color: oklch(0.556 0 0); font-weight: 400; }"
+    },
+    {
+      "name": "Answer Card",
+      "kind": "custom",
+      "description": "A projection: figure first, interval directly beneath.",
+      "html": "<div class=\"ds-answer\"><div class=\"ds-a-slot\">Core</div><div class=\"ds-a-unit\">Collapse &amp; Yatoro</div><div class=\"ds-a-fig\">30,676</div><div class=\"ds-a-int\">29,886–31,625 · 90% range</div></div>",
+      "css": ".ds-answer { width: 220px; padding: 16px; border-radius: 14px; background: oklch(0.955 0.045 88); color: oklch(0.24 0.04 70); font-family: 'Inter Variable', system-ui, sans-serif; } .ds-a-slot { font: 500 14px 'Space Grotesk Variable', system-ui, sans-serif; } .ds-a-unit { font-size: 12px; color: oklch(0.46 0.07 70); } .ds-a-fig { font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.25; margin-top: 2px; } .ds-a-int { font-size: 12px; color: oklch(0.46 0.07 70); font-variant-numeric: tabular-nums; }",
+      "refersTo": "card"
+    },
+    {
+      "name": "Tabs",
+      "kind": "nav",
+      "refersTo": "tabs",
+      "description": "Segmented control on a wash track.",
+      "html": "<div class=\"ds-tabs\"><button class=\"ds-tab ds-tab-on\">I have a banner</button><button class=\"ds-tab\">My roster</button></div>",
+      "css": ".ds-tabs { display: flex; width: 360px; padding: 3px; background: oklch(0.97 0 0); border-radius: 10px; } .ds-tab { flex: 1; height: 28px; border: 0; background: transparent; border-radius: 8px; font: 500 14px 'Inter Variable', system-ui, sans-serif; color: oklch(0.145 0 0 / .6); cursor: pointer; } .ds-tab:hover { color: oklch(0.145 0 0); } .ds-tab-on { background: oklch(1 0 0); color: oklch(0.145 0 0); box-shadow: 0 1px 3px rgb(0 0 0 / .1); }"
+    },
+    {
+      "name": "Ranked Ledger",
+      "kind": "custom",
+      "refersTo": "card",
+      "description": "Gold lead card in two mirrored halves (name over team, figure over interval), then one ruled list of the rest with rank, name over team and a right-aligned score over its range.",
+      "html": "<div class=\"ds-ledger\"><div class=\"ds-ledger-lead\"><div><p class=\"ds-ledger-name\">Yatoro &amp; Larl</p><p class=\"ds-ledger-team\">TEAM SPIRIT</p></div><div class=\"ds-ledger-right\"><p class=\"ds-ledger-figure\">30,712</p><p class=\"ds-ledger-int\">29,886–31,625 · 90% range</p></div></div><ol class=\"ds-ledger-list\"><li><span class=\"ds-ledger-rank\">2</span><div><p class=\"ds-ledger-row-name\">Ame &amp; Xm</p><p class=\"ds-ledger-team\">XTREME GAMING</p></div><div class=\"ds-ledger-right\"><p class=\"ds-ledger-score\">29,940</p><p class=\"ds-ledger-int\">28,910–30,980</p></div></li><li><span class=\"ds-ledger-rank\">3</span><div><p class=\"ds-ledger-row-name\">skiter &amp; Ceb</p><p class=\"ds-ledger-team\">TUNDRA</p></div><div class=\"ds-ledger-right\"><p class=\"ds-ledger-score\">28,415</p><p class=\"ds-ledger-int\">27,300–29,600</p></div></li></ol></div>",
+      "css": ".ds-ledger { display: grid; gap: 12px; max-width: 420px; font: 400 14px/1.43 'Inter Variable', 'Inter', system-ui, sans-serif; color: oklch(0.145 0 0); } .ds-ledger p { margin: 0; } .ds-ledger-lead { display: flex; justify-content: space-between; align-items: end; gap: 16px; padding: 16px; border-radius: 14px; background: linear-gradient(to bottom, oklch(1 0 0 / 0.06), transparent), oklch(0.955 0.045 88); color: oklch(0.24 0.04 70); } .ds-ledger-name { font-weight: 600; font-size: 16px; } .ds-ledger-team { font-size: 11.2px; font-weight: 600; letter-spacing: 0.12em; color: oklch(0.556 0 0); } .ds-ledger-lead .ds-ledger-team, .ds-ledger-lead .ds-ledger-int { color: oklch(0.46 0.07 70); } .ds-ledger-right { text-align: right; font-variant-numeric: tabular-nums; } .ds-ledger-figure { font-size: 36px; font-weight: 600; line-height: 1; letter-spacing: -0.025em; } .ds-ledger-int { font-size: 12px; line-height: 1.33; color: oklch(0.556 0 0); } .ds-ledger-list { list-style: none; margin: 0; padding: 0 16px; border-radius: 14px; box-shadow: 0 0 0 1px oklch(0.145 0 0 / 0.1); } .ds-ledger-list li { display: grid; grid-template-columns: 20px 1fr auto; align-items: center; gap: 12px; padding: 10px 0; } .ds-ledger-list li + li { border-top: 1px solid oklch(0.922 0 0); } .ds-ledger-rank { color: oklch(0.556 0 0); font-variant-numeric: tabular-nums; font-size: 12px; } .ds-ledger-row-name { font-weight: 500; } .ds-ledger-score { font-weight: 600; }"
+    },
+    {
+      "name": "Banner Strip",
+      "kind": "custom",
+      "description": "A built banner as 24px weave swatches in banner order; an empty slot is dashed. The colour word is printed elsewhere: the weave confirms, it never carries the meaning alone.",
+      "html": "<div class=\"ds-strip\" role=\"img\" aria-label=\"Banner: red, blue, green, empty, red\"><span class=\"ds-swatch ds-swatch-red\"></span><span class=\"ds-swatch ds-swatch-blue\"></span><span class=\"ds-swatch ds-swatch-green\"></span><span class=\"ds-swatch ds-swatch-empty\"></span><span class=\"ds-swatch ds-swatch-red\"></span></div>",
+      "css": ".ds-strip { display: inline-flex; gap: 4px; } .ds-swatch { width: 24px; height: 24px; border-radius: 6px; box-shadow: inset 0 0 0 1px oklch(0.145 0 0 / 0.1); } .ds-swatch-empty { box-shadow: none; border: 1px dashed oklch(0.708 0 0); box-sizing: border-box; } .ds-swatch-red { --pat: oklch(0.74 0.127 21); background-color: oklch(0.82 0.085 21); background-image: repeating-conic-gradient(var(--pat) 0% 25%, transparent 0% 50%); background-size: 24px 24px; } .ds-swatch-blue { --pat: oklch(0.74 0.127 274); background-color: oklch(0.82 0.085 274); background-image: repeating-linear-gradient(90deg, var(--pat) 0 11px, transparent 11px 22px); } .ds-swatch-green { --pat: oklch(0.74 0.127 145); background-color: oklch(0.82 0.085 145); background-image: repeating-linear-gradient(45deg, var(--pat) 0 7px, transparent 7px 20px), repeating-linear-gradient(-45deg, var(--pat) 0 7px, transparent 7px 20px); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Compendium Ledger",
+    "overview": "A ledger is where a careful person writes down what they hold and what it is worth. This tool is that ledger for the TI compendium: the reader brings the emblems they rolled and the players they are weighing, and the page writes back a figure with its margin of error beside it. The compendium's own world - its banners, the three emblem weaves, the stage - supplies the identity. The ledger supplies the discipline: neutral paper, exact figures, nothing printed that was not measured.\n\nThe surface is deliberately quiet so that two things can be loud: the projected figure, and the colour of an emblem. Everything else is greyscale shadcn chrome on Inter. Controls are tactile in the game's sense - chips and cards that read as items you pick up and place, with a clear press, a clear selected state and the emblem's weave arriving when you touch it.\n\nThe system is a refinement of what ships, not a new world. Keep the neutral shell, the two-family type pairing and the weave palette; improve hierarchy, first-visit clarity and the physical feel of selection.",
+    "keyCharacteristics": [
+      "Neutral, zero-chroma paper and ink; colour is reserved for emblems and alarms.",
+      "Figures first: large tabular numerals, interval directly under the figure.",
+      "Emblem colour is a woven pattern measured off the client, never a flat fill.",
+      "Tactile controls: a visible press, a visible selected state, weave on touch.",
+      "Light and dark are equals; each palette is tuned for its own page."
+    ],
+    "rules": [
+      {
+        "name": "The Four Inks Rule",
+        "body": "Hue appears only as an emblem colour, an alarm, or the answer's gold. A new accent, a coloured heading or another tinted card is a further meaning for colour, and a reader will look for what it means. Gold is never used on an input, a button or a heading: it marks the answer and nothing else.",
+        "section": "colors"
+      },
+      {
+        "name": "The One Recipe Rule",
+        "body": "Emblem colours differ by hue and weave only. Never tune one hue's lightness or chroma on its own; `client/scripts/check-tone.mjs` fails the build when gamut or AA contrast breaks.",
+        "section": "colors"
+      },
+      {
+        "name": "The Weave Is Not The Signal Rule",
+        "body": "The colour word (\"RED\") is always printed; the weave confirms it. Colour is never the only way to tell two emblems apart.",
+        "section": "colors"
+      },
+      {
+        "name": "The Names In Inter Rule",
+        "body": "Player and team names go in Inter, never Space Grotesk: it lacks Cyrillic and Greek, and a nickname would render in two fonts.",
+        "section": "typography"
+      },
+      {
+        "name": "The Tight Scale Rule",
+        "body": "Steps between type roles are about 1.125, as product UI wants, not the 1.25 a landing page would use. The detector's `flat-type-hierarchy` warning is a known, accepted exception here; hierarchy comes from weight, the Figure size and placement, not from bigger headings.",
+        "section": "typography"
+      },
+      {
+        "name": "The Interval Sits Under The Figure Rule",
+        "body": "A projection is set as figure, then caption interval directly below. Never split them across a column or a fold.",
+        "section": "typography"
+      },
+      {
+        "name": "The Gold Answer Rule",
+        "body": "The cards that ARE the answer (the lead unit on the banner tab, the roster total on the roster tab) are filled in compendium gold, with no outline. Everything else keeps the neutral 10% ring, including the three slot cards: they are the parts the total is made of, not the output. Gold is how a reader finds the result first; spend it on nothing else.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Lift Means Picked Rule",
+        "body": "A shadow on an in-page control means it is selected or pressed. Do not use shadow for decoration.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** set every projection as Figure with its interval caption directly beneath it.",
+      "**Do** keep colour to the three emblem weaves, Alarm Red and the answer gold.",
+      "**Do** give every selectable thing a visible press (1px) and a selected state beyond colour (border, fill, weight).",
+      "**Do** run `npm run check:tone` after touching any emblem token.",
+      "**Do** keep prose blocks at or under 75ch (about 30rem at 14px)."
+    ],
+    "donts": [
+      "**Don't** show a placeholder figure; use the skeleton panel.",
+      "**Don't** introduce another accent hue, gradient text, or tint any card that is not the answer.",
+      "**Don't** fill an emblem chip with a flat colour; it wears the weave.",
+      "**Don't** set player or team names in Space Grotesk.",
+      "**Don't** use shadows on resting in-page surfaces.",
+      "**Don't** explain a thing twice on one screen. Each sentence says one fact once; reasoning lives in the FAQ, not under the number.",
+      "**Don't** put a card around a line of three facts."
+    ]
+  }
+}
